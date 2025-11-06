@@ -6,9 +6,13 @@ import { Inspector } from "../components/Sidebar/Inspector";
 import { useAppStore } from "../state/useAppStore";
 
 export const App = (): JSX.Element => {
-  const addChainNode = useAppStore((state) => state.actions.addChainNode);
-  const deleteNode = useAppStore((state) => state.actions.deleteNode);
+  const addChild = useAppStore((state) => state.actions.addChild);
+  const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
+  const undo = useAppStore((state) => state.actions.undo);
+  const redo = useAppStore((state) => state.actions.redo);
   const selectionId = useAppStore((state) => state.selectionId);
+  const canUndo = useAppStore((state) => state.canUndo);
+  const canRedo = useAppStore((state) => state.canRedo);
 
   return (
     <ReactFlowProvider>
@@ -18,26 +22,22 @@ export const App = (): JSX.Element => {
             <Toolbar
               {...menu}
               onAddChainNode={() => {
-                if (selectionId) {
-                  addChainNode({ parentId: selectionId });
-                } else {
-                  addChainNode();
-                }
+                addChild(selectionId ?? undefined);
               }}
               onDeleteSelection={() => {
-                if (selectionId) {
-                  deleteNode(selectionId);
-                }
+                deleteSelection();
               }}
               canDelete={Boolean(selectionId)}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
             />
             <div className="flex flex-1 overflow-hidden">
               <div className="flex-1 bg-slate-100">
                 <Canvas />
               </div>
-              <div className="w-72 bg-white">
-                <Inspector />
-              </div>
+              <Inspector />
             </div>
           </div>
         )}

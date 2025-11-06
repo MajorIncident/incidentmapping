@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
@@ -18,7 +18,10 @@ const ChainNodeComponent = ({
   selected,
 }: NodeProps<ChainNodeData>): JSX.Element => {
   const renameNode = useAppStore((state) => state.actions.renameNode);
-  const [isEditing, setIsEditing] = useState(false);
+  const startEditing = useAppStore((state) => state.actions.startEditing);
+  const finishEditing = useAppStore((state) => state.actions.finishEditing);
+  const editingId = useAppStore((state) => state.editingId);
+  const isEditing = editingId === id;
   const [value, setValue] = useState(data.title);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -31,22 +34,25 @@ const ChainNodeComponent = ({
 
   useEffect(() => {
     setValue(data.title);
-  }, [data.title]);
+  }, [data.title, isEditing]);
 
   const openEditor = useCallback(() => {
     setValue(data.title);
-    setIsEditing(true);
-  }, [data.title]);
+    startEditing(id);
+  }, [data.title, id, startEditing]);
 
   const commitEdit = useCallback(() => {
-    renameNode(id, value);
-    setIsEditing(false);
-  }, [id, renameNode, value]);
+    const renamed = renameNode(id, value);
+    if (!renamed) {
+      setValue(data.title);
+    }
+    finishEditing();
+  }, [data.title, finishEditing, id, renameNode, value]);
 
   const cancelEdit = useCallback(() => {
     setValue(data.title);
-    setIsEditing(false);
-  }, [data.title]);
+    finishEditing();
+  }, [data.title, finishEditing]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -62,10 +68,19 @@ const ChainNodeComponent = ({
     [cancelEdit, commitEdit],
   );
 
+  const containerClassName = useMemo(
+    () =>
+      `${containerClasses} ${
+        selected ? "ring-2 ring-canvas-accent focus-within:ring-2" : "ring-0"
+      }`,
+    [selected],
+  );
+
   return (
     <div
-      className={`${containerClasses} ${selected ? "ring-2 ring-canvas-accent" : "ring-0"}`}
+      className={containerClassName}
       onDoubleClick={openEditor}
+      data-testid="chain-node"
     >
       <Handle type="target" position={Position.Top} className="!bg-slate-400" />
       <Handle

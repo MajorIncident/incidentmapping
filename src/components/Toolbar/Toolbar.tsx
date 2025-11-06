@@ -4,6 +4,10 @@ type ToolbarProps = FileMenuRenderProps & {
   onAddChainNode: () => void;
   onDeleteSelection: () => void;
   canDelete: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 };
 
 const buttonBase =
@@ -17,17 +21,27 @@ export const Toolbar = ({
   onAddChainNode,
   onDeleteSelection,
   canDelete,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: ToolbarProps): JSX.Element => {
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center gap-2">
-        <button type="button" className={buttonBase} onClick={onNew}>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onNew}
+          aria-label="Create a new map"
+        >
           New
         </button>
         <button
           type="button"
           className={buttonBase}
           onClick={() => void onOpen()}
+          aria-label="Open an existing map"
         >
           Open…
         </button>
@@ -35,15 +49,44 @@ export const Toolbar = ({
           type="button"
           className={buttonBase}
           onClick={() => void onSave()}
+          aria-label="Save the current map"
         >
           Save
         </button>
-        <button type="button" className={buttonBase} onClick={onExportPng}>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onExportPng}
+          aria-label="Export the current map as a PNG"
+        >
           Export PNG
         </button>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" className={buttonBase} onClick={onAddChainNode}>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label="Undo the last action"
+        >
+          Undo
+        </button>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label="Redo the previously undone action"
+        >
+          Redo
+        </button>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onAddChainNode}
+          aria-label="Add a new chain node"
+        >
           Add ChainNode
         </button>
         <button
@@ -51,6 +94,7 @@ export const Toolbar = ({
           className={buttonBase}
           onClick={onDeleteSelection}
           disabled={!canDelete}
+          aria-label="Delete the selected node"
         >
           Delete
         </button>
