@@ -6,7 +6,7 @@ Milestone 1 delivers a lean canvas experience for building cause/effect chains. 
 
 ## Layering
 
-- **State Management**: Zustand (`src/state/useAppStore.ts`) holds the authoritative graph state. All mutations flow through serializable actions (e.g. `addChainNode`, `renameNode`, `deleteNode`).
+- **State Management**: Zustand (`src/state/useAppStore.ts`) holds the authoritative graph state. All mutations flow through serializable actions such as `addChild`, `addSibling`, `nudgeNodeBy`, `renameNode`, and `deleteSelection`.
 - **Data Model**: Zod schemas in `src/features/maps/schema.ts` describe the persisted `MapData` contract and perform validation before load/save operations.
 - **Persistence**: `src/features/persistence/localfs.ts` uses the File System Access API when available; `src/features/persistence/download.ts` supplies Blob/download fallbacks. `components/FileMenu/FileMenu.tsx` orchestrates persistence flows for the UI.
 - **Presentation**: React components under `src/components` render the canvas (`Canvas`), node visuals (`NodeTypes`), toolbar/File menu, and sidebar inspector.
@@ -28,11 +28,24 @@ Milestone 1 delivers a lean canvas experience for building cause/effect chains. 
 - `src/state`: Zustand store definition.
 - `src/lib`: shared utilities (e.g., id generation).
 - `tests/unit`: Vitest suites for schema and store correctness.
-- `tests/e2e`: Playwright smoke test verifying end-to-end flows.
+- `tests/e2e`: Playwright suites verifying file flows plus keyboard + sidebar workflows.
 
 ## Styling
 
 Tailwind CSS powers styling via utility classes. Global styles live in `src/styles/index.css`. Canvas nodes leverage brand accents and a subtle depth shadow.
+
+## History model
+
+- Every mutating action captures a lightweight snapshot (`nodes`, `edges`, `metadata`, `selectionId`) before changes are applied.
+- Snapshots are stored in a past/future stack inside the store, enabling `undo()`/`redo()` along with derived `canUndo`/`canRedo` flags for UI state.
+- `nudgeNodeBy` batches repeated keyboard nudges: the first nudge pushes a snapshot immediately, while subsequent nudges within 200 ms reuse the same history entry to avoid noise.
+- Undo/redo restores snapshots through pure state replacements so saves/exports always reflect the visible graph.
+
+## Keyboard handling
+
+- `src/hooks/useKeyboardShortcuts.ts` wires global listeners for save/open plus canvas workflows (arrow nudges, `Enter` child creation, `Shift+Enter` siblings, `Delete` removal, and undo/redo bindings).
+- The hook skips actions while typing in inputs/textarea content, preserving native text editing semantics.
+- History-aware actions invoked from the keyboard (nudges, add/remove) automatically update selection, inspector state, and inline node editing.
 
 ## Tooling & CI
 
