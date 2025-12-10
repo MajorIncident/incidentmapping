@@ -3,6 +3,7 @@ import { FileMenu } from "../components/FileMenu/FileMenu";
 import { Toolbar } from "../components/Toolbar/Toolbar";
 import { Canvas } from "../components/Canvas/Canvas";
 import { Inspector } from "../components/Sidebar/Inspector";
+import { Footer } from "../components/Footer/Footer";
 import { useAppStore } from "../state/useAppStore";
 
 export const App = (): JSX.Element => {
@@ -39,6 +40,7 @@ export const App = (): JSX.Element => {
               </div>
               <Inspector />
             </div>
+            <Footer />
           </div>
         )}
       </FileMenu>

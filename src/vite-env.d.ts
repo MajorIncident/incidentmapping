@@ -17,6 +17,13 @@ type SaveFilePickerOptions = {
 };
 
 declare global {
+  const __BUILD_INFO__: {
+    version: string;
+    commit: string;
+    commitDate: string;
+    builtAt: string;
+  };
+
   interface FileSystemWritableFileStream {
     write(data: Blob): Promise<void>;
     close(): Promise<void>;

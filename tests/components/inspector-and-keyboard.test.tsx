@@ -100,7 +100,7 @@ describe("Inspector and keyboard workflows", () => {
       expect(useAppStore.getState().nodes).toHaveLength(2);
     });
 
-    const nodes = await screen.findAllByTestId("chain-node", { hidden: true });
+    const nodes = await screen.findAllByTestId("chain-node");
     expect(nodes).toHaveLength(2);
 
     const newNodeId = useAppStore.getState().nodes[1]?.id;
