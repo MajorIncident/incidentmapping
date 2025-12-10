@@ -9,6 +9,8 @@ export type ChainNodeData = {
   description?: string;
   owner?: string;
   timestamp?: string;
+  positiveConsequenceBulletPoints: string[];
+  negativeConsequenceBulletPoints: string[];
 };
 
 type HistoryEntry = {
@@ -86,6 +88,8 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     description: node.description,
     owner: node.owner,
     timestamp: node.timestamp,
+    positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
+    negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
   },
 });
 
@@ -109,6 +113,8 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     description: node.data.description,
     owner: node.data.owner,
     timestamp: node.data.timestamp,
+    positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
+    negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     position: snapPosition(node.position),
   }));
 
@@ -297,7 +303,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: newNodeId,
           type: "ChainNode",
           position,
-          data: { title: "New ChainNode" },
+          data: {
+            title: "New ChainNode",
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+          },
         };
         const nextNodes = [...state.nodes, newNode];
         const nextEdges = parentNode
@@ -371,7 +381,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: newNodeId,
           type: "ChainNode",
           position,
-          data: { title: "New ChainNode" },
+          data: {
+            title: "New ChainNode",
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+          },
         };
         const nextNodes = [...state.nodes, newNode];
         const nextEdges = parentId

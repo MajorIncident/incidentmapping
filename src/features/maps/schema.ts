@@ -12,6 +12,8 @@ export const chainNodeSchema = z.object({
   description: z.string().optional(),
   owner: z.string().optional(),
   timestamp: z.string().optional(),
+  positiveConsequenceBulletPoints: z.array(z.string()).default([]),
+  negativeConsequenceBulletPoints: z.array(z.string()).default([]),
   position: positionSchema,
 });
 
