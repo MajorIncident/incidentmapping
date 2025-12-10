@@ -48,18 +48,22 @@ describe("Inspector and keyboard workflows", () => {
       actions.select(id ?? null);
     });
 
-    render(
-      <ReactFlowProvider>
-        <Inspector />
-      </ReactFlowProvider>,
-    );
+    await act(async () => {
+      render(
+        <ReactFlowProvider>
+          <Inspector />
+        </ReactFlowProvider>,
+      );
+    });
 
     const titleInput = await screen.findByRole("textbox", { name: /^Title$/i });
     expect(titleInput).toHaveValue("New ChainNode");
 
     const ownerInput = screen.getByRole("textbox", { name: /^Owner$/i });
-    await userEvent.clear(ownerInput);
-    await userEvent.type(ownerInput, "Incident Manager");
+    await act(async () => {
+      await userEvent.clear(ownerInput);
+      await userEvent.type(ownerInput, "Incident Manager");
+    });
     expect(useAppStore.getState().nodes[0]?.data.owner).toBe(
       "Incident Manager",
     );
@@ -67,8 +71,10 @@ describe("Inspector and keyboard workflows", () => {
     const timestampInput = screen.getByRole("textbox", {
       name: /^Timestamp$/i,
     });
-    await userEvent.clear(timestampInput);
-    await userEvent.type(timestampInput, "2024-06-01T12:00:00Z");
+    await act(async () => {
+      await userEvent.clear(timestampInput);
+      await userEvent.type(timestampInput, "2024-06-01T12:00:00Z");
+    });
     expect(useAppStore.getState().nodes[0]?.data.timestamp).toBe(
       "2024-06-01T12:00:00Z",
     );
@@ -85,7 +91,9 @@ describe("Inspector and keyboard workflows", () => {
       actions.finishEditing();
     });
 
-    render(<App />);
+    await act(async () => {
+      render(<App />);
+    });
 
     await screen.findByRole("button", { name: "Add a new chain node" });
     await waitFor(() => {
