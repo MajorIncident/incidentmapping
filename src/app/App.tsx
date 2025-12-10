@@ -11,9 +11,11 @@ export const App = (): JSX.Element => {
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
+  const setMapTitle = useAppStore((state) => state.actions.setMapTitle);
   const selectionId = useAppStore((state) => state.selectionId);
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
+  const mapTitle = useAppStore((state) => state.metadata?.title ?? "");
 
   return (
     <ReactFlowProvider>
@@ -22,6 +24,8 @@ export const App = (): JSX.Element => {
           <div className="flex h-screen flex-col">
             <Toolbar
               {...menu}
+              mapTitle={mapTitle}
+              onMapTitleChange={setMapTitle}
               onAddChainNode={() => {
                 addChild(selectionId ?? undefined);
               }}

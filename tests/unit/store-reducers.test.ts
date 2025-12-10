@@ -124,4 +124,20 @@ describe("useAppStore actions", () => {
       expect.arrayContaining([firstChild, siblingId]),
     );
   });
+
+  it("updates the map title and records history", () => {
+    const { actions } = useAppStore.getState();
+    const initialHistory = useAppStore.getState().history.past.length;
+
+    actions.setMapTitle("Postmortem Draft");
+
+    let state = useAppStore.getState();
+    expect(state.metadata?.title).toBe("Postmortem Draft");
+    expect(state.history.past.length).toBe(initialHistory + 1);
+    expect(state.canUndo).toBe(true);
+
+    actions.undo();
+    state = useAppStore.getState();
+    expect(state.metadata?.title).toBe("Untitled Map");
+  });
 });

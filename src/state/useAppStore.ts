@@ -39,6 +39,7 @@ type AppState = {
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
+    setMapTitle: (title: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
     nudgeNodeBy: (id: string, dx: number, dy: number) => void;
@@ -246,6 +247,35 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (created) {
         get().actions.startEditing(created);
       }
+    },
+    setMapTitle: (title) => {
+      const nextTitle = title.trim();
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        const currentTitle = state.metadata?.title ?? "";
+        if (currentTitle === nextTitle) {
+          return {};
+        }
+        const nextMetadata = nextTitle.length
+          ? { ...(state.metadata ?? {}), title: nextTitle }
+          : undefined;
+        const candidate = {
+          ...state,
+          metadata: nextMetadata,
+        } satisfies AppState;
+        const nextSnapshot = snapshotFromState(candidate);
+        const history = updateHistoryState(
+          state,
+          prevSnapshot,
+          !snapshotsEqual(prevSnapshot, nextSnapshot),
+        );
+        return {
+          metadata: nextMetadata,
+          history,
+          canUndo: history.past.length > 0,
+          canRedo: history.future.length > 0,
+        };
+      });
     },
     addChild: (parentId) => {
       const initialParentId = parentId ?? get().selectionId ?? undefined;
