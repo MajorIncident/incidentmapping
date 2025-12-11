@@ -108,7 +108,9 @@ const ChainNodeComponent = ({
       {!isEditing && showDetails ? (
         <div className="mt-2 space-y-2 text-xs text-slate-600">
           {data.description ? (
-            <p className="text-slate-600">{data.description}</p>
+            <p className="whitespace-pre-wrap break-words text-[13px] text-slate-700">
+              {data.description}
+            </p>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -118,7 +120,12 @@ const ChainNodeComponent = ({
               <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
                 {positivePoints.length > 0 ? (
                   positivePoints.map((point, index) => (
-                    <li key={`${id}-positive-${index}`}>{point}</li>
+                    <li
+                      key={`${id}-positive-${index}`}
+                      className="whitespace-pre-wrap break-words"
+                    >
+                      {point}
+                    </li>
                   ))
                 ) : (
                   <li className="text-slate-400 italic">No positive impacts</li>
@@ -132,7 +139,12 @@ const ChainNodeComponent = ({
               <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
                 {negativePoints.length > 0 ? (
                   negativePoints.map((point, index) => (
-                    <li key={`${id}-negative-${index}`}>{point}</li>
+                    <li
+                      key={`${id}-negative-${index}`}
+                      className="whitespace-pre-wrap break-words"
+                    >
+                      {point}
+                    </li>
                   ))
                 ) : (
                   <li className="text-slate-400 italic">No negative impacts</li>
