@@ -196,9 +196,6 @@ const BarrierNodeComponent = ({
           {badgeText}
         </span>
       </div>
-      <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
-        Between nodes
-      </div>
       <p className="mt-1 text-sm text-slate-700">
         {description ?? "No barrier description provided."}
       </p>
