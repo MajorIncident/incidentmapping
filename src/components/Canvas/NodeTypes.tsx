@@ -20,6 +20,7 @@ const ChainNodeComponent = ({
   const renameNode = useAppStore((state) => state.actions.renameNode);
   const startEditing = useAppStore((state) => state.actions.startEditing);
   const finishEditing = useAppStore((state) => state.actions.finishEditing);
+  const showDetails = useAppStore((state) => state.showDetails);
   const editingId = useAppStore((state) => state.editingId);
   const isEditing = editingId === id;
   const [value, setValue] = useState(data.title);
@@ -76,6 +77,9 @@ const ChainNodeComponent = ({
     [selected],
   );
 
+  const positivePoints = data.positiveConsequenceBulletPoints ?? [];
+  const negativePoints = data.negativeConsequenceBulletPoints ?? [];
+
   return (
     <div
       className={containerClassName}
@@ -101,6 +105,43 @@ const ChainNodeComponent = ({
       ) : (
         <div className={titleClasses}>{data.title}</div>
       )}
+      {!isEditing && showDetails ? (
+        <div className="mt-2 space-y-2 text-xs text-slate-600">
+          {data.description ? (
+            <p className="text-slate-600">{data.description}</p>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                Positive
+              </div>
+              <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
+                {positivePoints.length > 0 ? (
+                  positivePoints.map((point, index) => (
+                    <li key={`${id}-positive-${index}`}>{point}</li>
+                  ))
+                ) : (
+                  <li className="text-slate-400 italic">No positive impacts</li>
+                )}
+              </ul>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
+                Negative
+              </div>
+              <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
+                {negativePoints.length > 0 ? (
+                  negativePoints.map((point, index) => (
+                    <li key={`${id}-negative-${index}`}>{point}</li>
+                  ))
+                ) : (
+                  <li className="text-slate-400 italic">No negative impacts</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

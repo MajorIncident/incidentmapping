@@ -11,6 +11,8 @@ type ToolbarProps = FileMenuRenderProps & {
   canRedo: boolean;
   mapTitle: string;
   onMapTitleChange: (title: string) => void;
+  showDetails: boolean;
+  onToggleDetails: () => void;
 };
 
 const buttonBase =
@@ -30,6 +32,8 @@ export const Toolbar = ({
   onRedo,
   canUndo,
   canRedo,
+  showDetails,
+  onToggleDetails,
 }: ToolbarProps): JSX.Element => {
   const [draftTitle, setDraftTitle] = useState(mapTitle);
 
@@ -121,6 +125,14 @@ export const Toolbar = ({
           aria-label="Add a new chain node"
         >
           Add ChainNode
+        </button>
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onToggleDetails}
+          aria-label="Toggle node detail visibility"
+        >
+          {showDetails ? "Hide Details" : "Show Details"}
         </button>
         <button
           type="button"
