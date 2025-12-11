@@ -24,6 +24,15 @@ export const causeEffectEdgeSchema = z.object({
   toId: z.string().min(1),
 });
 
+export const barrierSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("Barrier"),
+  upstreamNodeId: z.string().min(1),
+  downstreamNodeId: z.string().min(1),
+  breached: z.boolean(),
+  breachedItems: z.array(z.string()).default([]),
+});
+
 export const metadataSchema = z
   .object({
     title: z.string().optional(),
@@ -35,8 +44,10 @@ export const mapDataSchema = z.object({
   metadata: metadataSchema,
   nodes: z.array(chainNodeSchema),
   edges: z.array(causeEffectEdgeSchema),
+  barriers: z.array(barrierSchema).default([]),
 });
 
 export type MapData = z.infer<typeof mapDataSchema>;
 export type ChainNode = z.infer<typeof chainNodeSchema>;
 export type CauseEffectEdge = z.infer<typeof causeEffectEdgeSchema>;
+export type Barrier = z.infer<typeof barrierSchema>;

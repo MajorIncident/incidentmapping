@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import { emptyMap, sampleMap } from "../features/maps/fixtures";
-import type { ChainNode, MapData } from "../features/maps/schema";
+import type { Barrier, ChainNode, MapData } from "../features/maps/schema";
 import { createId } from "../lib/id";
 
 export type ChainNodeData = {
@@ -17,6 +17,7 @@ type HistoryEntry = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: MapData["metadata"];
+  barriers: Barrier[];
   selectionId: string | null;
 };
 
@@ -29,6 +30,7 @@ type AppState = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: MapData["metadata"];
+  barriers: Barrier[];
   selectionId: string | null;
   editingId: string | null;
   showDetails: boolean;
@@ -138,10 +140,16 @@ const cloneEdge = (edge: Edge): Edge => ({
   data: edge.data ? { ...edge.data } : undefined,
 });
 
+const cloneBarrier = (barrier: Barrier): Barrier => ({
+  ...barrier,
+  breachedItems: [...barrier.breachedItems],
+});
+
 const snapshotFromState = (state: AppState): HistoryEntry => ({
   nodes: state.nodes.map(cloneNode),
   edges: state.edges.map(cloneEdge),
   metadata: state.metadata ? { ...state.metadata } : undefined,
+  barriers: state.barriers.map(cloneBarrier),
   selectionId: state.selectionId,
 });
 
@@ -249,6 +257,7 @@ const applyHistorySnapshot = (snapshot: HistoryEntry) => ({
   nodes: snapshot.nodes.map(cloneNode),
   edges: snapshot.edges.map(cloneEdge),
   metadata: snapshot.metadata ? { ...snapshot.metadata } : undefined,
+  barriers: snapshot.barriers.map(cloneBarrier),
   selectionId: snapshot.selectionId,
 });
 
@@ -303,6 +312,7 @@ const createEmptyState = () => ({
   nodes: mapNodesToReactNodes(emptyMap.nodes),
   edges: mapEdgesToReactEdges(emptyMap),
   metadata: emptyMap.metadata ? { ...emptyMap.metadata } : undefined,
+  barriers: emptyMap.barriers ? [...emptyMap.barriers] : [],
   selectionId: null,
   editingId: null,
   showDetails: true,
@@ -316,6 +326,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   nodes: mapNodesToReactNodes(sampleMap.nodes),
   edges: mapEdgesToReactEdges(sampleMap),
   metadata: sampleMap.metadata ? { ...sampleMap.metadata } : undefined,
+  barriers: sampleMap.barriers ? [...sampleMap.barriers] : [],
   selectionId: sampleMap.nodes[0]?.id ?? null,
   editingId: null,
   showDetails: true,
@@ -338,6 +349,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           .nodes,
         edges: mapEdgesToReactEdges(map),
         metadata: map.metadata ? { ...map.metadata } : undefined,
+        barriers: map.barriers ? [...map.barriers] : [],
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
@@ -348,7 +360,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     },
     toMap: () => {
-      const { nodes, edges, metadata } = get();
+      const { nodes, edges, metadata, barriers } = get();
       return {
         schemaVersion: 1,
         metadata,
@@ -359,6 +371,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           fromId: edge.source,
           toId: edge.target,
         })),
+        barriers: barriers.map(cloneBarrier),
       };
     },
     addChainNode: (options) => {
