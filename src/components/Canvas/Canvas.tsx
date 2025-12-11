@@ -1,5 +1,10 @@
-import { useCallback, useMemo } from "react";
-import ReactFlow, { Background, Controls, type Node } from "reactflow";
+import { useCallback, useEffect, useMemo } from "react";
+import ReactFlow, {
+  Background,
+  Controls,
+  type Node,
+  useReactFlow,
+} from "reactflow";
 import "reactflow/dist/style.css";
 import { useAppStore, type ChainNodeData } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
@@ -11,7 +16,9 @@ type CanvasProps = {
 export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   const nodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
+  const layoutVersion = useAppStore((state) => state.layoutVersion);
   const { moveNode, select } = useAppStore((state) => state.actions);
+  const reactFlow = useReactFlow();
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData>) => {
@@ -30,6 +37,10 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
     },
     [moveNode],
   );
+
+  useEffect(() => {
+    reactFlow.fitView({ padding: 0.2, includeHiddenNodes: true });
+  }, [layoutVersion, reactFlow]);
 
   const memorizedNodeTypes = useMemo(() => nodeTypes, []);
 
