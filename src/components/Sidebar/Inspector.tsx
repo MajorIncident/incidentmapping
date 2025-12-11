@@ -29,8 +29,21 @@ export const Inspector = (): JSX.Element => {
     (state) =>
       state.nodes.find((candidate) => candidate.id === selectionId) ?? null,
   );
+  const chainNodes = useAppStore((state) => state.nodes);
+  const barriers = useAppStore((state) => state.barriers);
+  const edges = useAppStore((state) => state.edges);
+  const barrier = useAppStore(
+    (state) => state.barriers.find((item) => item.id === selectionId) ?? null,
+  );
   const renameNode = useAppStore((state) => state.actions.renameNode);
   const updateNodeData = useAppStore((state) => state.actions.updateNodeData);
+  const addBarrierForFirstDownstream = useAppStore(
+    (state) => state.actions.addBarrierForFirstDownstream,
+  );
+  const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
+  const updateBarrierData = useAppStore(
+    (state) => state.actions.updateBarrierData,
+  );
   const startEditing = useAppStore((state) => state.actions.startEditing);
   const select = useAppStore((state) => state.actions.select);
   const { fitView } = useReactFlow();
@@ -45,6 +58,9 @@ export const Inspector = (): JSX.Element => {
   );
   const [positiveErrors, setPositiveErrors] = useState<string[]>([]);
   const [negativeErrors, setNegativeErrors] = useState<string[]>([]);
+  const [breachedItems, setBreachedItems] = useState<string[]>([]);
+  const [breachedErrors, setBreachedErrors] = useState<string[]>([]);
+  const [isBreached, setIsBreached] = useState(false);
 
   useEffect(() => {
     if (node) {
@@ -65,6 +81,18 @@ export const Inspector = (): JSX.Element => {
       setNegativeErrors([]);
     }
   }, [node]);
+
+  useEffect(() => {
+    if (barrier) {
+      setIsBreached(barrier.breached);
+      setBreachedItems(barrier.breachedItems ?? []);
+      setBreachedErrors([]);
+    } else {
+      setIsBreached(false);
+      setBreachedItems([]);
+      setBreachedErrors([]);
+    }
+  }, [barrier]);
 
   const handleTitleCommit = useCallback(() => {
     if (!node) {
@@ -125,6 +153,93 @@ export const Inspector = (): JSX.Element => {
       });
     },
     [node, updateNodeData],
+  );
+
+  const handleToggleBreached = useCallback(
+    (checked: boolean) => {
+      if (!barrier) {
+        return;
+      }
+      setIsBreached(checked);
+      updateBarrierData(barrier.id, { breached: checked });
+    },
+    [barrier, updateBarrierData],
+  );
+
+  const validateBreachedList = useCallback((values: string[]): string[] => {
+    return values.map((value) =>
+      value.trim().length === 0 ? "This field is required." : "",
+    );
+  }, []);
+
+  const commitBreachedItems = useCallback(
+    (values: string[]) => {
+      if (!barrier) {
+        return;
+      }
+      const errors = validateBreachedList(values);
+      setBreachedErrors(errors);
+      setBreachedItems(values);
+      if (errors.some((error) => error.length > 0)) {
+        return;
+      }
+      const trimmed = values.map((value) => value.trim());
+      updateBarrierData(barrier.id, { breachedItems: trimmed });
+    },
+    [barrier, updateBarrierData, validateBreachedList],
+  );
+
+  const handleBreachedListChange = useCallback(
+    (index: number, event: ChangeEvent<HTMLInputElement>) => {
+      const next = [...breachedItems];
+      next[index] = event.target.value;
+      commitBreachedItems(next);
+    },
+    [breachedItems, commitBreachedItems],
+  );
+
+  const handleAddBreachedItem = useCallback(() => {
+    const next = [...breachedItems, ""];
+    commitBreachedItems(next);
+  }, [breachedItems, commitBreachedItems]);
+
+  const handleRemoveBreachedItem = useCallback(
+    (index: number) => {
+      const next = breachedItems.filter((_, i) => i !== index);
+      const nextErrors = breachedErrors.filter((_, i) => i !== index);
+      setBreachedErrors(nextErrors);
+      commitBreachedItems(next);
+    },
+    [breachedErrors, breachedItems, commitBreachedItems],
+  );
+
+  const handleBreachedListBlur = useCallback(() => {
+    commitBreachedItems(breachedItems);
+  }, [breachedItems, commitBreachedItems]);
+
+  const handleBreachedListKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>, index: number) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const errors = validateBreachedList(breachedItems);
+        if (!errors.some((error) => error.length > 0)) {
+          handleAddBreachedItem();
+        } else {
+          setBreachedErrors(errors);
+        }
+      }
+      if (event.key === "Backspace" && event.currentTarget.value === "") {
+        if (breachedItems.length > 0) {
+          handleRemoveBreachedItem(index);
+        }
+      }
+    },
+    [
+      breachedItems,
+      handleAddBreachedItem,
+      handleRemoveBreachedItem,
+      validateBreachedList,
+    ],
   );
 
   const handleFocusTitle = useCallback(() => {
@@ -334,6 +449,7 @@ export const Inspector = (): JSX.Element => {
 
   const ownerValue = node?.data.owner ?? "";
   const timestampValue = node?.data.timestamp ?? "";
+  const selectedEntityId = node?.id ?? barrier?.id ?? null;
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -346,6 +462,147 @@ export const Inspector = (): JSX.Element => {
   );
 
   const body = useMemo(() => {
+    if (barrier) {
+      const upstreamNode =
+        chainNodes.find(
+          (candidate) => candidate.id === barrier.upstreamNodeId,
+        ) ?? null;
+      const downstreamNode =
+        chainNodes.find(
+          (candidate) => candidate.id === barrier.downstreamNodeId,
+        ) ?? null;
+
+      return (
+        <form
+          className="flex flex-1 flex-col gap-5"
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-semibold text-slate-900">Barrier</h3>
+            <p className="text-xs text-slate-500">
+              Between {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
+              {downstreamNode?.data.title ?? barrier.downstreamNodeId}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-col">
+              <span className={labelClasses}>Breached</span>
+              <span className="text-xs text-slate-500">
+                Toggle to reveal breached items inside the barrier card.
+              </span>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <input
+                type="checkbox"
+                checked={isBreached}
+                onChange={(event) => handleToggleBreached(event.target.checked)}
+              />
+              {isBreached ? "Breached" : "Intact"}
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className={labelClasses}>Breached Items</span>
+              <button
+                type="button"
+                className={`${buttonClasses} px-2 py-1 text-xs`}
+                onClick={handleAddBreachedItem}
+                disabled={!isBreached}
+              >
+                Add
+              </button>
+            </div>
+            {!isBreached ? (
+              <p className="text-xs text-slate-500">
+                Mark the barrier as breached to track how it failed.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {breachedItems.length === 0 ? (
+                  <p className="text-xs text-slate-500">No breach items yet.</p>
+                ) : null}
+                {breachedItems.map((item, index) => (
+                  <div key={`breached-${index}`} className="flex gap-2">
+                    <input
+                      className={`${inputClasses} ${
+                        breachedErrors[index]?.length
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                          : ""
+                      }`}
+                      value={item}
+                      onChange={(event) =>
+                        handleBreachedListChange(index, event)
+                      }
+                      onBlur={handleBreachedListBlur}
+                      onKeyDown={(event) =>
+                        handleBreachedListKeyDown(event, index)
+                      }
+                      placeholder="Describe how the barrier was breached"
+                      aria-invalid={Boolean(breachedErrors[index])}
+                      aria-describedby={
+                        breachedErrors[index]?.length
+                          ? `breach-error-${index}`
+                          : undefined
+                      }
+                    />
+                    <button
+                      type="button"
+                      className={`${buttonClasses} px-2 py-1 text-xs`}
+                      onClick={() => handleRemoveBreachedItem(index)}
+                      aria-label={`Remove breach item ${index + 1}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                {breachedErrors.some((error) => error.length > 0) ? (
+                  <div className="flex flex-col gap-1">
+                    {breachedErrors.map((error, index) =>
+                      error.length ? (
+                        <p
+                          key={`breach-error-${index}`}
+                          id={`breach-error-${index}`}
+                          className="text-xs font-medium text-red-600"
+                        >
+                          {error}
+                        </p>
+                      ) : null,
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={buttonClasses}
+              onClick={() => select(barrier.upstreamNodeId)}
+            >
+              Select Upstream Node
+            </button>
+            <button
+              type="button"
+              className={buttonClasses}
+              onClick={() => select(barrier.downstreamNodeId)}
+            >
+              Select Downstream Node
+            </button>
+            <button
+              type="button"
+              className={`${buttonClasses} border-rose-200 text-rose-700`}
+              onClick={() => removeBarrier(barrier.id)}
+            >
+              Remove Barrier
+            </button>
+          </div>
+        </form>
+      );
+    }
+
     if (!node) {
       return (
         <p className="text-sm text-slate-500" role="status">
@@ -353,6 +610,22 @@ export const Inspector = (): JSX.Element => {
         </p>
       );
     }
+
+    const downstreamEdge =
+      edges.find((edge) => edge.source === node.id) ?? null;
+    const downstreamNode = downstreamEdge
+      ? (chainNodes.find(
+          (candidate) => candidate.id === downstreamEdge.target,
+        ) ?? null)
+      : null;
+    const existingBarrier = downstreamEdge
+      ? (barriers.find(
+          (item) =>
+            item.upstreamNodeId === node.id &&
+            item.downstreamNodeId === downstreamEdge.target,
+        ) ?? null)
+      : null;
+
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-1">
@@ -401,6 +674,65 @@ export const Inspector = (): JSX.Element => {
             onChange={(event) => setDescription(event.target.value)}
             onBlur={handleDescriptionBlur}
           />
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center justify-between">
+            <span className={labelClasses}>Barrier</span>
+            {existingBarrier ? (
+              <span
+                className={`text-xs font-semibold ${
+                  existingBarrier.breached
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                }`}
+              >
+                {existingBarrier.breached ? "Breached" : "Holding"}
+              </span>
+            ) : null}
+          </div>
+          {!downstreamEdge ? (
+            <p className="text-xs text-slate-500">
+              Add a downstream ChainNode to place a barrier.
+            </p>
+          ) : existingBarrier ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-slate-700">
+                Barrier between {node.data.title} and{" "}
+                {downstreamNode?.data.title ?? downstreamEdge.target}.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={buttonClasses}
+                  onClick={() => select(existingBarrier.id)}
+                >
+                  Edit Barrier
+                </button>
+                <button
+                  type="button"
+                  className={`${buttonClasses} border-rose-200 text-rose-700`}
+                  onClick={() => removeBarrier(existingBarrier.id)}
+                >
+                  Remove Barrier
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-700">
+                Insert a barrier between {node.data.title} and{" "}
+                {downstreamNode?.data.title ?? downstreamEdge.target}.
+              </p>
+              <button
+                type="button"
+                className={`${buttonClasses} px-2 py-1 text-xs`}
+                onClick={() => addBarrierForFirstDownstream(node.id)}
+              >
+                Add Barrier
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -610,28 +942,44 @@ export const Inspector = (): JSX.Element => {
       </form>
     );
   }, [
+    addBarrierForFirstDownstream,
+    barrier,
+    barriers,
+    breachedErrors,
+    breachedItems,
+    chainNodes,
+    description,
+    edges,
+    handleAddBreachedItem,
+    handleAddListItem,
+    handleBreachedListBlur,
+    handleBreachedListChange,
+    handleBreachedListKeyDown,
     handleCenter,
     handleDescriptionBlur,
     handleFocusTitle,
-    handleOwnerChange,
-    handleSubmit,
-    handleTimestampChange,
-    handleTitleCommit,
-    handleAddListItem,
     handleListBlur,
     handleListChange,
     handleListKeyDown,
+    handleOwnerChange,
+    handleRemoveBreachedItem,
     handleRemoveListItem,
-    node,
+    handleSubmit,
+    handleTimestampChange,
+    handleTitleCommit,
+    handleToggleBreached,
+    isBreached,
     negativeConsequences,
     negativeErrors,
+    node,
     ownerValue,
     positiveConsequences,
     positiveErrors,
+    removeBarrier,
+    select,
     timestampValue,
     title,
     titleError,
-    description,
   ]);
 
   return (
@@ -648,9 +996,9 @@ export const Inspector = (): JSX.Element => {
         >
           Inspector
         </h2>
-        {node ? (
+        {selectedEntityId ? (
           <span className="text-xs text-slate-500" aria-live="polite">
-            Node ID: {node.id}
+            ID: {selectedEntityId}
           </span>
         ) : null}
       </div>

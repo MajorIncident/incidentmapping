@@ -13,6 +13,14 @@ export type ChainNodeData = {
   negativeConsequenceBulletPoints: string[];
 };
 
+export type BarrierNodeData = {
+  kind: "Barrier";
+  upstreamNodeId: string;
+  downstreamNodeId: string;
+  breached: boolean;
+  breachedItems: string[];
+};
+
 type HistoryEntry = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
@@ -45,12 +53,14 @@ type AppState = {
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
+    addBarrierForFirstDownstream: (upstreamId?: string) => string | null;
     setMapTitle: (title: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
     nudgeNodeBy: (id: string, dx: number, dy: number) => void;
     deleteNode: (id: string) => void;
     deleteSelection: () => void;
+    removeBarrier: (barrierId: string) => void;
     select: (id: string | null) => void;
     startEditing: (id: string) => void;
     finishEditing: () => void;
@@ -59,6 +69,10 @@ type AppState = {
     updateNodeData: (
       id: string,
       patch: Partial<Omit<ChainNodeData, "title">>,
+    ) => void;
+    updateBarrierData: (
+      id: string,
+      patch: Partial<Pick<Barrier, "breached" | "breachedItems">>,
     ) => void;
     undo: () => void;
     redo: () => void;
@@ -307,6 +321,11 @@ const computeParentId = (edges: Edge[], childId: string): string | null => {
   const parentEdge = edges.find((edge) => edge.target === childId);
   return parentEdge ? parentEdge.source : null;
 };
+
+const findFirstDownstreamEdge = (
+  edges: Edge[],
+  upstreamId: string,
+): Edge | null => edges.find((edge) => edge.source === upstreamId) ?? null;
 
 const createEmptyState = () => ({
   nodes: mapNodesToReactNodes(emptyMap.nodes),
@@ -569,6 +588,65 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
+    addBarrierForFirstDownstream: (upstreamId) => {
+      const targetUpstreamId = upstreamId ?? get().selectionId ?? undefined;
+      if (!targetUpstreamId) {
+        return null;
+      }
+      const prevSnapshot = snapshotFromState(get());
+      let createdId: string | null = null;
+      set((state) => {
+        const downstreamEdge = findFirstDownstreamEdge(
+          state.edges,
+          targetUpstreamId,
+        );
+        if (!downstreamEdge) {
+          return {};
+        }
+        const alreadyExists = state.barriers.some(
+          (barrier) =>
+            barrier.upstreamNodeId === targetUpstreamId &&
+            barrier.downstreamNodeId === downstreamEdge.target,
+        );
+        if (alreadyExists) {
+          return {};
+        }
+        const barrierId = createId("barrier");
+        createdId = barrierId;
+        const nextBarriers = [
+          ...state.barriers,
+          {
+            id: barrierId,
+            kind: "Barrier" as const,
+            upstreamNodeId: targetUpstreamId,
+            downstreamNodeId: downstreamEdge.target,
+            breached: false,
+            breachedItems: [],
+          },
+        ];
+        const candidate = {
+          ...state,
+          barriers: nextBarriers,
+          selectionId: barrierId,
+          editingId: null,
+        } satisfies AppState;
+        const nextSnapshot = snapshotFromState(candidate);
+        const history = updateHistoryState(
+          state,
+          prevSnapshot,
+          !snapshotsEqual(prevSnapshot, nextSnapshot),
+        );
+        return {
+          barriers: nextBarriers,
+          selectionId: barrierId,
+          editingId: null,
+          history,
+          canUndo: history.past.length > 0,
+          canRedo: history.future.length > 0,
+        };
+      });
+      return createdId;
+    },
     renameNode: (id, title) => {
       const trimmed = title.trim();
       if (trimmed.length === 0) {
@@ -725,11 +803,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         const remainingEdges = state.edges.filter(
           (edge) => !toRemove.has(edge.source) && !toRemove.has(edge.target),
         );
+        const remainingBarriers = state.barriers.filter(
+          (barrier) =>
+            !toRemove.has(barrier.upstreamNodeId) &&
+            !toRemove.has(barrier.downstreamNodeId),
+        );
 
         const candidate = {
           ...state,
           nodes: remainingNodes,
           edges: remainingEdges,
+          barriers: remainingBarriers,
           selectionId: null,
           editingId: null,
         } satisfies AppState;
@@ -742,6 +826,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           nodes: remainingNodes,
           edges: remainingEdges,
+          barriers: remainingBarriers,
           selectionId: null,
           editingId: null,
           history,
@@ -755,7 +840,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!selectionId) {
         return;
       }
+      const barrier = get().barriers.find((item) => item.id === selectionId);
+      if (barrier) {
+        get().actions.removeBarrier(selectionId);
+        return;
+      }
       get().actions.deleteNode(selectionId);
+    },
+    removeBarrier: (barrierId) => {
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        const nextBarriers = state.barriers.filter(
+          (barrier) => barrier.id !== barrierId,
+        );
+        if (nextBarriers.length === state.barriers.length) {
+          return {};
+        }
+        const candidate = {
+          ...state,
+          barriers: nextBarriers,
+          selectionId:
+            state.selectionId === barrierId ? null : state.selectionId,
+          editingId: state.selectionId === barrierId ? null : state.editingId,
+        } satisfies AppState;
+        const nextSnapshot = snapshotFromState(candidate);
+        const history = updateHistoryState(
+          state,
+          prevSnapshot,
+          !snapshotsEqual(prevSnapshot, nextSnapshot),
+        );
+        return {
+          barriers: nextBarriers,
+          selectionId: candidate.selectionId,
+          editingId: candidate.editingId,
+          history,
+          canUndo: history.past.length > 0,
+          canRedo: history.future.length > 0,
+        };
+      });
     },
     select: (id) => {
       set({ selectionId: id ?? null, editingId: null });
@@ -839,6 +961,49 @@ export const useAppStore = create<AppState>((set, get) => ({
           nodes: laidOutNodes,
           history,
           layoutVersion: candidate.layoutVersion,
+          canUndo: history.past.length > 0,
+          canRedo: history.future.length > 0,
+        };
+      });
+    },
+    updateBarrierData: (id, patch) => {
+      const prevSnapshot = snapshotFromState(get());
+      let changed = false;
+      set((state) => {
+        const nextBarriers = state.barriers.map((barrier) => {
+          if (barrier.id !== id) {
+            return barrier;
+          }
+          const hasBreachedItems = patch.breachedItems !== undefined;
+          const nextBarrier = {
+            ...barrier,
+            ...patch,
+            breachedItems: hasBreachedItems
+              ? [...(patch.breachedItems ?? [])]
+              : barrier.breachedItems,
+          } satisfies Barrier;
+          if (JSON.stringify(nextBarrier) === JSON.stringify(barrier)) {
+            return barrier;
+          }
+          changed = true;
+          return nextBarrier;
+        });
+        if (!changed) {
+          return {};
+        }
+        const candidate = {
+          ...state,
+          barriers: nextBarriers,
+        } satisfies AppState;
+        const nextSnapshot = snapshotFromState(candidate);
+        const history = updateHistoryState(
+          state,
+          prevSnapshot,
+          !snapshotsEqual(prevSnapshot, nextSnapshot),
+        );
+        return {
+          barriers: nextBarriers,
+          history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
         };
