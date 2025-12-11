@@ -463,15 +463,6 @@ export const Inspector = (): JSX.Element => {
 
   const body = useMemo(() => {
     if (barrier) {
-      const upstreamNode =
-        chainNodes.find(
-          (candidate) => candidate.id === barrier.upstreamNodeId,
-        ) ?? null;
-      const downstreamNode =
-        chainNodes.find(
-          (candidate) => candidate.id === barrier.downstreamNodeId,
-        ) ?? null;
-
       return (
         <form
           className="flex flex-1 flex-col gap-5"
@@ -479,10 +470,6 @@ export const Inspector = (): JSX.Element => {
         >
           <div className="flex flex-col gap-1">
             <h3 className="text-sm font-semibold text-slate-900">Barrier</h3>
-            <p className="text-xs text-slate-500">
-              Between {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
-              {downstreamNode?.data.title ?? barrier.downstreamNodeId}
-            </p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">

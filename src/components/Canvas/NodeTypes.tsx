@@ -195,9 +195,6 @@ const BarrierNodeComponent = ({
           {badgeText}
         </span>
       </div>
-      <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
-        Between nodes
-      </div>
       {bulletVisible ? (
         <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-rose-700">
           {bulletPoints.map((point, index) => (
