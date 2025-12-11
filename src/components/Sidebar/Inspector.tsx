@@ -453,12 +453,25 @@ export const Inspector = (): JSX.Element => {
     if (!selectionId) {
       return;
     }
+
+    if (barrier) {
+      fitView({
+        nodes: [
+          { id: barrier.upstreamNodeId },
+          { id: barrier.downstreamNodeId },
+        ],
+        duration: 300,
+        padding: 0.6,
+      });
+      return;
+    }
+
     fitView({
       nodes: [{ id: selectionId }],
       duration: 300,
       padding: 0.6,
     });
-  }, [fitView, selectionId]);
+  }, [barrier, fitView, selectionId]);
 
   const ownerValue = node?.data.owner ?? "";
   const timestampValue = node?.data.timestamp ?? "";
