@@ -4,7 +4,11 @@ import "reactflow/dist/style.css";
 import { useAppStore, type ChainNodeData } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
 
-export const Canvas = (): JSX.Element => {
+type CanvasProps = {
+  showDetails: boolean;
+};
+
+export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   const nodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
   const { moveNode, select } = useAppStore((state) => state.actions);
@@ -31,6 +35,7 @@ export const Canvas = (): JSX.Element => {
 
   return (
     <ReactFlow
+      key={showDetails ? "details" : "summary"}
       style={{ width: "100%", height: "100%" }}
       nodes={nodes}
       edges={edges}
