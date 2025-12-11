@@ -38,6 +38,7 @@ Barrier {
   kind: 'Barrier';
   upstreamNodeId: string;   // ChainNode id that supplies protection
   downstreamNodeId: string; // ChainNode id receiving protection
+  description?: string;     // explanation of what the barrier does
   breached: boolean;        // whether the barrier was compromised
   breachedItems: string[];  // bullet points describing the breach
 }

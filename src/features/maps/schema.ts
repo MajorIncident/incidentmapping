@@ -29,6 +29,7 @@ export const barrierSchema = z.object({
   kind: z.literal("Barrier"),
   upstreamNodeId: z.string().min(1),
   downstreamNodeId: z.string().min(1),
+  description: z.string().optional(),
   breached: z.boolean(),
   breachedItems: z.array(z.string()).default([]),
 });

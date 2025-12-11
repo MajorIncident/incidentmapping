@@ -35,6 +35,7 @@ export const sampleMap: MapData = {
       kind: "Barrier",
       upstreamNodeId: "root",
       downstreamNodeId: "child",
+      description: "Firewall between services",
       breached: false,
       breachedItems: [],
     },

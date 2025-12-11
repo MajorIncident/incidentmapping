@@ -52,6 +52,7 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
           kind: "Barrier",
           upstreamNodeId: matchingBarrier.upstreamNodeId,
           downstreamNodeId: matchingBarrier.downstreamNodeId,
+          description: matchingBarrier.description,
           breached: matchingBarrier.breached,
           breachedItems: matchingBarrier.breachedItems,
         },
