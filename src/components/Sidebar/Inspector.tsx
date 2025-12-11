@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type KeyboardEvent,
 } from "react";
 import { useReactFlow } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
@@ -36,16 +37,32 @@ export const Inspector = (): JSX.Element => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [positiveConsequences, setPositiveConsequences] = useState<string[]>(
+    [],
+  );
+  const [negativeConsequences, setNegativeConsequences] = useState<string[]>(
+    [],
+  );
+  const [positiveErrors, setPositiveErrors] = useState<string[]>([]);
+  const [negativeErrors, setNegativeErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (node) {
       setTitle(node.data.title);
       setDescription(node.data.description ?? "");
       setTitleError(null);
+      setPositiveConsequences(node.data.positiveConsequenceBulletPoints ?? []);
+      setNegativeConsequences(node.data.negativeConsequenceBulletPoints ?? []);
+      setPositiveErrors([]);
+      setNegativeErrors([]);
     } else {
       setTitle("");
       setDescription("");
       setTitleError(null);
+      setPositiveConsequences([]);
+      setNegativeConsequences([]);
+      setPositiveErrors([]);
+      setNegativeErrors([]);
     }
   }, [node]);
 
@@ -115,6 +132,194 @@ export const Inspector = (): JSX.Element => {
       startEditing(selectionId);
     }
   }, [selectionId, startEditing]);
+
+  const validateListValues = useCallback((values: string[]): string[] => {
+    return values.map((value) =>
+      value.trim().length === 0 ? "This field is required." : "",
+    );
+  }, []);
+
+  const commitListValues = useCallback(
+    (
+      listType: "positive" | "negative",
+      values: string[],
+      setValues: (next: string[]) => void,
+      setErrors: (next: string[]) => void,
+    ) => {
+      if (!node) {
+        return;
+      }
+
+      const errors = validateListValues(values);
+      setErrors(errors);
+      setValues(values);
+
+      const hasError = errors.some((error) => error.length > 0);
+      if (hasError) {
+        return;
+      }
+
+      const trimmedValues = values.map((value) => value.trim());
+      updateNodeData(node.id, {
+        [listType === "positive"
+          ? "positiveConsequenceBulletPoints"
+          : "negativeConsequenceBulletPoints"]: trimmedValues,
+      });
+    },
+    [node, updateNodeData, validateListValues],
+  );
+
+  const handleListChange = useCallback(
+    (
+      listType: "positive" | "negative",
+      index: number,
+      event: ChangeEvent<HTMLInputElement>,
+    ) => {
+      const value = event.target.value;
+      if (listType === "positive") {
+        const next = [...positiveConsequences];
+        next[index] = value;
+        commitListValues(
+          "positive",
+          next,
+          setPositiveConsequences,
+          setPositiveErrors,
+        );
+      } else {
+        const next = [...negativeConsequences];
+        next[index] = value;
+        commitListValues(
+          "negative",
+          next,
+          setNegativeConsequences,
+          setNegativeErrors,
+        );
+      }
+    },
+    [
+      commitListValues,
+      negativeConsequences,
+      positiveConsequences,
+      setNegativeConsequences,
+      setPositiveConsequences,
+    ],
+  );
+
+  const handleAddListItem = useCallback(
+    (listType: "positive" | "negative") => {
+      if (listType === "positive") {
+        const next = [...positiveConsequences, ""];
+        commitListValues(
+          "positive",
+          next,
+          setPositiveConsequences,
+          setPositiveErrors,
+        );
+      } else {
+        const next = [...negativeConsequences, ""];
+        commitListValues(
+          "negative",
+          next,
+          setNegativeConsequences,
+          setNegativeErrors,
+        );
+      }
+    },
+    [
+      commitListValues,
+      negativeConsequences,
+      positiveConsequences,
+      setNegativeConsequences,
+      setPositiveConsequences,
+    ],
+  );
+
+  const handleRemoveListItem = useCallback(
+    (listType: "positive" | "negative", index: number) => {
+      if (listType === "positive") {
+        const next = positiveConsequences.filter((_, i) => i !== index);
+        const nextErrors = positiveErrors.filter((_, i) => i !== index);
+        setPositiveErrors(nextErrors);
+        commitListValues(
+          "positive",
+          next,
+          setPositiveConsequences,
+          setPositiveErrors,
+        );
+      } else {
+        const next = negativeConsequences.filter((_, i) => i !== index);
+        const nextErrors = negativeErrors.filter((_, i) => i !== index);
+        setNegativeErrors(nextErrors);
+        commitListValues(
+          "negative",
+          next,
+          setNegativeConsequences,
+          setNegativeErrors,
+        );
+      }
+    },
+    [
+      commitListValues,
+      negativeConsequences,
+      negativeErrors,
+      positiveConsequences,
+      positiveErrors,
+      setNegativeConsequences,
+      setPositiveConsequences,
+    ],
+  );
+
+  const handleListBlur = useCallback(
+    (
+      listType: "positive" | "negative",
+      currentValues: string[],
+      setValues: (next: string[]) => void,
+      setErrors: (next: string[]) => void,
+    ) => {
+      commitListValues(listType, currentValues, setValues, setErrors);
+    },
+    [commitListValues],
+  );
+
+  const handleListKeyDown = useCallback(
+    (
+      event: KeyboardEvent<HTMLInputElement>,
+      listType: "positive" | "negative",
+      index: number,
+    ) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const values =
+          listType === "positive" ? positiveConsequences : negativeConsequences;
+        const errors = validateListValues(values);
+        const hasError = errors.some((error) => error.length > 0);
+        if (!hasError) {
+          handleAddListItem(listType);
+        } else {
+          if (listType === "positive") {
+            setPositiveErrors(errors);
+          } else {
+            setNegativeErrors(errors);
+          }
+        }
+      }
+
+      if (event.key === "Backspace" && event.currentTarget.value === "") {
+        const values =
+          listType === "positive" ? positiveConsequences : negativeConsequences;
+        if (values.length > 0) {
+          handleRemoveListItem(listType, index);
+        }
+      }
+    },
+    [
+      handleAddListItem,
+      handleRemoveListItem,
+      negativeConsequences,
+      positiveConsequences,
+      validateListValues,
+    ],
+  );
 
   const handleCenter = useCallback(() => {
     if (!selectionId) {
@@ -198,6 +403,162 @@ export const Inspector = (): JSX.Element => {
           />
         </div>
 
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold text-slate-900">Consequences</h3>
+
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className={labelClasses}>Positive</span>
+              <button
+                type="button"
+                className={`${buttonClasses} px-2 py-1 text-xs`}
+                onClick={() => handleAddListItem("positive")}
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {positiveConsequences.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  No positive consequences yet.
+                </p>
+              ) : null}
+              {positiveConsequences.map((item, index) => (
+                <div key={`positive-${index}`} className="flex gap-2">
+                  <input
+                    className={`${inputClasses} ${
+                      positiveErrors[index]?.length
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                        : ""
+                    }`}
+                    value={item}
+                    onChange={(event) =>
+                      handleListChange("positive", index, event)
+                    }
+                    onBlur={() =>
+                      handleListBlur(
+                        "positive",
+                        positiveConsequences,
+                        setPositiveConsequences,
+                        setPositiveErrors,
+                      )
+                    }
+                    onKeyDown={(event) =>
+                      handleListKeyDown(event, "positive", index)
+                    }
+                    placeholder="Add a positive consequence"
+                    aria-invalid={Boolean(positiveErrors[index])}
+                    aria-describedby={
+                      positiveErrors[index]?.length
+                        ? `positive-error-${index}`
+                        : undefined
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={`${buttonClasses} px-2 py-1 text-xs`}
+                    onClick={() => handleRemoveListItem("positive", index)}
+                    aria-label={`Remove positive consequence ${index + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {positiveErrors.some((error) => error.length > 0) ? (
+                <div className="flex flex-col gap-1">
+                  {positiveErrors.map((error, index) =>
+                    error.length ? (
+                      <p
+                        key={`positive-error-${index}`}
+                        id={`positive-error-${index}`}
+                        className="text-xs font-medium text-red-600"
+                      >
+                        {error}
+                      </p>
+                    ) : null,
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className={labelClasses}>Negative</span>
+              <button
+                type="button"
+                className={`${buttonClasses} px-2 py-1 text-xs`}
+                onClick={() => handleAddListItem("negative")}
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {negativeConsequences.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  No negative consequences yet.
+                </p>
+              ) : null}
+              {negativeConsequences.map((item, index) => (
+                <div key={`negative-${index}`} className="flex gap-2">
+                  <input
+                    className={`${inputClasses} ${
+                      negativeErrors[index]?.length
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                        : ""
+                    }`}
+                    value={item}
+                    onChange={(event) =>
+                      handleListChange("negative", index, event)
+                    }
+                    onBlur={() =>
+                      handleListBlur(
+                        "negative",
+                        negativeConsequences,
+                        setNegativeConsequences,
+                        setNegativeErrors,
+                      )
+                    }
+                    onKeyDown={(event) =>
+                      handleListKeyDown(event, "negative", index)
+                    }
+                    placeholder="Add a negative consequence"
+                    aria-invalid={Boolean(negativeErrors[index])}
+                    aria-describedby={
+                      negativeErrors[index]?.length
+                        ? `negative-error-${index}`
+                        : undefined
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={`${buttonClasses} px-2 py-1 text-xs`}
+                    onClick={() => handleRemoveListItem("negative", index)}
+                    aria-label={`Remove negative consequence ${index + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {negativeErrors.some((error) => error.length > 0) ? (
+                <div className="flex flex-col gap-1">
+                  {negativeErrors.map((error, index) =>
+                    error.length ? (
+                      <p
+                        key={`negative-error-${index}`}
+                        id={`negative-error-${index}`}
+                        className="text-xs font-medium text-red-600"
+                      >
+                        {error}
+                      </p>
+                    ) : null,
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-1">
           <label htmlFor="inspector-owner" className={labelClasses}>
             Owner
@@ -256,8 +617,17 @@ export const Inspector = (): JSX.Element => {
     handleSubmit,
     handleTimestampChange,
     handleTitleCommit,
+    handleAddListItem,
+    handleListBlur,
+    handleListChange,
+    handleListKeyDown,
+    handleRemoveListItem,
     node,
+    negativeConsequences,
+    negativeErrors,
     ownerValue,
+    positiveConsequences,
+    positiveErrors,
     timestampValue,
     title,
     titleError,
