@@ -46,7 +46,7 @@ export const App = (): JSX.Element => {
             />
             <div className="flex flex-1 overflow-hidden">
               <div className="flex-1 bg-slate-100">
-                <Canvas />
+                <Canvas showDetails={showDetails} />
               </div>
               <Inspector />
             </div>
