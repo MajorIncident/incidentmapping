@@ -10,6 +10,7 @@ MapData {
   };
   nodes: ChainNode[];
   edges: CauseEffectEdge[];
+  barriers?: Barrier[];  // optional, defaults to empty array
 }
 
 ChainNode {
@@ -30,6 +31,15 @@ CauseEffectEdge {
   kind: 'CauseEffectEdge';
   fromId: string;         // parent ChainNode id
   toId: string;           // child ChainNode id
+}
+
+Barrier {
+  id: string;
+  kind: 'Barrier';
+  upstreamNodeId: string;   // ChainNode id that supplies protection
+  downstreamNodeId: string; // ChainNode id receiving protection
+  breached: boolean;        // whether the barrier was compromised
+  breachedItems: string[];  // bullet points describing the breach
 }
 ```
 

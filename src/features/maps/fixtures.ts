@@ -29,6 +29,16 @@ export const sampleMap: MapData = {
       toId: "child",
     },
   ],
+  barriers: [
+    {
+      id: "barrier-root-child",
+      kind: "Barrier",
+      upstreamNodeId: "root",
+      downstreamNodeId: "child",
+      breached: false,
+      breachedItems: [],
+    },
+  ],
 };
 
 export const emptyMap: MapData = {
@@ -36,4 +46,5 @@ export const emptyMap: MapData = {
   metadata: { title: "Untitled Map" },
   nodes: [],
   edges: [],
+  barriers: [],
 };
