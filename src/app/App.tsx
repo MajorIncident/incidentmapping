@@ -11,11 +11,15 @@ export const App = (): JSX.Element => {
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
+  const toggleShowDetails = useAppStore(
+    (state) => state.actions.toggleShowDetails,
+  );
   const setMapTitle = useAppStore((state) => state.actions.setMapTitle);
   const selectionId = useAppStore((state) => state.selectionId);
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
   const mapTitle = useAppStore((state) => state.metadata?.title ?? "");
+  const showDetails = useAppStore((state) => state.showDetails);
 
   return (
     <ReactFlowProvider>
@@ -37,6 +41,8 @@ export const App = (): JSX.Element => {
               onRedo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
+              onToggleDetails={toggleShowDetails}
+              showDetails={showDetails}
             />
             <div className="flex flex-1 overflow-hidden">
               <div className="flex-1 bg-slate-100">

@@ -31,6 +31,7 @@ type AppState = {
   metadata: MapData["metadata"];
   selectionId: string | null;
   editingId: string | null;
+  showDetails: boolean;
   history: HistoryState;
   canUndo: boolean;
   canRedo: boolean;
@@ -50,6 +51,8 @@ type AppState = {
     select: (id: string | null) => void;
     startEditing: (id: string) => void;
     finishEditing: () => void;
+    setShowDetails: (visible: boolean) => void;
+    toggleShowDetails: () => void;
     updateNodeData: (
       id: string,
       patch: Partial<Omit<ChainNodeData, "title">>,
@@ -201,6 +204,7 @@ const createEmptyState = () => ({
   metadata: emptyMap.metadata ? { ...emptyMap.metadata } : undefined,
   selectionId: null,
   editingId: null,
+  showDetails: true,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
@@ -212,26 +216,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   metadata: sampleMap.metadata ? { ...sampleMap.metadata } : undefined,
   selectionId: sampleMap.nodes[0]?.id ?? null,
   editingId: null,
+  showDetails: true,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
   actions: {
     newMap: () => {
       resetMoveDebounce();
-      set(createEmptyState());
+      set((state) => ({
+        ...createEmptyState(),
+        showDetails: state.showDetails,
+      }));
     },
     loadMap: (map) => {
       resetMoveDebounce();
-      set({
+      set((state) => ({
         nodes: mapNodesToReactNodes(map.nodes),
         edges: mapEdgesToReactEdges(map),
         metadata: map.metadata ? { ...map.metadata } : undefined,
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
+        showDetails: state.showDetails,
         history: createEmptyHistory(),
         canUndo: false,
         canRedo: false,
-      });
+      }));
     },
     toMap: () => {
       const { nodes, edges, metadata } = get();
@@ -622,6 +631,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     finishEditing: () => {
       set({ editingId: null });
+    },
+    setShowDetails: (visible) => {
+      set({ showDetails: visible });
+    },
+    toggleShowDetails: () => {
+      set((state) => ({ showDetails: !state.showDetails }));
     },
     updateNodeData: (id, patch) => {
       const prevSnapshot = snapshotFromState(get());
