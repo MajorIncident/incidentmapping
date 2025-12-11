@@ -32,6 +32,7 @@ type AppState = {
   selectionId: string | null;
   editingId: string | null;
   showDetails: boolean;
+  layoutVersion: number;
   history: HistoryState;
   canUndo: boolean;
   canRedo: boolean;
@@ -65,6 +66,11 @@ type AppState = {
 export const GRID_SIZE = 8;
 
 const MOVE_DEBOUNCE_MS = 200;
+const MIN_VERTICAL_MARGIN = 24;
+const MIN_HORIZONTAL_MARGIN = 24;
+const DEFAULT_NODE_WIDTH = 240;
+const DEFAULT_NODE_HEIGHT = 140;
+const DETAILS_HEIGHT = 140;
 
 let moveDebounceActive = false;
 let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -142,6 +148,101 @@ const snapshotFromState = (state: AppState): HistoryEntry => ({
 const snapshotsEqual = (a: HistoryEntry, b: HistoryEntry): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
+const getEstimatedSize = (
+  node: Node<ChainNodeData>,
+  showDetails: boolean,
+): { width: number; height: number } => ({
+  width: node.width ?? DEFAULT_NODE_WIDTH,
+  height:
+    node.height ??
+    (showDetails ? DEFAULT_NODE_HEIGHT + DETAILS_HEIGHT : DEFAULT_NODE_HEIGHT),
+});
+
+const overlapsWithMargin = (
+  a: Node<ChainNodeData>,
+  b: Node<ChainNodeData>,
+  showDetails: boolean,
+) => {
+  const aSize = getEstimatedSize(a, showDetails);
+  const bSize = getEstimatedSize(b, showDetails);
+  return (
+    a.position.x < b.position.x + bSize.width + MIN_HORIZONTAL_MARGIN &&
+    a.position.x + aSize.width + MIN_HORIZONTAL_MARGIN > b.position.x &&
+    a.position.y < b.position.y + bSize.height + MIN_VERTICAL_MARGIN &&
+    a.position.y + aSize.height + MIN_VERTICAL_MARGIN > b.position.y
+  );
+};
+
+const layoutNodes = (
+  nodes: Node<ChainNodeData>[],
+  showDetails: boolean,
+): Node<ChainNodeData>[] => {
+  const sorted = [...nodes].sort((a, b) =>
+    a.position.y === b.position.y
+      ? a.position.x - b.position.x
+      : a.position.y - b.position.y,
+  );
+
+  const positioned = new Map<string, Node<ChainNodeData>>();
+
+  sorted.forEach((node) => {
+    let candidate: Node<ChainNodeData> = { ...node };
+    const attempts = nodes.length * 4;
+
+    for (let i = 0; i < attempts; i += 1) {
+      const colliding = Array.from(positioned.values()).find((other) =>
+        overlapsWithMargin(candidate, other, showDetails),
+      );
+
+      if (!colliding) {
+        break;
+      }
+
+      const collidingSize = getEstimatedSize(colliding, showDetails);
+
+      const shiftRight = {
+        ...candidate,
+        position: snapPosition({
+          x: colliding.position.x + collidingSize.width + MIN_HORIZONTAL_MARGIN,
+          y: candidate.position.y,
+        }),
+      };
+
+      if (!overlapsWithMargin(shiftRight, colliding, showDetails)) {
+        candidate = shiftRight;
+        continue;
+      }
+
+      candidate = {
+        ...candidate,
+        position: snapPosition({
+          x: candidate.position.x,
+          y: colliding.position.y + collidingSize.height + MIN_VERTICAL_MARGIN,
+        }),
+      };
+    }
+
+    positioned.set(candidate.id, candidate);
+  });
+
+  return nodes.map((node) => positioned.get(node.id) ?? node);
+};
+
+const applyLayout = (
+  nodes: Node<ChainNodeData>[],
+  showDetails: boolean,
+): { nodes: Node<ChainNodeData>[]; changed: boolean } => {
+  const laidOut = layoutNodes(nodes, showDetails);
+  const previousPositions = new Map(
+    nodes.map((node) => [node.id, `${node.position.x}-${node.position.y}`]),
+  );
+  const changed = laidOut.some((node) => {
+    const previous = previousPositions.get(node.id);
+    return previous !== `${node.position.x}-${node.position.y}`;
+  });
+  return { nodes: laidOut, changed };
+};
+
 const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
 
 const applyHistorySnapshot = (snapshot: HistoryEntry) => ({
@@ -205,6 +306,7 @@ const createEmptyState = () => ({
   selectionId: null,
   editingId: null,
   showDetails: true,
+  layoutVersion: 0,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
@@ -217,6 +319,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectionId: sampleMap.nodes[0]?.id ?? null,
   editingId: null,
   showDetails: true,
+  layoutVersion: 0,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
@@ -231,12 +334,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     loadMap: (map) => {
       resetMoveDebounce();
       set((state) => ({
-        nodes: mapNodesToReactNodes(map.nodes),
+        nodes: applyLayout(mapNodesToReactNodes(map.nodes), state.showDetails)
+          .nodes,
         edges: mapEdgesToReactEdges(map),
         metadata: map.metadata ? { ...map.metadata } : undefined,
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
+        layoutVersion: state.layoutVersion + 1,
         history: createEmptyHistory(),
         canUndo: false,
         canRedo: false,
@@ -332,12 +437,19 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
+        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
+          nextNodes,
+          state.showDetails,
+        );
         const candidate = {
           ...state,
-          nodes: nextNodes,
+          nodes: laidOutNodes,
           edges: nextEdges,
           selectionId: newNodeId,
           editingId: newNodeId,
+          layoutVersion: layoutChanged
+            ? state.layoutVersion + 1
+            : state.layoutVersion,
         } satisfies AppState;
         const nextSnapshot = snapshotFromState(candidate);
         const history = updateHistoryState(
@@ -346,10 +458,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           !snapshotsEqual(prevSnapshot, nextSnapshot),
         );
         return {
-          nodes: nextNodes,
+          nodes: laidOutNodes,
           edges: nextEdges,
           selectionId: newNodeId,
           editingId: newNodeId,
+          layoutVersion: candidate.layoutVersion,
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
@@ -410,12 +523,19 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
+        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
+          nextNodes,
+          state.showDetails,
+        );
         const candidate = {
           ...state,
-          nodes: nextNodes,
+          nodes: laidOutNodes,
           edges: nextEdges,
           selectionId: newNodeId,
           editingId: newNodeId,
+          layoutVersion: layoutChanged
+            ? state.layoutVersion + 1
+            : state.layoutVersion,
         } satisfies AppState;
         const nextSnapshot = snapshotFromState(candidate);
         const history = updateHistoryState(
@@ -424,10 +544,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           !snapshotsEqual(prevSnapshot, nextSnapshot),
         );
         return {
-          nodes: nextNodes,
+          nodes: laidOutNodes,
           edges: nextEdges,
           selectionId: newNodeId,
           editingId: newNodeId,
+          layoutVersion: candidate.layoutVersion,
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
@@ -633,10 +754,35 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ editingId: null });
     },
     setShowDetails: (visible) => {
-      set({ showDetails: visible });
+      set((state) => {
+        const { nodes: laidOutNodes, changed } = applyLayout(
+          state.nodes,
+          visible,
+        );
+        return {
+          showDetails: visible,
+          nodes: laidOutNodes,
+          layoutVersion: changed
+            ? state.layoutVersion + 1
+            : state.layoutVersion,
+        };
+      });
     },
     toggleShowDetails: () => {
-      set((state) => ({ showDetails: !state.showDetails }));
+      set((state) => {
+        const nextShowDetails = !state.showDetails;
+        const { nodes: laidOutNodes, changed } = applyLayout(
+          state.nodes,
+          nextShowDetails,
+        );
+        return {
+          showDetails: nextShowDetails,
+          nodes: laidOutNodes,
+          layoutVersion: changed
+            ? state.layoutVersion + 1
+            : state.layoutVersion,
+        };
+      });
     },
     updateNodeData: (id, patch) => {
       const prevSnapshot = snapshotFromState(get());
@@ -659,9 +805,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!changed) {
           return {};
         }
+        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
+          nextNodes,
+          state.showDetails,
+        );
         const candidate = {
           ...state,
-          nodes: nextNodes,
+          nodes: laidOutNodes,
+          layoutVersion: layoutChanged
+            ? state.layoutVersion + 1
+            : state.layoutVersion,
         } satisfies AppState;
         const nextSnapshot = snapshotFromState(candidate);
         const history = updateHistoryState(
@@ -670,8 +823,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           !snapshotsEqual(prevSnapshot, nextSnapshot),
         );
         return {
-          nodes: nextNodes,
+          nodes: laidOutNodes,
           history,
+          layoutVersion: candidate.layoutVersion,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
         };
