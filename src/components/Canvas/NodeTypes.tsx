@@ -171,6 +171,7 @@ const BarrierNodeComponent = ({
   const badgeClasses = data.breached
     ? "bg-rose-100 text-rose-700 border-rose-300"
     : "bg-emerald-100 text-emerald-700 border-emerald-300";
+  const description = data.description?.trim();
 
   return (
     <div
@@ -198,6 +199,9 @@ const BarrierNodeComponent = ({
       <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
         Between nodes
       </div>
+      <p className="mt-1 text-sm text-slate-700">
+        {description ?? "No barrier description provided."}
+      </p>
       {bulletVisible ? (
         <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-rose-700">
           {bulletPoints.map((point, index) => (

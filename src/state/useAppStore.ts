@@ -17,6 +17,7 @@ export type BarrierNodeData = {
   kind: "Barrier";
   upstreamNodeId: string;
   downstreamNodeId: string;
+  description?: string;
   breached: boolean;
   breachedItems: string[];
 };
@@ -72,7 +73,9 @@ type AppState = {
     ) => void;
     updateBarrierData: (
       id: string,
-      patch: Partial<Pick<Barrier, "breached" | "breachedItems">>,
+      patch: Partial<
+        Pick<Barrier, "breached" | "breachedItems" | "description">
+      >,
     ) => void;
     undo: () => void;
     redo: () => void;

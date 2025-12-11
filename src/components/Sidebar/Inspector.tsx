@@ -56,6 +56,7 @@ export const Inspector = (): JSX.Element => {
   const [negativeConsequences, setNegativeConsequences] = useState<string[]>(
     [],
   );
+  const [barrierDescription, setBarrierDescription] = useState("");
   const [positiveErrors, setPositiveErrors] = useState<string[]>([]);
   const [negativeErrors, setNegativeErrors] = useState<string[]>([]);
   const [breachedItems, setBreachedItems] = useState<string[]>([]);
@@ -86,10 +87,12 @@ export const Inspector = (): JSX.Element => {
     if (barrier) {
       setIsBreached(barrier.breached);
       setBreachedItems(barrier.breachedItems ?? []);
+      setBarrierDescription(barrier.description ?? "");
       setBreachedErrors([]);
     } else {
       setIsBreached(false);
       setBreachedItems([]);
+      setBarrierDescription("");
       setBreachedErrors([]);
     }
   }, [barrier]);
@@ -165,6 +168,16 @@ export const Inspector = (): JSX.Element => {
     },
     [barrier, updateBarrierData],
   );
+
+  const handleBarrierDescriptionBlur = useCallback(() => {
+    if (!barrier) {
+      return;
+    }
+    const trimmed = barrierDescription.trim();
+    updateBarrierData(barrier.id, {
+      description: trimmed.length ? trimmed : undefined,
+    });
+  }, [barrier, barrierDescription, updateBarrierData]);
 
   const validateBreachedList = useCallback((values: string[]): string[] => {
     return values.map((value) =>
@@ -483,6 +496,20 @@ export const Inspector = (): JSX.Element => {
               Between {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
               {downstreamNode?.data.title ?? barrier.downstreamNodeId}
             </p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="barrier-description" className={labelClasses}>
+              Description
+            </label>
+            <textarea
+              id="barrier-description"
+              className={textAreaClasses}
+              value={barrierDescription}
+              onChange={(event) => setBarrierDescription(event.target.value)}
+              onBlur={handleBarrierDescriptionBlur}
+              placeholder="Explain what this barrier does"
+            />
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -944,6 +971,7 @@ export const Inspector = (): JSX.Element => {
   }, [
     addBarrierForFirstDownstream,
     barrier,
+    barrierDescription,
     barriers,
     breachedErrors,
     breachedItems,
@@ -955,6 +983,7 @@ export const Inspector = (): JSX.Element => {
     handleBreachedListBlur,
     handleBreachedListChange,
     handleBreachedListKeyDown,
+    handleBarrierDescriptionBlur,
     handleCenter,
     handleDescriptionBlur,
     handleFocusTitle,
