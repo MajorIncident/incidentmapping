@@ -2,16 +2,14 @@ import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
+  type Edge,
   type Node,
   useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import {
-  useAppStore,
-  type BarrierNodeData,
-  type ChainNodeData,
-} from "../../state/useAppStore";
+import { useAppStore, type ChainNodeData } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
+import { BarrierEdge, type BarrierEdgeData } from "./BarrierEdge";
 
 type CanvasProps = {
   showDetails: boolean;
@@ -26,9 +24,7 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   const reactFlow = useReactFlow();
 
   const { nodes, renderedEdges } = useMemo(() => {
-    const nodeLookup = new Map(chainNodes.map((node) => [node.id, node]));
-    const barrierNodes: Node<BarrierNodeData>[] = [];
-    const flowEdges = edges.flatMap((edge) => {
+    const flowEdges: Edge<BarrierEdgeData>[] = edges.map((edge) => {
       const matchingBarrier = barriers.find(
         (barrier) =>
           barrier.upstreamNodeId === edge.source &&
@@ -36,63 +32,43 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
       );
 
       if (!matchingBarrier) {
-        return [edge];
+        return edge;
       }
 
-      const upstream = nodeLookup.get(edge.source);
-      const downstream = nodeLookup.get(edge.target);
-      if (!upstream || !downstream) {
-        return [edge];
-      }
-
-      const barrierNode: Node<BarrierNodeData> = {
-        id: matchingBarrier.id,
-        type: "Barrier",
+      return {
+        ...edge,
+        id: `${edge.id}-${matchingBarrier.id}`,
+        type: "BarrierEdge",
         data: {
-          kind: "Barrier",
-          upstreamNodeId: matchingBarrier.upstreamNodeId,
-          downstreamNodeId: matchingBarrier.downstreamNodeId,
+          barrierId: matchingBarrier.id,
           description: matchingBarrier.description,
           breached: matchingBarrier.breached,
           breachedItems: matchingBarrier.breachedItems,
+          onSelect: select,
         },
-        position: {
-          x:
-            upstream.position.x +
-            (downstream.position.x - upstream.position.x) / 2,
-          y:
-            upstream.position.y +
-            (downstream.position.y - upstream.position.y) / 2,
-        },
-        draggable: false,
-        selectable: true,
-      };
-
-      barrierNodes.push(barrierNode);
-
-      return [
-        {
-          ...edge,
-          id: `${edge.id}-${matchingBarrier.id}-upstream`,
-          target: matchingBarrier.id,
-        },
-        {
-          ...edge,
-          id: `${edge.id}-${matchingBarrier.id}-downstream`,
-          source: matchingBarrier.id,
-        },
-      ];
+      } satisfies Edge<BarrierEdgeData>;
     });
 
     return {
-      nodes: [...chainNodes, ...barrierNodes],
+      nodes: chainNodes,
       renderedEdges: flowEdges,
     };
-  }, [barriers, chainNodes, edges]);
+  }, [barriers, chainNodes, edges, select]);
 
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
+    (_: React.MouseEvent, node: Node<ChainNodeData>) => {
       select(node.id);
+    },
+    [select],
+  );
+
+  const handleEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge<BarrierEdgeData>) => {
+      if (edge.type === "BarrierEdge" && edge.data?.barrierId) {
+        select(edge.data.barrierId);
+        return;
+      }
+      select(null);
     },
     [select],
   );
@@ -102,10 +78,7 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   }, [select]);
 
   const handleNodeDragStop = useCallback(
-    (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
-      if (node.type === "Barrier") {
-        return;
-      }
+    (_: React.MouseEvent, node: Node<ChainNodeData>) => {
       moveNode(node.id, node.position);
     },
     [moveNode],
@@ -116,6 +89,7 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   }, [layoutVersion, reactFlow]);
 
   const memorizedNodeTypes = useMemo(() => nodeTypes, []);
+  const memorizedEdgeTypes = useMemo(() => ({ BarrierEdge }), []);
 
   return (
     <ReactFlow
@@ -124,10 +98,12 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
       nodes={nodes}
       edges={renderedEdges}
       nodeTypes={memorizedNodeTypes}
+      edgeTypes={memorizedEdgeTypes}
       fitView
       fitViewOptions={{ padding: 0.2, includeHiddenNodes: true }}
       proOptions={{ hideAttribution: true }}
       onNodeClick={handleNodeClick}
+      onEdgeClick={handleEdgeClick}
       onPaneClick={handlePaneClick}
       onNodeDragStop={handleNodeDragStop}
       snapToGrid
