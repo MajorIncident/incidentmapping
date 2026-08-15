@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
-import { emptyMap, sampleMap } from "../features/maps/fixtures";
+import { sampleMap } from "../features/maps/fixtures";
 import type { Barrier, ChainNode, MapData } from "../features/maps/schema";
 import { createId } from "../lib/id";
 import {
@@ -114,6 +114,7 @@ const MOVE_DEBOUNCE_MS = 200;
 
 let moveDebounceActive = false;
 let nextEditorFocusRequestId = 1;
+let nextNewMapViewportRequestId = 1;
 let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const resetMoveDebounce = () => {
@@ -262,21 +263,49 @@ const findFirstDownstreamEdge = (
   upstreamId: string,
 ): Edge | null => edges.find((edge) => edge.source === upstreamId) ?? null;
 
-const createEmptyState = () => ({
-  nodes: mapNodesToReactNodes(emptyMap.nodes),
-  edges: mapEdgesToReactEdges(emptyMap),
-  metadata: emptyMap.metadata ? { ...emptyMap.metadata } : undefined,
-  barriers: emptyMap.barriers ? [...emptyMap.barriers] : [],
-  selectionId: null,
-  editingId: null,
-  showDetails: true,
-  layoutVersion: 0,
-  viewportRequest: null,
-  editorFocusRequest: null,
-  history: createEmptyHistory(),
-  canUndo: false,
-  canRedo: false,
+/** Creates the initial event for an interactive map without mutating a fixture. */
+export const createRootNode = (): ChainNode => ({
+  id: createId("node"),
+  kind: "ChainNode",
+  title: "New incident",
+  description: "",
+  positiveConsequenceBulletPoints: [],
+  negativeConsequenceBulletPoints: [],
+  position: snapPosition({ x: 0, y: 0 }),
 });
+
+/** Creates a fresh interactive map; imported maps may still legitimately be empty. */
+export const createNewMap = (): MapData => ({
+  schemaVersion: 1,
+  metadata: { title: "Untitled Map" },
+  nodes: [createRootNode()],
+  edges: [],
+  barriers: [],
+});
+
+const createNewMapState = () => {
+  const map = createNewMap();
+  const rootId = map.nodes[0].id;
+  return {
+    nodes: mapNodesToReactNodes(map.nodes),
+    edges: mapEdgesToReactEdges(map),
+    metadata: map.metadata ? { ...map.metadata } : undefined,
+    barriers: map.barriers ? [...map.barriers] : [],
+    selectionId: rootId,
+    editingId: rootId,
+    showDetails: true,
+    layoutVersion: 0,
+    viewportRequest: { id: nextNewMapViewportRequestId++, nodeIds: [rootId] },
+    editorFocusRequest: {
+      id: nextEditorFocusRequestId++,
+      nodeId: rootId,
+      field: "title" as const,
+    },
+    history: createEmptyHistory(),
+    canUndo: false,
+    canRedo: false,
+  };
+};
 
 export const useAppStore = create<AppState>((set, get) => ({
   nodes: mapNodesToReactNodes(sampleMap.nodes),
@@ -296,7 +325,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     newMap: () => {
       resetMoveDebounce();
       set((state) => ({
-        ...createEmptyState(),
+        ...createNewMapState(),
         showDetails: state.showDetails,
       }));
     },

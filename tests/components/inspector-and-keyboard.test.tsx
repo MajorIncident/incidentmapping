@@ -12,6 +12,7 @@ import { ReactFlowProvider } from "reactflow";
 import { Inspector } from "../../src/components/Sidebar/Inspector";
 import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
+import { emptyMap } from "../../src/features/maps/fixtures";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -56,7 +57,7 @@ describe("Inspector and keyboard workflows", () => {
   beforeEach(() => {
     const { actions } = useAppStore.getState();
     act(() => {
-      actions.newMap();
+      actions.loadMap(emptyMap);
     });
   });
 
