@@ -23,6 +23,14 @@ const ChainNodeComponent = ({
   const renameNode = useAppStore((state) => state.actions.renameNode);
   const startEditing = useAppStore((state) => state.actions.startEditing);
   const finishEditing = useAppStore((state) => state.actions.finishEditing);
+  const requestEditorFocus = useAppStore(
+    (state) => state.actions.requestEditorFocus,
+  );
+  const clearEditorFocusRequest = useAppStore(
+    (state) => state.actions.clearEditorFocusRequest,
+  );
+  const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
+  const viewportRequest = useAppStore((state) => state.viewportRequest);
   const showDetails = useAppStore((state) => state.showDetails);
   const editingId = useAppStore((state) => state.editingId);
   const isEditing = editingId === id;
@@ -30,11 +38,33 @@ const ChainNodeComponent = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (isEditing) {
+    if (
+      editorFocusRequest?.field === "title" &&
+      editorFocusRequest.nodeId === id &&
+      !viewportRequest
+    ) {
+      startEditing(id);
+    }
+  }, [editorFocusRequest, id, startEditing, viewportRequest]);
+
+  useEffect(() => {
+    if (isEditing && !viewportRequest) {
       inputRef.current?.focus();
       inputRef.current?.select();
+      if (
+        editorFocusRequest?.field === "title" &&
+        editorFocusRequest.nodeId === id
+      ) {
+        clearEditorFocusRequest(editorFocusRequest.id);
+      }
     }
-  }, [isEditing]);
+  }, [
+    clearEditorFocusRequest,
+    editorFocusRequest,
+    id,
+    isEditing,
+    viewportRequest,
+  ]);
 
   useEffect(() => {
     setValue(data.title);
@@ -45,13 +75,18 @@ const ChainNodeComponent = ({
     startEditing(id);
   }, [data.title, id, startEditing]);
 
-  const commitEdit = useCallback(() => {
-    const renamed = renameNode(id, value);
-    if (!renamed) {
-      setValue(data.title);
-    }
-    finishEditing();
-  }, [data.title, finishEditing, id, renameNode, value]);
+  const commitEdit = useCallback(
+    (continueToDescription = false) => {
+      const renamed = renameNode(id, value);
+      if (!renamed) {
+        setValue(data.title);
+      }
+      finishEditing();
+      if (renamed && continueToDescription)
+        requestEditorFocus(id, "description");
+    },
+    [data.title, finishEditing, id, renameNode, requestEditorFocus, value],
+  );
 
   const cancelEdit = useCallback(() => {
     setValue(data.title);
@@ -62,7 +97,7 @@ const ChainNodeComponent = ({
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        commitEdit();
+        commitEdit(true);
       }
       if (event.key === "Escape") {
         event.preventDefault();
@@ -132,7 +167,7 @@ const ChainNodeComponent = ({
           ref={inputRef}
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          onBlur={commitEdit}
+          onBlur={() => commitEdit()}
           onKeyDown={handleKeyDown}
           className={inputClasses}
           aria-label="Node title"
