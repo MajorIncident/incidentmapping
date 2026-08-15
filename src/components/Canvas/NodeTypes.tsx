@@ -80,8 +80,17 @@ const ChainNodeComponent = ({
     [selected],
   );
 
-  const positivePoints = data.positiveConsequenceBulletPoints ?? [];
-  const negativePoints = data.negativeConsequenceBulletPoints ?? [];
+  const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
+    (point) => point.trim().length > 0,
+  );
+  const negativePoints = (data.negativeConsequenceBulletPoints ?? []).filter(
+    (point) => point.trim().length > 0,
+  );
+  const hasPositivePoints = positivePoints.length > 0;
+  const hasNegativePoints = negativePoints.length > 0;
+  const hasDescription = Boolean(data.description?.trim());
+  const hasVisibleDetails =
+    hasDescription || hasPositivePoints || hasNegativePoints;
 
   return (
     <div
@@ -108,53 +117,61 @@ const ChainNodeComponent = ({
       ) : (
         <div className={titleClasses}>{data.title}</div>
       )}
-      {!isEditing && showDetails ? (
-        <div className="mt-2 space-y-2 text-xs text-slate-600">
-          {data.description ? (
+      {!isEditing && showDetails && hasVisibleDetails ? (
+        <div
+          className="mt-2 space-y-2 text-xs text-slate-600"
+          data-testid="node-details"
+        >
+          {hasDescription ? (
             <p className="whitespace-pre-wrap break-words text-[13px] text-slate-700">
               {data.description}
             </p>
           ) : null}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
-                Positive
-              </div>
-              <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
-                {positivePoints.length > 0 ? (
-                  positivePoints.map((point, index) => (
-                    <li
-                      key={`${id}-positive-${index}`}
-                      className="whitespace-pre-wrap break-words"
-                    >
-                      {point}
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-slate-400 italic">No positive impacts</li>
-                )}
-              </ul>
+          {hasPositivePoints || hasNegativePoints ? (
+            <div
+              className={`grid gap-2 ${
+                hasPositivePoints && hasNegativePoints
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
+              }`}
+              data-testid="consequence-grid"
+            >
+              {hasPositivePoints ? (
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                    Positive
+                  </div>
+                  <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
+                    {positivePoints.map((point, index) => (
+                      <li
+                        key={`${id}-positive-${index}`}
+                        className="whitespace-pre-wrap break-words"
+                      >
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {hasNegativePoints ? (
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
+                    Negative
+                  </div>
+                  <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
+                    {negativePoints.map((point, index) => (
+                      <li
+                        key={`${id}-negative-${index}`}
+                        className="whitespace-pre-wrap break-words"
+                      >
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
-            <div className="space-y-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
-                Negative
-              </div>
-              <ul className="list-disc space-y-1 pl-4 text-[13px] text-slate-700">
-                {negativePoints.length > 0 ? (
-                  negativePoints.map((point, index) => (
-                    <li
-                      key={`${id}-negative-${index}`}
-                      className="whitespace-pre-wrap break-words"
-                    >
-                      {point}
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-slate-400 italic">No negative impacts</li>
-                )}
-              </ul>
-            </div>
-          </div>
+          ) : null}
         </div>
       ) : null}
     </div>
