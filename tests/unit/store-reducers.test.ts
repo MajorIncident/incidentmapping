@@ -5,14 +5,47 @@ import {
   snapPosition,
   VERTICAL_GAP,
 } from "../../src/features/layout/hierarchy";
+import { emptyMap } from "../../src/features/maps/fixtures";
 
 describe("useAppStore actions", () => {
   beforeEach(() => {
-    const { newMap } = useAppStore.getState().actions;
-    newMap();
+    useAppStore.getState().actions.loadMap(emptyMap);
     if (!useAppStore.getState().showDetails) {
       useAppStore.getState().actions.setShowDetails(true);
     }
+  });
+
+  it("creates a fresh selected root in edit mode without history", () => {
+    const { actions } = useAppStore.getState();
+    actions.addChild();
+    actions.renameNode(useAppStore.getState().selectionId!, "Old incident");
+
+    actions.newMap();
+    const first = useAppStore.getState();
+    const root = first.nodes[0];
+    expect(first.nodes).toHaveLength(1);
+    expect(root.data).toMatchObject({
+      title: "New incident",
+      description: "",
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+    });
+    expect(root.position).toEqual(snapPosition({ x: 0, y: 0 }));
+    expect(first.edges).toEqual([]);
+    expect(first.barriers).toEqual([]);
+    expect(first.selectionId).toBe(root.id);
+    expect(first.editingId).toBe(root.id);
+    expect(first.viewportRequest?.nodeIds).toEqual([root.id]);
+    expect(first.editorFocusRequest).toMatchObject({
+      nodeId: root.id,
+      field: "title",
+    });
+    expect(first.history).toEqual({ past: [], future: [] });
+    expect(first.canUndo).toBe(false);
+    expect(first.canRedo).toBe(false);
+
+    actions.newMap();
+    expect(useAppStore.getState().nodes[0].id).not.toBe(root.id);
   });
 
   it("supports add → rename → move → delete flow", () => {

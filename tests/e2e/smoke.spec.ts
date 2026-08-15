@@ -8,15 +8,14 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "New" }).click();
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
-
-  const titleLocator = page.getByText("New ChainNode").first();
-  await titleLocator.dblclick();
   const input = page.getByRole("textbox", { name: "Node title" });
+  await expect(input).toBeFocused();
   await input.fill("Primary Event");
   await input.press("Enter");
+  await expect(page.getByText("Primary Event")).toBeVisible();
 
   await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save" }).click();
@@ -41,7 +40,6 @@ test("creating another child focuses the parent and complete sibling group", asy
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New" }).click();
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   const parent = page.locator(".react-flow__node").first();
