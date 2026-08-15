@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GRID_SIZE, useAppStore } from "../../src/state/useAppStore";
+import {
+  getNodeSize,
+  snapPosition,
+  VERTICAL_GAP,
+} from "../../src/features/layout/hierarchy";
 
 describe("useAppStore actions", () => {
   beforeEach(() => {
     const { newMap } = useAppStore.getState().actions;
     newMap();
+    if (!useAppStore.getState().showDetails) {
+      useAppStore.getState().actions.setShowDetails(true);
+    }
   });
 
   it("supports add → rename → move → delete flow", () => {
@@ -109,18 +117,93 @@ describe("useAppStore actions", () => {
     });
   });
 
-  it("centers a single child directly below its parent on the grid", () => {
+  it.each([true, false])(
+    "centers a first child below its parent without moving existing nodes (details: %s)",
+    (showDetails) => {
+      const { actions } = useAppStore.getState();
+      actions.setShowDetails(showDetails);
+      const parentId = actions.addChild() as string;
+      actions.select(null);
+      const unrelatedId = actions.addChild() as string;
+      actions.moveNode(parentId, { x: 104, y: 72 });
+      actions.moveNode(unrelatedId, { x: 776, y: 344 });
+      useAppStore.setState((state) => ({
+        nodes: state.nodes.map((node) =>
+          node.id === parentId
+            ? { ...node, width: 248, height: showDetails ? 312 : 152 }
+            : node,
+        ),
+      }));
+      const before = useAppStore.getState();
+      const parentBefore = before.nodes.find((node) => node.id === parentId)!;
+      const unrelatedBefore = before.nodes.find(
+        (node) => node.id === unrelatedId,
+      )!;
+      const childId = actions.addChild(parentId) as string;
+      const state = useAppStore.getState();
+      const parent = state.nodes.find((node) => node.id === parentId)!;
+      const child = state.nodes.find((node) => node.id === childId)!;
+      const parentSize = getNodeSize(parent, showDetails);
+      const childSize = getNodeSize(child, showDetails);
+      const expected = snapPosition({
+        x: parent.position.x + parentSize.width / 2 - childSize.width / 2,
+        y: parent.position.y + parentSize.height + VERTICAL_GAP,
+      });
+
+      expect(child.position).toEqual(expected);
+      expect(
+        Math.abs(
+          child.position.x +
+            childSize.width / 2 -
+            (parent.position.x + parentSize.width / 2),
+        ),
+      ).toBeLessThanOrEqual(GRID_SIZE / 2);
+      expect(parent.position).toEqual(parentBefore.position);
+      expect(
+        state.nodes.find((node) => node.id === unrelatedId)?.position,
+      ).toEqual(unrelatedBefore.position);
+      expect(state.layoutVersion).toBe(before.layoutVersion);
+      expect(child.position.x % GRID_SIZE).toBe(0);
+      expect(child.position.y % GRID_SIZE).toBe(0);
+    },
+  );
+
+  it("uses both measured widths and relayouts an evenly split second child", () => {
     const { actions } = useAppStore.getState();
     const parentId = actions.addChild() as string;
-    const childId = actions.addChild(parentId) as string;
+    useAppStore.setState((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === parentId ? { ...node, width: 320, height: 184 } : node,
+      ),
+    }));
+    const firstId = actions.addChild(parentId) as string;
+    useAppStore.setState((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === firstId ? { ...node, width: 192 } : node,
+      ),
+    }));
+    const beforeSecond = useAppStore.getState();
+    const parentBefore = beforeSecond.nodes.find(
+      (node) => node.id === parentId,
+    )!;
+    const firstBefore = beforeSecond.nodes.find((node) => node.id === firstId)!;
+    expect(firstBefore.position.x).toBe(
+      snapPosition({
+        x: parentBefore.position.x + 320 / 2 - 240 / 2,
+        y: parentBefore.position.y + 184 + VERTICAL_GAP,
+      }).x,
+    );
+
+    const secondId = actions.addChild(parentId) as string;
     const state = useAppStore.getState();
     const parent = state.nodes.find((node) => node.id === parentId)!;
-    const child = state.nodes.find((node) => node.id === childId)!;
-
-    expect(child.position.x).toBe(parent.position.x);
-    expect(child.position.y).toBeGreaterThan(parent.position.y);
-    expect(child.position.x % GRID_SIZE).toBe(0);
-    expect(child.position.y % GRID_SIZE).toBe(0);
+    const first = state.nodes.find((node) => node.id === firstId)!;
+    const second = state.nodes.find((node) => node.id === secondId)!;
+    expect(first.position.y).toBe(second.position.y);
+    expect((first.position.x + second.position.x + 240) / 2).toBe(
+      parent.position.x + 320 / 2,
+    );
+    expect(state.layoutVersion).toBeGreaterThan(beforeSecond.layoutVersion);
   });
 
   it("spaces siblings evenly around their parent at one level", () => {

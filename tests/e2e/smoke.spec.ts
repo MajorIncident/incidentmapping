@@ -46,8 +46,27 @@ test("creating another child focuses the parent and complete sibling group", asy
 
   const parent = page.locator(".react-flow__node").first();
   await parent.click();
+  const parentBeforeFirstChild = await parent.boundingBox();
+  expect(parentBeforeFirstChild).not.toBeNull();
   await page.getByRole("button", { name: "Add ChainNode" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+  await page.waitForTimeout(500);
+  const parentAfterFirstChild = await parent.boundingBox();
+  expect(parentAfterFirstChild).not.toBeNull();
+  expect(parentAfterFirstChild!.x).toBeCloseTo(parentBeforeFirstChild!.x, 0);
+  expect(parentAfterFirstChild!.y).toBeCloseTo(parentBeforeFirstChild!.y, 0);
+
+  const firstChild = page.locator(".react-flow__node").nth(1);
+  const [bottomHandle, topHandle] = await Promise.all([
+    parent.locator(".react-flow__handle-bottom").boundingBox(),
+    firstChild.locator(".react-flow__handle-top").boundingBox(),
+  ]);
+  expect(bottomHandle).not.toBeNull();
+  expect(topHandle).not.toBeNull();
+  expect(bottomHandle!.x + bottomHandle!.width / 2).toBeCloseTo(
+    topHandle!.x + topHandle!.width / 2,
+    0,
+  );
   await parent.click();
   await page.getByRole("button", { name: "Add ChainNode" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");

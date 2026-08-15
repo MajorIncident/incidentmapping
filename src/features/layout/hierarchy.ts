@@ -2,11 +2,11 @@ import type { Edge, Node, XYPosition } from "reactflow";
 
 export const GRID_SIZE = 8;
 
-const DEFAULT_NODE_WIDTH = 240;
-const DEFAULT_NODE_HEIGHT = 140;
-const DETAILS_HEIGHT = 140;
-const HORIZONTAL_GAP = 32;
-const VERTICAL_GAP = 64;
+export const DEFAULT_NODE_WIDTH = 240;
+export const DEFAULT_NODE_HEIGHT = 140;
+export const DETAILS_HEIGHT = 140;
+export const HORIZONTAL_GAP = 32;
+export const VERTICAL_GAP = 64;
 const BARRIER_CLEARANCE = 176;
 const TREE_GAP = 96;
 
@@ -24,7 +24,7 @@ export const snapPosition = ({ x, y }: XYPosition): XYPosition => ({
   y: Math.round(y / GRID_SIZE) * GRID_SIZE,
 });
 
-const sizeOf = <Data>(node: Node<Data>, showDetails: boolean) => ({
+export const getNodeSize = <Data>(node: Node<Data>, showDetails: boolean) => ({
   width: node.width ?? DEFAULT_NODE_WIDTH,
   height:
     node.height ??
@@ -114,7 +114,7 @@ export const layoutHierarchy = <Data>(
       0,
     );
     const width = Math.max(
-      sizeOf(byId.get(id)!, showDetails).width,
+      getNodeSize(byId.get(id)!, showDetails).width,
       childrenWidth,
     );
     widths.set(id, width);
@@ -128,7 +128,7 @@ export const layoutHierarchy = <Data>(
     const level = depth.get(node.id) ?? 0;
     levelHeights[level] = Math.max(
       levelHeights[level],
-      sizeOf(node, showDetails).height,
+      getNodeSize(node, showDetails).height,
     );
   });
   const barrierLevels = new Set<number>();
@@ -157,7 +157,7 @@ export const layoutHierarchy = <Data>(
     positions.set(
       id,
       snapPosition({
-        x: left + (footprint - sizeOf(node, showDetails).width) / 2,
+        x: left + (footprint - getNodeSize(node, showDetails).width) / 2,
         y: levelY[depth.get(id) ?? 0],
       }),
     );

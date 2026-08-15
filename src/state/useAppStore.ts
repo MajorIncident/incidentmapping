@@ -5,7 +5,9 @@ import type { Barrier, ChainNode, MapData } from "../features/maps/schema";
 import { createId } from "../lib/id";
 import {
   applyHierarchyLayout,
+  getNodeSize,
   snapPosition,
+  VERTICAL_GAP,
 } from "../features/layout/hierarchy";
 
 export { GRID_SIZE } from "../features/layout/hierarchy";
@@ -366,23 +368,33 @@ export const useAppStore = create<AppState>((set, get) => ({
         const parentNode = initialParentId
           ? (state.nodes.find((node) => node.id === initialParentId) ?? null)
           : null;
-        const basePosition = parentNode
-          ? {
-              x: parentNode.position.x,
-              y: parentNode.position.y + 160,
-            }
-          : { x: 0, y: 0 };
-        const position = snapPosition(basePosition);
         const newNode: Node<ChainNodeData> = {
           id: newNodeId,
           type: "ChainNode",
-          position,
+          position: { x: 0, y: 0 },
           data: {
             title: "New ChainNode",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
           },
         };
+        const outgoingChildCount = parentNode
+          ? state.edges.filter((edge) => edge.source === parentNode.id).length
+          : 0;
+        const position = parentNode
+          ? (() => {
+              const parentSize = getNodeSize(parentNode, state.showDetails);
+              const childSize = getNodeSize(newNode, state.showDetails);
+              return snapPosition({
+                x:
+                  parentNode.position.x +
+                  parentSize.width / 2 -
+                  childSize.width / 2,
+                y: parentNode.position.y + parentSize.height + VERTICAL_GAP,
+              });
+            })()
+          : snapPosition({ x: 0, y: 0 });
+        newNode.position = position;
         const nextNodes = [...state.nodes, newNode];
         const nextEdges = parentNode
           ? [
@@ -399,11 +411,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
-        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
-          nextNodes,
-          nextEdges,
-          state.showDetails,
-        );
+        const firstChild = Boolean(parentNode && outgoingChildCount === 0);
+        const { nodes: laidOutNodes, changed: layoutChanged } = firstChild
+          ? { nodes: nextNodes, changed: false }
+          : applyLayout(nextNodes, nextEdges, state.showDetails);
         const candidate = {
           ...state,
           nodes: laidOutNodes,
