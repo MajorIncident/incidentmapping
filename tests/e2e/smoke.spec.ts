@@ -110,3 +110,28 @@ test("organizes moved nodes and frames the complete graph", async ({
     expect(box.right).toBeLessThanOrEqual(flow!.x + flow!.width);
   }
 });
+
+test("shows map semantics and highlights only a selected branch", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Sample Incident Chain" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Incident map legend")).toContainText(
+    "top to bottom",
+  );
+  await expect(page.getByLabel("Incident map overview")).toBeVisible();
+
+  const eventNodes = page.locator('[data-testid="chain-node"]');
+  await eventNodes.last().click();
+  await expect(eventNodes.first()).toHaveAttribute(
+    "data-selected-path",
+    "true",
+  );
+  await expect(eventNodes.last()).toHaveAttribute("data-selected-path", "true");
+  await expect(page.locator(".incident-edge--upstream")).toHaveCount(2);
+  await expect(
+    page.locator(".incident-edge--upstream .react-flow__edge-path").first(),
+  ).toHaveCSS("stroke-dasharray", "7px, 4px");
+});

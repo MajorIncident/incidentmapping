@@ -17,6 +17,13 @@ export type ChainNodeData = {
   timestamp?: string;
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
+  /** Ephemeral canvas-only styling hints. This field is never serialized. */
+  presentation?: {
+    isRoot: boolean;
+    isLeaf: boolean;
+    isOnSelectedPath: boolean;
+    isUnrelated: boolean;
+  };
 };
 
 export type BarrierNodeData = {
