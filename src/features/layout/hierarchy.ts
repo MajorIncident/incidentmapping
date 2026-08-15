@@ -6,8 +6,18 @@ const DEFAULT_NODE_WIDTH = 240;
 const DEFAULT_NODE_HEIGHT = 140;
 const DETAILS_HEIGHT = 140;
 const HORIZONTAL_GAP = 32;
-const VERTICAL_GAP = 32;
-const TREE_GAP = 64;
+const VERTICAL_GAP = 64;
+const BARRIER_CLEARANCE = 176;
+const TREE_GAP = 96;
+
+export type HierarchyLayoutOptions = {
+  showDetails: boolean;
+  /** Edges containing a rendered barrier card need a larger level gap. */
+  barrierEdges?: ReadonlyArray<{
+    upstreamNodeId: string;
+    downstreamNodeId: string;
+  }>;
+};
 
 export const snapPosition = ({ x, y }: XYPosition): XYPosition => ({
   x: Math.round(x / GRID_SIZE) * GRID_SIZE,
@@ -26,113 +36,152 @@ export const buildChildrenByParent = (edges: Edge[]): Map<string, string[]> => {
   const result = new Map<string, string[]>();
   edges.forEach((edge) => {
     const children = result.get(edge.source) ?? [];
-    if (!children.includes(edge.target)) {
-      children.push(edge.target);
-    }
+    if (!children.includes(edge.target)) children.push(edge.target);
     result.set(edge.source, children);
   });
   return result;
 };
 
 /**
- * Lays out every hierarchy from top to bottom. A subtree's footprint includes
- * all descendants, so sibling subtrees cannot overlap. Inputs are never
- * mutated and identical inputs always produce identical positions.
+ * Pure, deterministic full-graph layout. It first turns even malformed input
+ * into a spanning forest, then measures that forest bottom-up before placing
+ * parents over their child groups. Inputs are never mutated.
  */
 export const layoutHierarchy = <Data>(
   nodes: Node<Data>[],
   edges: Edge[],
-  showDetails: boolean,
+  options: boolean | HierarchyLayoutOptions,
 ): Node<Data>[] => {
+  if (!nodes.length) return [];
+  const { showDetails, barrierEdges = [] } =
+    typeof options === "boolean" ? { showDetails: options } : options;
   const byId = new Map(nodes.map((node) => [node.id, node]));
-  const childrenByParent = buildChildrenByParent(edges);
-  const childIds = new Set(edges.map((edge) => edge.target));
-  const roots = nodes
-    .filter((node) => !childIds.has(node.id))
-    .sort((a, b) => a.position.x - b.position.x || a.id.localeCompare(b.id));
-  const seen = new Set<string>();
+  const adjacency = buildChildrenByParent(
+    edges.filter((edge) => byId.has(edge.source) && byId.has(edge.target)),
+  );
+  const incoming = new Map(nodes.map((node) => [node.id, 0]));
+  edges.forEach((edge) => {
+    if (byId.has(edge.source) && byId.has(edge.target)) {
+      incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
+    }
+  });
+  const stable = (a: Node<Data>, b: Node<Data>) =>
+    a.position.x - b.position.x ||
+    a.position.y - b.position.y ||
+    a.id.localeCompare(b.id);
+  const discoveredRoots = nodes
+    .filter((node) => incoming.get(node.id) === 0)
+    .sort(stable);
 
-  const footprintMemo = new Map<string, number>();
-  const footprint = (id: string, ancestors = new Set<string>()): number => {
-    const cached = footprintMemo.get(id);
-    if (cached !== undefined) return cached;
-    const node = byId.get(id);
-    if (!node || ancestors.has(id)) return 0;
-    const nextAncestors = new Set(ancestors).add(id);
-    const childWidths = (childrenByParent.get(id) ?? [])
-      .filter((childId) => byId.has(childId))
-      .map((childId) => footprint(childId, nextAncestors));
-    const childrenWidth =
-      childWidths.reduce((total, width) => total + width, 0) +
-      Math.max(0, childWidths.length - 1) * HORIZONTAL_GAP;
-    const width = Math.max(sizeOf(node, showDetails).width, childrenWidth);
-    footprintMemo.set(id, width);
+  // Claim each node only once. This visited set makes cycles and shared
+  // descendants safe while retaining stable edge order.
+  const visited = new Set<string>();
+  const forestChildren = new Map<string, string[]>();
+  const depth = new Map<string, number>();
+  const roots: string[] = [];
+  const walk = (id: string, level: number) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    depth.set(id, level);
+    const claimed: string[] = [];
+    for (const childId of adjacency.get(id) ?? []) {
+      if (!visited.has(childId)) {
+        claimed.push(childId);
+        walk(childId, level + 1);
+      }
+    }
+    forestChildren.set(id, claimed);
+  };
+  for (const root of discoveredRoots) {
+    roots.push(root.id);
+    walk(root.id, 0);
+  }
+  // A disconnected cycle has no zero-incoming node, so promote its first
+  // stable member to an additional root and continue until all nodes belong.
+  for (const node of [...nodes].sort(stable)) {
+    if (!visited.has(node.id)) {
+      roots.push(node.id);
+      walk(node.id, 0);
+    }
+  }
+
+  const widths = new Map<string, number>();
+  const measure = (id: string): number => {
+    const children = forestChildren.get(id) ?? [];
+    const childrenWidth = children.reduce(
+      (sum, childId, index) =>
+        sum + measure(childId) + (index ? HORIZONTAL_GAP : 0),
+      0,
+    );
+    const width = Math.max(
+      sizeOf(byId.get(id)!, showDetails).width,
+      childrenWidth,
+    );
+    widths.set(id, width);
     return width;
   };
+  roots.forEach(measure);
+
+  const maxDepth = Math.max(...depth.values());
+  const levelHeights = Array.from({ length: maxDepth + 1 }, () => 0);
+  nodes.forEach((node) => {
+    const level = depth.get(node.id) ?? 0;
+    levelHeights[level] = Math.max(
+      levelHeights[level],
+      sizeOf(node, showDetails).height,
+    );
+  });
+  const barrierLevels = new Set<number>();
+  barrierEdges.forEach((barrier) => {
+    const upstreamDepth = depth.get(barrier.upstreamNodeId);
+    if (
+      upstreamDepth !== undefined &&
+      depth.get(barrier.downstreamNodeId) === upstreamDepth + 1
+    ) {
+      barrierLevels.add(upstreamDepth);
+    }
+  });
+  const levelY = [Math.min(...nodes.map((node) => node.position.y))];
+  for (let level = 0; level < maxDepth; level += 1) {
+    levelY[level + 1] =
+      levelY[level] +
+      levelHeights[level] +
+      VERTICAL_GAP +
+      (barrierLevels.has(level) ? BARRIER_CLEARANCE : 0);
+  }
 
   const positions = new Map<string, XYPosition>();
-  const place = (
-    id: string,
-    left: number,
-    y: number,
-    ancestors = new Set<string>(),
-  ) => {
-    const node = byId.get(id);
-    if (!node || ancestors.has(id) || seen.has(id)) return;
-    seen.add(id);
-    const nextAncestors = new Set(ancestors).add(id);
-    const nodeSize = sizeOf(node, showDetails);
-    const ownFootprint = footprint(id);
+  const place = (id: string, left: number) => {
+    const node = byId.get(id)!;
+    const footprint = widths.get(id)!;
     positions.set(
       id,
-      snapPosition({ x: left + (ownFootprint - nodeSize.width) / 2, y }),
+      snapPosition({
+        x: left + (footprint - sizeOf(node, showDetails).width) / 2,
+        y: levelY[depth.get(id) ?? 0],
+      }),
     );
-
-    const children = (childrenByParent.get(id) ?? []).filter((childId) =>
-      byId.has(childId),
-    );
-    if (!children.length) return;
-    const widths = children.map((childId) => footprint(childId));
-    const groupWidth =
-      widths.reduce((total, width) => total + width, 0) +
-      (widths.length - 1) * HORIZONTAL_GAP;
-    let childLeft = left + (ownFootprint - groupWidth) / 2;
-    const childY = y + nodeSize.height + VERTICAL_GAP;
-    children.forEach((childId, index) => {
-      place(childId, childLeft, childY, nextAncestors);
-      childLeft += widths[index] + HORIZONTAL_GAP;
-    });
+    let childLeft = left;
+    for (const childId of forestChildren.get(id) ?? []) {
+      place(childId, childLeft);
+      childLeft += widths.get(childId)! + HORIZONTAL_GAP;
+    }
   };
-
-  let treeLeft = roots.length
-    ? Math.min(...roots.map((root) => root.position.x))
-    : 0;
-  roots.forEach((root) => {
-    place(root.id, treeLeft, root.position.y);
-    treeLeft += footprint(root.id) + TREE_GAP;
+  let treeLeft = Math.min(...nodes.map((node) => node.position.x));
+  roots.forEach((id) => {
+    place(id, treeLeft);
+    treeLeft += widths.get(id)! + TREE_GAP;
   });
 
-  // Malformed/cyclic maps still get deterministic, collision-free islands.
-  nodes
-    .filter((node) => !seen.has(node.id))
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .forEach((node) => {
-      place(node.id, treeLeft, node.position.y);
-      treeLeft += footprint(node.id) + TREE_GAP;
-    });
-
-  return nodes.map((node) => ({
-    ...node,
-    position: positions.get(node.id) ?? snapPosition(node.position),
-  }));
+  return nodes.map((node) => ({ ...node, position: positions.get(node.id)! }));
 };
 
 export const applyHierarchyLayout = <Data>(
   nodes: Node<Data>[],
   edges: Edge[],
-  showDetails: boolean,
+  options: boolean | HierarchyLayoutOptions,
 ): { nodes: Node<Data>[]; changed: boolean } => {
-  const laidOut = layoutHierarchy(nodes, edges, showDetails);
+  const laidOut = layoutHierarchy(nodes, edges, options);
   return {
     nodes: laidOut,
     changed: laidOut.some(

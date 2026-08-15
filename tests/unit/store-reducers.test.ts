@@ -203,4 +203,31 @@ describe("useAppStore actions", () => {
     state = useAppStore.getState();
     expect(state.metadata?.title).toBe("Untitled Map");
   });
+
+  it("organizes atomically and restores positions through undo and redo", () => {
+    const { actions } = useAppStore.getState();
+    const parent = actions.addChild() as string;
+    const child = actions.addChild(parent) as string;
+    actions.moveNode(child, { x: 800, y: 800 });
+    const before = useAppStore.getState().nodes.map((node) => node.position);
+    const selection = useAppStore.getState().selectionId;
+
+    actions.organizeNodes();
+    const organized = useAppStore.getState().nodes.map((node) => node.position);
+    expect(organized).not.toEqual(before);
+    expect(useAppStore.getState().selectionId).toBe(selection);
+    expect(useAppStore.getState().viewportRequest?.nodeIds).toEqual([
+      parent,
+      child,
+    ]);
+
+    actions.undo();
+    expect(useAppStore.getState().nodes.map((node) => node.position)).toEqual(
+      before,
+    );
+    actions.redo();
+    expect(useAppStore.getState().nodes.map((node) => node.position)).toEqual(
+      organized,
+    );
+  });
 });

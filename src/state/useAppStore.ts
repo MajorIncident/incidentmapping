@@ -74,6 +74,7 @@ type AppState = {
     finishEditing: () => void;
     setShowDetails: (visible: boolean) => void;
     toggleShowDetails: () => void;
+    organizeNodes: () => void;
     updateNodeData: (
       id: string,
       patch: Partial<Omit<ChainNodeData, "title">>,
@@ -175,7 +176,9 @@ const applyLayout = (
   nodes: Node<ChainNodeData>[],
   edges: Edge[],
   showDetails: boolean,
-) => applyHierarchyLayout(nodes, edges, showDetails);
+  barriers: Barrier[] = [],
+) =>
+  applyHierarchyLayout(nodes, edges, { showDetails, barrierEdges: barriers });
 
 const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
 
@@ -864,6 +867,31 @@ export const useAppStore = create<AppState>((set, get) => ({
           layoutVersion: changed
             ? state.layoutVersion + 1
             : state.layoutVersion,
+        };
+      });
+    },
+    organizeNodes: () => {
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        if (state.nodes.length < 2) return {};
+        const { nodes, changed } = applyLayout(
+          state.nodes,
+          state.edges,
+          state.showDetails,
+          state.barriers,
+        );
+        if (!changed) return {};
+        const history = updateHistoryState(state, prevSnapshot, true);
+        return {
+          nodes,
+          history,
+          canUndo: true,
+          canRedo: false,
+          layoutVersion: state.layoutVersion + 1,
+          viewportRequest: {
+            id: (state.viewportRequest?.id ?? 0) + 1,
+            nodeIds: nodes.map((node) => node.id),
+          },
         };
       });
     },

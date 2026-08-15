@@ -9,6 +9,8 @@ type ToolbarProps = FileMenuRenderProps & {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onOrganize: () => void;
+  canOrganize: boolean;
   mapTitle: string;
   onMapTitleChange: (title: string) => void;
   showDetails: boolean;
@@ -32,6 +34,8 @@ export const Toolbar = ({
   onRedo,
   canUndo,
   canRedo,
+  onOrganize,
+  canOrganize,
   showDetails,
   onToggleDetails,
 }: ToolbarProps): JSX.Element => {
@@ -48,6 +52,15 @@ export const Toolbar = ({
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className={buttonBase}
+          onClick={onOrganize}
+          disabled={!canOrganize}
+          aria-label="Organize all nodes"
+        >
+          Organize
+        </button>
         <button
           type="button"
           className={buttonBase}
