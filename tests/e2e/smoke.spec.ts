@@ -78,3 +78,35 @@ test("creating another child focuses the parent and complete sibling group", asy
     );
   }
 });
+
+test("organizes moved nodes and frames the complete graph", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Create a new map" }).click();
+  const organize = page.getByRole("button", { name: "Organize all nodes" });
+  await expect(organize).toBeDisabled();
+  await page.getByRole("button", { name: "Add a new chain node" }).click();
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+  await page.getByRole("button", { name: "Add a new chain node" }).click();
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+  await page
+    .locator(".react-flow__node")
+    .last()
+    .dragTo(page.locator(".react-flow__pane"), {
+      targetPosition: { x: 50, y: 50 },
+    });
+  await expect(organize).toBeEnabled();
+  await organize.click();
+  await page.waitForTimeout(500);
+  const flow = await page.locator(".react-flow").boundingBox();
+  const boxes = await page
+    .locator(".react-flow__node")
+    .evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().toJSON()),
+    );
+  for (const box of boxes) {
+    expect(box.left).toBeGreaterThanOrEqual(flow!.x);
+    expect(box.right).toBeLessThanOrEqual(flow!.x + flow!.width);
+  }
+});
