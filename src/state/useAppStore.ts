@@ -60,6 +60,11 @@ type AppState = {
   showDetails: boolean;
   layoutVersion: number;
   viewportRequest: { id: number; nodeIds: string[] } | null;
+  editorFocusRequest: {
+    id: number;
+    nodeId: string;
+    field: "title" | "description";
+  } | null;
   history: HistoryState;
   canUndo: boolean;
   canRedo: boolean;
@@ -97,12 +102,18 @@ type AppState = {
     undo: () => void;
     redo: () => void;
     clearViewportRequest: (id: number) => void;
+    requestEditorFocus: (
+      nodeId: string,
+      field: "title" | "description",
+    ) => void;
+    clearEditorFocusRequest: (id: number) => void;
   };
 };
 
 const MOVE_DEBOUNCE_MS = 200;
 
 let moveDebounceActive = false;
+let nextEditorFocusRequestId = 1;
 let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const resetMoveDebounce = () => {
@@ -261,6 +272,7 @@ const createEmptyState = () => ({
   showDetails: true,
   layoutVersion: 0,
   viewportRequest: null,
+  editorFocusRequest: null,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
@@ -276,6 +288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   showDetails: true,
   layoutVersion: 0,
   viewportRequest: null,
+  editorFocusRequest: null,
   history: createEmptyHistory(),
   canUndo: false,
   canRedo: false,
@@ -303,6 +316,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         showDetails: state.showDetails,
         layoutVersion: state.layoutVersion + 1,
         viewportRequest: null,
+        editorFocusRequest: null,
         history: createEmptyHistory(),
         canUndo: false,
         canRedo: false,
@@ -325,10 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     addChainNode: (options) => {
       const parentId = options?.parentId;
-      const created = get().actions.addChild(parentId);
-      if (created) {
-        get().actions.startEditing(created);
-      }
+      get().actions.addChild(parentId);
     },
     setMapTitle: (title) => {
       const nextTitle = title.trim();
@@ -448,6 +459,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 ],
               }
             : null,
+          editorFocusRequest: {
+            id: nextEditorFocusRequestId++,
+            nodeId: newNodeId,
+            field: "title",
+          },
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
@@ -548,6 +564,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 ],
               }
             : null,
+          editorFocusRequest: {
+            id: nextEditorFocusRequestId++,
+            nodeId: newNodeId,
+            field: "title",
+          },
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
@@ -1007,6 +1028,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     clearViewportRequest: (id) => {
       set((state) =>
         state.viewportRequest?.id === id ? { viewportRequest: null } : {},
+      );
+    },
+    requestEditorFocus: (nodeId, field) => {
+      set({
+        editorFocusRequest: { id: nextEditorFocusRequestId++, nodeId, field },
+      });
+    },
+    clearEditorFocusRequest: (id) => {
+      set((state) =>
+        state.editorFocusRequest?.id === id ? { editorFocusRequest: null } : {},
       );
     },
     undo: () => {

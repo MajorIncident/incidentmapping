@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -45,6 +46,10 @@ export const Inspector = (): JSX.Element => {
     (state) => state.actions.updateBarrierData,
   );
   const startEditing = useAppStore((state) => state.actions.startEditing);
+  const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
+  const clearEditorFocusRequest = useAppStore(
+    (state) => state.actions.clearEditorFocusRequest,
+  );
   const select = useAppStore((state) => state.actions.select);
   const { fitView } = useReactFlow();
   const [title, setTitle] = useState("");
@@ -62,6 +67,7 @@ export const Inspector = (): JSX.Element => {
   const [breachedItems, setBreachedItems] = useState<string[]>([]);
   const [breachedErrors, setBreachedErrors] = useState<string[]>([]);
   const [isBreached, setIsBreached] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (node) {
@@ -82,6 +88,18 @@ export const Inspector = (): JSX.Element => {
       setNegativeErrors([]);
     }
   }, [node]);
+
+  useEffect(() => {
+    if (
+      node &&
+      editorFocusRequest?.field === "description" &&
+      editorFocusRequest.nodeId === node.id
+    ) {
+      descriptionRef.current?.focus();
+      descriptionRef.current?.select();
+      clearEditorFocusRequest(editorFocusRequest.id);
+    }
+  }, [clearEditorFocusRequest, editorFocusRequest, node]);
 
   useEffect(() => {
     if (barrier) {
@@ -695,6 +713,7 @@ export const Inspector = (): JSX.Element => {
             Description
           </label>
           <textarea
+            ref={descriptionRef}
             id="inspector-description"
             className={textAreaClasses}
             value={description}

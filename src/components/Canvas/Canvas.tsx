@@ -234,8 +234,10 @@ export const Canvas = (): JSX.Element => {
           padding: 0.25,
           duration: 400,
         });
+        setTimeout(() => clearViewportRequest(viewportRequest.id), 400);
+      } else {
+        clearViewportRequest(viewportRequest.id);
       }
-      clearViewportRequest(viewportRequest.id);
     });
 
     return () => cancelAnimationFrame(frame);
