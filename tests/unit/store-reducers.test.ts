@@ -103,7 +103,70 @@ describe("useAppStore actions", () => {
     expect(state.edges[0]).toMatchObject({
       source: parentId,
       target: childId,
+      type: "step",
+      sourceHandle: "bottom",
+      targetHandle: "top",
     });
+  });
+
+  it("centers a single child directly below its parent on the grid", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    const childId = actions.addChild(parentId) as string;
+    const state = useAppStore.getState();
+    const parent = state.nodes.find((node) => node.id === parentId)!;
+    const child = state.nodes.find((node) => node.id === childId)!;
+
+    expect(child.position.x).toBe(parent.position.x);
+    expect(child.position.y).toBeGreaterThan(parent.position.y);
+    expect(child.position.x % GRID_SIZE).toBe(0);
+    expect(child.position.y % GRID_SIZE).toBe(0);
+  });
+
+  it("spaces siblings evenly around their parent at one level", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    const firstId = actions.addChild(parentId) as string;
+    const secondId = actions.addSibling(firstId) as string;
+    const thirdId = actions.addSibling(secondId) as string;
+    const state = useAppStore.getState();
+    const parent = state.nodes.find((node) => node.id === parentId)!;
+    const siblings = [firstId, secondId, thirdId].map(
+      (id) => state.nodes.find((node) => node.id === id)!,
+    );
+
+    expect(new Set(siblings.map((node) => node.position.y)).size).toBe(1);
+    expect(siblings[1].position.x - siblings[0].position.x).toBe(
+      siblings[2].position.x - siblings[1].position.x,
+    );
+    expect(siblings[1].position.x).toBe(parent.position.x);
+  });
+
+  it("moves descendants with their sibling subtree without changing offsets", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    const childId = actions.addChild(parentId) as string;
+    const descendantId = actions.addChild(childId) as string;
+    let state = useAppStore.getState();
+    const childBefore = state.nodes.find((node) => node.id === childId)!;
+    const descendantBefore = state.nodes.find(
+      (node) => node.id === descendantId,
+    )!;
+    const offsetBefore = {
+      x: descendantBefore.position.x - childBefore.position.x,
+      y: descendantBefore.position.y - childBefore.position.y,
+    };
+
+    actions.addSibling(childId);
+    state = useAppStore.getState();
+    const childAfter = state.nodes.find((node) => node.id === childId)!;
+    const descendantAfter = state.nodes.find(
+      (node) => node.id === descendantId,
+    )!;
+    expect({
+      x: descendantAfter.position.x - childAfter.position.x,
+      y: descendantAfter.position.y - childAfter.position.y,
+    }).toEqual(offsetBefore);
   });
 
   it("creates siblings that share the same parent", () => {

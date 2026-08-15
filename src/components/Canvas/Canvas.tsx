@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
+  getNodesBounds,
   type Node,
   useReactFlow,
 } from "reactflow";
@@ -13,16 +14,14 @@ import {
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
 
-type CanvasProps = {
-  showDetails: boolean;
-};
-
-export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
+export const Canvas = (): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
   const barriers = useAppStore((state) => state.barriers);
-  const layoutVersion = useAppStore((state) => state.layoutVersion);
-  const { moveNode, select } = useAppStore((state) => state.actions);
+  const viewportRequest = useAppStore((state) => state.viewportRequest);
+  const { clearViewportRequest, moveNode, select } = useAppStore(
+    (state) => state.actions,
+  );
   const reactFlow = useReactFlow();
 
   const { nodes, renderedEdges } = useMemo(() => {
@@ -112,14 +111,29 @@ export const Canvas = ({ showDetails }: CanvasProps): JSX.Element => {
   );
 
   useEffect(() => {
-    reactFlow.fitView({ padding: 0.2, includeHiddenNodes: true });
-  }, [layoutVersion, reactFlow]);
+    if (!viewportRequest) return;
+
+    const frame = requestAnimationFrame(() => {
+      const requestedIds = new Set(viewportRequest.nodeIds);
+      const requestedNodes = reactFlow
+        .getNodes()
+        .filter((node) => requestedIds.has(node.id));
+      if (requestedNodes.length > 0) {
+        void reactFlow.fitBounds(getNodesBounds(requestedNodes), {
+          padding: 0.25,
+          duration: 400,
+        });
+      }
+      clearViewportRequest(viewportRequest.id);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [clearViewportRequest, reactFlow, viewportRequest]);
 
   const memorizedNodeTypes = useMemo(() => nodeTypes, []);
 
   return (
     <ReactFlow
-      key={showDetails ? "details" : "summary"}
       style={{ width: "100%", height: "100%" }}
       nodes={nodes}
       edges={renderedEdges}
