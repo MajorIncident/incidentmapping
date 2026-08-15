@@ -98,8 +98,14 @@ const ChainNodeComponent = ({
       onDoubleClick={openEditor}
       data-testid="chain-node"
     >
-      <Handle type="target" position={Position.Top} className="!bg-slate-400" />
       <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        className="!bg-slate-400"
+      />
+      <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
         className="!bg-slate-400"
@@ -197,8 +203,14 @@ const BarrierNodeComponent = ({
       } ${data.breached ? "border-rose-500 bg-rose-50" : "border-sky-500 bg-sky-50"}`}
       data-testid="barrier-node"
     >
-      <Handle type="target" position={Position.Top} className="!bg-sky-500" />
       <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        className="!bg-sky-500"
+      />
+      <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
         className="!bg-sky-500"
