@@ -68,6 +68,36 @@ export const Inspector = (): JSX.Element => {
   const [breachedErrors, setBreachedErrors] = useState<string[]>([]);
   const [isBreached, setIsBreached] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const nextListItemId = useRef(0);
+  const positiveItemIds = useRef<string[]>([]);
+  const negativeItemIds = useRef<string[]>([]);
+  const breachedItemIds = useRef<string[]>([]);
+  const positiveInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const negativeInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const breachedInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const positiveAddRef = useRef<HTMLButtonElement | null>(null);
+  const negativeAddRef = useRef<HTMLButtonElement | null>(null);
+  const breachedAddRef = useRef<HTMLButtonElement | null>(null);
+  const [pendingFocus, setPendingFocus] = useState<{
+    listType: "positive" | "negative" | "breached";
+    itemId: string | null;
+  } | null>(null);
+
+  const createListItemId = useCallback(
+    (listType: "positive" | "negative" | "breached") =>
+      `${listType}-${nextListItemId.current++}`,
+    [],
+  );
+
+  useEffect(() => {
+    setPendingFocus(null);
+    positiveInputRefs.current.clear();
+    negativeInputRefs.current.clear();
+    breachedInputRefs.current.clear();
+    positiveItemIds.current = [];
+    negativeItemIds.current = [];
+    breachedItemIds.current = [];
+  }, [selectionId]);
 
   useEffect(() => {
     if (node) {
@@ -78,6 +108,22 @@ export const Inspector = (): JSX.Element => {
       setNegativeConsequences(node.data.negativeConsequenceBulletPoints ?? []);
       setPositiveErrors([]);
       setNegativeErrors([]);
+      if (
+        positiveItemIds.current.length !==
+        (node.data.positiveConsequenceBulletPoints ?? []).length
+      ) {
+        positiveItemIds.current = (
+          node.data.positiveConsequenceBulletPoints ?? []
+        ).map(() => createListItemId("positive"));
+      }
+      if (
+        negativeItemIds.current.length !==
+        (node.data.negativeConsequenceBulletPoints ?? []).length
+      ) {
+        negativeItemIds.current = (
+          node.data.negativeConsequenceBulletPoints ?? []
+        ).map(() => createListItemId("negative"));
+      }
     } else {
       setTitle("");
       setDescription("");
@@ -86,8 +132,10 @@ export const Inspector = (): JSX.Element => {
       setNegativeConsequences([]);
       setPositiveErrors([]);
       setNegativeErrors([]);
+      positiveItemIds.current = [];
+      negativeItemIds.current = [];
     }
-  }, [node]);
+  }, [createListItemId, node]);
 
   useEffect(() => {
     if (
@@ -107,13 +155,42 @@ export const Inspector = (): JSX.Element => {
       setBreachedItems(barrier.breachedItems ?? []);
       setBarrierDescription(barrier.description ?? "");
       setBreachedErrors([]);
+      if (
+        breachedItemIds.current.length !== (barrier.breachedItems ?? []).length
+      ) {
+        breachedItemIds.current = (barrier.breachedItems ?? []).map(() =>
+          createListItemId("breached"),
+        );
+      }
     } else {
       setIsBreached(false);
       setBreachedItems([]);
       setBarrierDescription("");
       setBreachedErrors([]);
+      breachedItemIds.current = [];
     }
-  }, [barrier]);
+  }, [barrier, createListItemId]);
+
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const inputRefs =
+      pendingFocus.listType === "positive"
+        ? positiveInputRefs.current
+        : pendingFocus.listType === "negative"
+          ? negativeInputRefs.current
+          : breachedInputRefs.current;
+    const addButton =
+      pendingFocus.listType === "positive"
+        ? positiveAddRef.current
+        : pendingFocus.listType === "negative"
+          ? negativeAddRef.current
+          : breachedAddRef.current;
+    (pendingFocus.itemId
+      ? inputRefs.get(pendingFocus.itemId)
+      : addButton
+    )?.focus();
+    setPendingFocus(null);
+  }, [pendingFocus, positiveConsequences, negativeConsequences, breachedItems]);
 
   const handleTitleCommit = useCallback(() => {
     if (!node) {
@@ -230,12 +307,23 @@ export const Inspector = (): JSX.Element => {
   );
 
   const handleAddBreachedItem = useCallback(() => {
+    const itemId = createListItemId("breached");
+    breachedItemIds.current = [...breachedItemIds.current, itemId];
+    setPendingFocus({ listType: "breached", itemId });
     const next = [...breachedItems, ""];
     commitBreachedItems(next);
-  }, [breachedItems, commitBreachedItems]);
+  }, [breachedItems, commitBreachedItems, createListItemId]);
 
   const handleRemoveBreachedItem = useCallback(
     (index: number) => {
+      const remainingIds = breachedItemIds.current.filter(
+        (_, i) => i !== index,
+      );
+      breachedItemIds.current = remainingIds;
+      setPendingFocus({
+        listType: "breached",
+        itemId: remainingIds[index - 1] ?? null,
+      });
       const next = breachedItems.filter((_, i) => i !== index);
       const nextErrors = breachedErrors.filter((_, i) => i !== index);
       setBreachedErrors(nextErrors);
@@ -257,6 +345,10 @@ export const Inspector = (): JSX.Element => {
           handleAddBreachedItem();
         } else {
           setBreachedErrors(errors);
+          const invalidIndex = errors.findIndex(Boolean);
+          breachedInputRefs.current
+            .get(breachedItemIds.current[invalidIndex])
+            ?.focus();
         }
       }
       if (event.key === "Backspace" && event.currentTarget.value === "") {
@@ -353,7 +445,10 @@ export const Inspector = (): JSX.Element => {
 
   const handleAddListItem = useCallback(
     (listType: "positive" | "negative") => {
+      const itemId = createListItemId(listType);
+      setPendingFocus({ listType, itemId });
       if (listType === "positive") {
+        positiveItemIds.current = [...positiveItemIds.current, itemId];
         const next = [...positiveConsequences, ""];
         commitListValues(
           "positive",
@@ -362,6 +457,7 @@ export const Inspector = (): JSX.Element => {
           setPositiveErrors,
         );
       } else {
+        negativeItemIds.current = [...negativeItemIds.current, itemId];
         const next = [...negativeConsequences, ""];
         commitListValues(
           "negative",
@@ -373,6 +469,7 @@ export const Inspector = (): JSX.Element => {
     },
     [
       commitListValues,
+      createListItemId,
       negativeConsequences,
       positiveConsequences,
       setNegativeConsequences,
@@ -383,6 +480,11 @@ export const Inspector = (): JSX.Element => {
   const handleRemoveListItem = useCallback(
     (listType: "positive" | "negative", index: number) => {
       if (listType === "positive") {
+        const remainingIds = positiveItemIds.current.filter(
+          (_, i) => i !== index,
+        );
+        positiveItemIds.current = remainingIds;
+        setPendingFocus({ listType, itemId: remainingIds[index - 1] ?? null });
         const next = positiveConsequences.filter((_, i) => i !== index);
         const nextErrors = positiveErrors.filter((_, i) => i !== index);
         setPositiveErrors(nextErrors);
@@ -393,6 +495,11 @@ export const Inspector = (): JSX.Element => {
           setPositiveErrors,
         );
       } else {
+        const remainingIds = negativeItemIds.current.filter(
+          (_, i) => i !== index,
+        );
+        negativeItemIds.current = remainingIds;
+        setPendingFocus({ listType, itemId: remainingIds[index - 1] ?? null });
         const next = negativeConsequences.filter((_, i) => i !== index);
         const nextErrors = negativeErrors.filter((_, i) => i !== index);
         setNegativeErrors(nextErrors);
@@ -447,6 +554,15 @@ export const Inspector = (): JSX.Element => {
           } else {
             setNegativeErrors(errors);
           }
+          const itemIds =
+            listType === "positive"
+              ? positiveItemIds.current
+              : negativeItemIds.current;
+          const inputRefs =
+            listType === "positive"
+              ? positiveInputRefs.current
+              : negativeInputRefs.current;
+          inputRefs.get(itemIds[errors.findIndex(Boolean)])?.focus();
         }
       }
 
@@ -551,6 +667,7 @@ export const Inspector = (): JSX.Element => {
             <div className="flex items-center justify-between">
               <span className={labelClasses}>Breached Items</span>
               <button
+                ref={breachedAddRef}
                 type="button"
                 className={`${buttonClasses} px-2 py-1 text-xs`}
                 onClick={handleAddBreachedItem}
@@ -569,8 +686,16 @@ export const Inspector = (): JSX.Element => {
                   <p className="text-xs text-slate-500">No breach items yet.</p>
                 ) : null}
                 {breachedItems.map((item, index) => (
-                  <div key={`breached-${index}`} className="flex gap-2">
+                  <div
+                    key={breachedItemIds.current[index]}
+                    className="flex gap-2"
+                  >
                     <input
+                      ref={(element) => {
+                        const id = breachedItemIds.current[index];
+                        if (element) breachedInputRefs.current.set(id, element);
+                        else breachedInputRefs.current.delete(id);
+                      }}
                       className={`${inputClasses} ${
                         breachedErrors[index]?.length
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500"
@@ -788,6 +913,7 @@ export const Inspector = (): JSX.Element => {
             <div className="flex items-center justify-between">
               <span className={labelClasses}>Positive</span>
               <button
+                ref={positiveAddRef}
                 type="button"
                 className={`${buttonClasses} px-2 py-1 text-xs`}
                 onClick={() => handleAddListItem("positive")}
@@ -802,8 +928,16 @@ export const Inspector = (): JSX.Element => {
                 </p>
               ) : null}
               {positiveConsequences.map((item, index) => (
-                <div key={`positive-${index}`} className="flex gap-2">
+                <div
+                  key={positiveItemIds.current[index]}
+                  className="flex gap-2"
+                >
                   <input
+                    ref={(element) => {
+                      const id = positiveItemIds.current[index];
+                      if (element) positiveInputRefs.current.set(id, element);
+                      else positiveInputRefs.current.delete(id);
+                    }}
                     className={`${inputClasses} ${
                       positiveErrors[index]?.length
                         ? "border-red-500 focus:border-red-500 focus:ring-red-500"
@@ -864,6 +998,7 @@ export const Inspector = (): JSX.Element => {
             <div className="flex items-center justify-between">
               <span className={labelClasses}>Negative</span>
               <button
+                ref={negativeAddRef}
                 type="button"
                 className={`${buttonClasses} px-2 py-1 text-xs`}
                 onClick={() => handleAddListItem("negative")}
@@ -878,8 +1013,16 @@ export const Inspector = (): JSX.Element => {
                 </p>
               ) : null}
               {negativeConsequences.map((item, index) => (
-                <div key={`negative-${index}`} className="flex gap-2">
+                <div
+                  key={negativeItemIds.current[index]}
+                  className="flex gap-2"
+                >
                   <input
+                    ref={(element) => {
+                      const id = negativeItemIds.current[index];
+                      if (element) negativeInputRefs.current.set(id, element);
+                      else negativeInputRefs.current.delete(id);
+                    }}
                     className={`${inputClasses} ${
                       negativeErrors[index]?.length
                         ? "border-red-500 focus:border-red-500 focus:ring-red-500"
