@@ -4,6 +4,7 @@ import {
   render,
   screen,
   fireEvent,
+  within,
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -18,6 +19,28 @@ declare global {
 }
 
 describe("Inspector and keyboard workflows", () => {
+  const renderSelectedNode = async () => {
+    const { actions } = useAppStore.getState();
+    let id: string | null = null;
+    act(() => {
+      id = actions.addChild();
+      actions.select(id);
+    });
+    await act(async () => {
+      render(
+        <ReactFlowProvider>
+          <Inspector />
+        </ReactFlowProvider>,
+      );
+    });
+    await screen.findByRole("textbox", { name: /^Title$/i });
+    expect(id).toBeTruthy();
+    return id ?? "";
+  };
+
+  const consequenceSection = (label: "Positive" | "Negative") =>
+    screen.getByText(label).parentElement?.parentElement as HTMLElement;
+
   beforeAll(() => {
     vi.stubGlobal(
       "ResizeObserver",
@@ -121,5 +144,89 @@ describe("Inspector and keyboard workflows", () => {
       expect(editor).not.toBeNull();
       expect(editor).toBe(document.activeElement);
     });
+  });
+
+  it.each([
+    ["Positive", "Add a positive consequence"],
+    ["Negative", "Add a negative consequence"],
+  ] as const)(
+    "adds and focuses successive %s consequences with Enter",
+    async (label, placeholder) => {
+      await renderSelectedNode();
+      const user = userEvent.setup();
+      await user.click(
+        within(consequenceSection(label)).getByRole("button", { name: "Add" }),
+      );
+      const first = screen.getByPlaceholderText(placeholder);
+      expect(first).toHaveFocus();
+
+      await user.type(first, "First value{Enter}");
+      const inputs = screen.getAllByPlaceholderText(placeholder);
+      expect(inputs).toHaveLength(2);
+      expect(inputs[1]).toHaveFocus();
+      await user.type(inputs[1], "Second value");
+      expect(inputs[1]).toHaveValue("Second value");
+    },
+  );
+
+  it("keeps focus on the first invalid consequence when Enter validation fails", async () => {
+    await renderSelectedNode();
+    const user = userEvent.setup();
+    await user.click(
+      within(consequenceSection("Positive")).getByRole("button", {
+        name: "Add",
+      }),
+    );
+    const input = screen.getByPlaceholderText("Add a positive consequence");
+    await user.keyboard("{Enter}");
+
+    expect(
+      screen.getAllByPlaceholderText("Add a positive consequence"),
+    ).toHaveLength(1);
+    expect(input).toHaveFocus();
+    expect(screen.getByText("This field is required.")).toBeVisible();
+  });
+
+  it("focuses Add after removing the only empty item and the previous input otherwise", async () => {
+    await renderSelectedNode();
+    const user = userEvent.setup();
+    const section = consequenceSection("Negative");
+    const addButton = within(section).getByRole("button", { name: "Add" });
+    await user.click(addButton);
+    await user.keyboard("{Backspace}");
+    expect(addButton).toHaveFocus();
+
+    await user.click(addButton);
+    await user.type(
+      screen.getByPlaceholderText("Add a negative consequence"),
+      "Kept{Enter}",
+    );
+    const inputs = screen.getAllByPlaceholderText("Add a negative consequence");
+    await user.keyboard("{Backspace}");
+    expect(inputs[0]).toHaveFocus();
+  });
+
+  it("clears pending list focus when the selected node changes", async () => {
+    await renderSelectedNode();
+    const { actions } = useAppStore.getState();
+    const addButton = within(consequenceSection("Positive")).getByRole(
+      "button",
+      { name: "Add" },
+    );
+    fireEvent.click(addButton);
+    act(() => {
+      const nextId = actions.addChild();
+      actions.select(nextId);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByPlaceholderText("Add a positive consequence"),
+      ).not.toBeInTheDocument();
+    });
+    expect(document.activeElement).not.toHaveAttribute(
+      "placeholder",
+      "Add a positive consequence",
+    );
   });
 });
