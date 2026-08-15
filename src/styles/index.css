@@ -19,3 +19,26 @@ body,
 button:focus-visible {
   @apply outline-none ring-2 ring-offset-2 ring-canvas-accent;
 }
+
+.react-flow__node:focus-visible {
+  @apply rounded-2xl outline-none ring-4 ring-sky-500 ring-offset-2;
+}
+
+.incident-edge path.react-flow__edge-path {
+  transition:
+    stroke 160ms ease,
+    stroke-width 160ms ease,
+    opacity 160ms ease;
+}
+
+.incident-edge--unrelated path.react-flow__edge-path {
+  opacity: 0.32;
+}
+
+.incident-edge--upstream path.react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.react-flow__minimap {
+  @apply !bottom-4 !right-4 overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm;
+}

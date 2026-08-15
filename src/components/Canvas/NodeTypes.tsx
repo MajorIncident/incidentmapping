@@ -8,7 +8,7 @@ const inputClasses =
   "w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 focus:border-canvas-accent focus:outline-none focus:ring-2 focus:ring-canvas-accent";
 
 const containerClasses =
-  "min-w-[180px] max-w-[240px] rounded-3xl border border-slate-200 bg-white px-4 py-3 text-left shadow-node transition";
+  "relative min-w-[190px] max-w-[260px] rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-left shadow-node transition duration-200 focus-within:ring-2 focus-within:ring-canvas-accent";
 
 const barrierClasses =
   "relative min-w-[160px] max-w-[220px] rounded-[24px] border-2 px-4 py-3 text-left shadow-node transition";
@@ -72,13 +72,21 @@ const ChainNodeComponent = ({
     [cancelEdit, commitEdit],
   );
 
-  const containerClassName = useMemo(
-    () =>
-      `${containerClasses} ${
-        selected ? "ring-2 ring-canvas-accent focus-within:ring-2" : "ring-0"
-      }`,
-    [selected],
-  );
+  const presentation = data.presentation;
+  const containerClassName = useMemo(() => {
+    const root = presentation?.isRoot
+      ? "border-violet-600 bg-violet-50/70 pt-5"
+      : "border-slate-200";
+    const related = presentation?.isUnrelated
+      ? "opacity-45 saturate-50"
+      : "opacity-100";
+    const active = selected
+      ? "ring-4 ring-sky-500 ring-offset-2 border-sky-700 shadow-lg"
+      : presentation?.isOnSelectedPath
+        ? "ring-2 ring-slate-300"
+        : "ring-0";
+    return `${containerClasses} ${root} ${related} ${active}`;
+  }, [presentation, selected]);
 
   const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
     (point) => point.trim().length > 0,
@@ -97,18 +105,27 @@ const ChainNodeComponent = ({
       className={containerClassName}
       onDoubleClick={openEditor}
       data-testid="chain-node"
+      data-root={presentation?.isRoot || undefined}
+      data-leaf={presentation?.isLeaf || undefined}
+      data-selected-path={presentation?.isOnSelectedPath || undefined}
+      data-unrelated={presentation?.isUnrelated || undefined}
     >
+      {presentation?.isRoot ? (
+        <div className="absolute inset-x-0 top-0 rounded-t-[14px] bg-violet-600 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+          Root event
+        </div>
+      ) : null}
       <Handle
         id="top"
         type="target"
         position={Position.Top}
-        className="!bg-slate-400"
+        className="!h-3 !w-3 !border-2 !border-white !bg-slate-600"
       />
       <Handle
         id="bottom"
         type="source"
         position={Position.Bottom}
-        className="!bg-slate-400"
+        className="!h-3 !w-3 !border-2 !border-white !bg-slate-600"
       />
       {isEditing ? (
         <input
@@ -121,7 +138,11 @@ const ChainNodeComponent = ({
           aria-label="Node title"
         />
       ) : (
-        <div className={titleClasses}>{data.title}</div>
+        <div
+          className={`${titleClasses} whitespace-pre-wrap break-words leading-snug`}
+        >
+          {data.title}
+        </div>
       )}
       {!isEditing && showDetails && hasVisibleDetails ? (
         <div
@@ -177,6 +198,28 @@ const ChainNodeComponent = ({
                 </div>
               ) : null}
             </div>
+          ) : null}
+        </div>
+      ) : null}
+      {!isEditing &&
+      !showDetails &&
+      (hasPositivePoints || hasNegativePoints) ? (
+        <div className="mt-2 flex gap-1.5" aria-label="Consequences">
+          {hasPositivePoints ? (
+            <span
+              className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800"
+              aria-label={`${positivePoints.length} positive consequences`}
+            >
+              +{positivePoints.length}
+            </span>
+          ) : null}
+          {hasNegativePoints ? (
+            <span
+              className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-800"
+              aria-label={`${negativePoints.length} negative consequences`}
+            >
+              −{negativePoints.length}
+            </span>
           ) : null}
         </div>
       ) : null}

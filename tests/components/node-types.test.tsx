@@ -12,12 +12,15 @@ const defaultData: ChainNodeData = {
   negativeConsequenceBulletPoints: [],
 };
 
-const renderChainNode = (data: Partial<ChainNodeData> = {}) => {
+const renderChainNode = (
+  data: Partial<ChainNodeData> = {},
+  selected = false,
+) => {
   const ChainNode = nodeTypes.ChainNode;
   const props = {
     id: "node-1",
     data: { ...defaultData, ...data },
-    selected: false,
+    selected,
     type: "ChainNode",
     xPos: 0,
     yPos: 0,
@@ -91,5 +94,40 @@ describe("ChainNode details", () => {
 
     expect(screen.queryByTestId("node-details")).not.toBeInTheDocument();
     expect(screen.queryByText("Root cause details")).not.toBeInTheDocument();
+  });
+
+  it("shows compact accessible consequence counts in summary mode", () => {
+    act(() => useAppStore.getState().actions.setShowDetails(false));
+    renderChainNode({
+      positiveConsequenceBulletPoints: ["Recovery"],
+      negativeConsequenceBulletPoints: ["Delay", "Cost"],
+    });
+    expect(screen.getByLabelText("1 positive consequences")).toHaveTextContent(
+      "+1",
+    );
+    expect(screen.getByLabelText("2 negative consequences")).toHaveTextContent(
+      "−2",
+    );
+    expect(screen.queryByText("Recovery")).not.toBeInTheDocument();
+  });
+
+  it("exposes derived root, leaf, path, and unrelated presentation states", () => {
+    renderChainNode(
+      {
+        presentation: {
+          isRoot: true,
+          isLeaf: true,
+          isOnSelectedPath: true,
+          isUnrelated: false,
+        },
+      },
+      true,
+    );
+    const node = screen.getByTestId("chain-node");
+    expect(node).toHaveAttribute("data-root", "true");
+    expect(node).toHaveAttribute("data-leaf", "true");
+    expect(node).toHaveAttribute("data-selected-path", "true");
+    expect(node).toHaveClass("ring-4", "border-sky-700");
+    expect(screen.getByText("Root event")).toBeInTheDocument();
   });
 });
