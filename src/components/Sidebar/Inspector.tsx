@@ -154,7 +154,7 @@ export const Inspector = ({
 
   useEffect(() => {
     if (barrier) {
-      setIsBreached(barrier.breached);
+      setIsBreached(barrier.breached ?? barrier.status === "Failed");
       setBreachedItems(barrier.breachedItems ?? []);
       setBarrierDescription(barrier.description ?? "");
       setBreachedErrors([]);

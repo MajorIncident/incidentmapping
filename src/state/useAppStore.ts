@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
-import type { Barrier, ChainNode, MapData } from "../features/maps/schema";
+import type {
+  Barrier,
+  ChainNode,
+  MapData,
+  MapDataV1,
+  RelationshipEdge,
+} from "../features/maps/schema";
+import { parseAndMigrateMapData } from "../features/maps/migration";
 import { createId } from "../lib/id";
 import {
   applyHierarchyLayout,
@@ -12,12 +19,19 @@ import {
 export { GRID_SIZE } from "../features/layout/hierarchy";
 
 export type ChainNodeData = {
+  referenceId?: string;
+  nodeType?: ChainNode["nodeType"];
   title: string;
   description?: string;
   owner?: string;
   timestamp?: string;
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
+  evidenceItems?: ChainNode["evidenceItems"];
+  severity?: ChainNode["severity"];
+  incidentStatus?: ChainNode["incidentStatus"];
+  factorCategory?: ChainNode["factorCategory"];
+  factorSignificance?: ChainNode["factorSignificance"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
   presentation?: {
     isRoot: boolean;
@@ -32,15 +46,24 @@ export type BarrierNodeData = {
   upstreamNodeId: string;
   downstreamNodeId: string;
   description?: string;
-  breached: boolean;
-  breachedItems: string[];
+  status: Barrier["status"];
+  failureReason?: Barrier["failureReason"];
+  failureDetails?: string;
+  /** Compatibility view used by the current barrier editor; never persisted. */
+  breached?: boolean;
+  breachedItems?: string[];
+};
+
+type RuntimeBarrier = Barrier & {
+  breached?: boolean;
+  breachedItems?: string[];
 };
 
 type HistoryEntry = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: MapData["metadata"];
-  barriers: Barrier[];
+  barriers: RuntimeBarrier[];
   selectionId: string | null;
 };
 
@@ -53,7 +76,7 @@ type AppState = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: MapData["metadata"];
-  barriers: Barrier[];
+  barriers: RuntimeBarrier[];
   selectionId: string | null;
   editingId: string | null;
   showDetails: boolean;
@@ -69,7 +92,7 @@ type AppState = {
   canRedo: boolean;
   actions: {
     newMap: () => void;
-    loadMap: (map: MapData) => void;
+    loadMap: (map: MapData | MapDataV1) => void;
     toMap: () => MapData;
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
@@ -98,7 +121,15 @@ type AppState = {
     updateBarrierData: (
       id: string,
       patch: Partial<
-        Pick<Barrier, "breached" | "breachedItems" | "description">
+        Pick<
+          RuntimeBarrier,
+          | "status"
+          | "failureReason"
+          | "failureDetails"
+          | "description"
+          | "breached"
+          | "breachedItems"
+        >
       >,
       options?: { debounceHistory?: boolean },
     ) => void;
@@ -145,11 +176,18 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
   position: snapPosition(node.position),
   data: {
     title: node.title,
+    referenceId: node.referenceId,
+    nodeType: node.nodeType,
     description: node.description,
     owner: node.owner,
     timestamp: node.timestamp,
     positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
+    evidenceItems: node.evidenceItems.map((item) => ({ ...item })),
+    severity: node.severity,
+    incidentStatus: node.incidentStatus,
+    factorCategory: node.factorCategory,
+    factorSignificance: node.factorSignificance,
   },
 });
 
@@ -164,7 +202,12 @@ const mapEdgesToReactEdges = (map: MapData): Edge[] =>
     type: "step",
     sourceHandle: "bottom",
     targetHandle: "top",
-    data: { kind: edge.kind },
+    data: {
+      kind: edge.kind,
+      ...(edge.kind === "ActionEdge" && edge.status
+        ? { status: edge.status }
+        : {}),
+    },
   }));
 
 const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
@@ -172,18 +215,34 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     id: node.id,
     kind: "ChainNode",
     title: node.data.title,
+    referenceId: node.data.referenceId ?? "N-001",
+    nodeType: node.data.nodeType ?? "Event",
     description: node.data.description,
     owner: node.data.owner,
     timestamp: node.data.timestamp,
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
+    evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
+    severity: node.data.severity,
+    incidentStatus: node.data.incidentStatus,
+    factorCategory: node.data.factorCategory,
+    factorSignificance: node.data.factorSignificance,
     position: snapPosition(node.position),
   }));
 
 const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => ({
   ...node,
   position: { ...node.position },
-  data: { ...node.data },
+  data: {
+    ...node.data,
+    positiveConsequenceBulletPoints: [
+      ...node.data.positiveConsequenceBulletPoints,
+    ],
+    negativeConsequenceBulletPoints: [
+      ...node.data.negativeConsequenceBulletPoints,
+    ],
+    evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
+  },
 });
 
 const cloneEdge = (edge: Edge): Edge => ({
@@ -191,9 +250,9 @@ const cloneEdge = (edge: Edge): Edge => ({
   data: edge.data ? { ...edge.data } : undefined,
 });
 
-const cloneBarrier = (barrier: Barrier): Barrier => ({
+const cloneBarrier = (barrier: RuntimeBarrier): RuntimeBarrier => ({
   ...barrier,
-  breachedItems: [...barrier.breachedItems],
+  breachedItems: barrier.breachedItems ? [...barrier.breachedItems] : undefined,
 });
 
 const snapshotFromState = (state: AppState): HistoryEntry => ({
@@ -298,15 +357,18 @@ export const createRootNode = (): ChainNode => ({
   id: createId("node"),
   kind: "ChainNode",
   title: "New incident",
+  referenceId: "N-001",
+  nodeType: "Event",
   description: "",
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
+  evidenceItems: [],
   position: snapPosition({ x: 0, y: 0 }),
 });
 
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   metadata: { title: "Untitled Map" },
   nodes: [createRootNode()],
   edges: [],
@@ -348,7 +410,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         showDetails: state.showDetails,
       }));
     },
-    loadMap: (map) => {
+    loadMap: (input) => {
+      const map = parseAndMigrateMapData(input);
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
@@ -359,7 +422,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         ).nodes,
         edges: mapEdgesToReactEdges(map),
         metadata: map.metadata ? { ...map.metadata } : undefined,
-        barriers: map.barriers ? [...map.barriers] : [],
+        barriers: map.barriers.map((barrier) => ({
+          ...barrier,
+          breached: barrier.status === "Failed",
+          breachedItems: barrier.failureDetails?.split("\n") ?? [],
+        })),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
@@ -374,19 +441,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     toMap: () => {
       const { nodes, edges, metadata, barriers } = get();
       return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         metadata,
         nodes: serializeNodes(nodes),
-        edges: edges.map((edge) => ({
-          id: edge.id,
-          kind: "CauseEffectEdge" as const,
-          fromId: edge.source,
-          toId: edge.target,
-        })),
+        edges: edges.map(
+          (edge): RelationshipEdge =>
+            edge.data?.kind === "ActionEdge"
+              ? {
+                  id: edge.id,
+                  kind: "ActionEdge",
+                  fromId: edge.source,
+                  toId: edge.target,
+                  status: edge.data.status,
+                }
+              : {
+                  id: edge.id,
+                  kind: "CauseEffectEdge",
+                  fromId: edge.source,
+                  toId: edge.target,
+                },
+        ),
         barriers: barriers.map((barrier) => {
           const description = barrier.description?.trim();
           return {
-            ...cloneBarrier(barrier),
+            id: barrier.id,
+            kind: barrier.kind,
+            upstreamNodeId: barrier.upstreamNodeId,
+            downstreamNodeId: barrier.downstreamNodeId,
+            status:
+              barrier.breached === undefined
+                ? barrier.status
+                : barrier.breached
+                  ? ("Failed" as const)
+                  : ("Effective" as const),
+            failureReason: barrier.failureReason,
+            failureDetails: barrier.breachedItems
+              ? barrier.breachedItems.filter(Boolean).join("\n") || undefined
+              : barrier.failureDetails,
             description: description?.length ? description : undefined,
           };
         }),
@@ -440,8 +531,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           position: { x: 0, y: 0 },
           data: {
             title: "New Event",
+            referenceId: `N-${String(state.nodes.length + 1).padStart(3, "0")}`,
+            nodeType: "Event",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
+            evidenceItems: [],
           },
         };
         const outgoingChildCount = parentNode
@@ -561,8 +655,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           position,
           data: {
             title: "New Event",
+            referenceId: `N-${String(state.nodes.length + 1).padStart(3, "0")}`,
+            nodeType: "Event",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
+            evidenceItems: [],
           },
         };
         const nextNodes = [...state.nodes, newNode];
@@ -659,6 +756,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             kind: "Barrier" as const,
             upstreamNodeId,
             downstreamNodeId,
+            status: "Failed" as const,
             breached: true,
             breachedItems: [],
           },
@@ -1076,7 +1174,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             breachedItems: hasBreachedItems
               ? [...(patch.breachedItems ?? [])]
               : barrier.breachedItems,
-          } satisfies Barrier;
+          } satisfies RuntimeBarrier;
           if (JSON.stringify(nextBarrier) === JSON.stringify(barrier)) {
             return barrier;
           }
