@@ -243,24 +243,24 @@ describe("Inspector and keyboard workflows", () => {
       </ReactFlowProvider>,
     );
 
-    expect(screen.getByText("Add barrier to branch")).toBeVisible();
+    expect(screen.getByText("Add Control to branch")).toBeVisible();
     expect(screen.getByText(/Branch 1 of 2.*ld-one/)).toBeVisible();
     expect(screen.getByText(/Branch 2 of 2.*ld-two/)).toBeVisible();
     expect(
       screen.getByRole("button", {
-        name: "Barrier exists: Parent → Duplicate",
+        name: "Control exists: Parent → Duplicate",
       }),
     ).toBeDisabled();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Add barrier: Parent → Duplicate" }),
+      screen.getByRole("button", { name: "Add Control: Parent → Duplicate" }),
     );
     expect(useAppStore.getState().barriers[1]).toMatchObject({
       downstreamNodeId: "child-two",
     });
     expect(
       await screen.findByRole("heading", {
-        name: "Barrier between Parent and Duplicate",
+        name: "Control between Parent and Duplicate",
       }),
     ).toBeVisible();
   });

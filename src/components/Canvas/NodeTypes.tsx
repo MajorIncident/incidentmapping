@@ -480,7 +480,7 @@ const BarrierNodeComponent = ({
       </>
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-sky-800">
-          Barrier
+          Control
         </div>
         <span
           className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClasses[data.status]}`}
