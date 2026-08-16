@@ -25,7 +25,7 @@
       "negativeConsequenceBulletPoints": ["Connections put at risk"],
       "evidenceItems": [
         {
-          "id": "local-1",
+          "id": "EV-001",
           "text": "Passenger service log records 42 delayed bags"
         }
       ],
@@ -49,7 +49,7 @@
       "negativeConsequenceBulletPoints": ["Bags accumulated at induction"],
       "evidenceItems": [
         {
-          "id": "local-1",
+          "id": "EV-002",
           "text": "Belt controller log: photo-eye fault at 18:31"
         }
       ],

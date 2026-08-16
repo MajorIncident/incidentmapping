@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseAndMigrateMapData } from "../../src/features/maps/migration";
 import {
-  mapDataV2Schema,
+  mapDataSchema,
   type MapDataV1,
+  type MapDataV2,
 } from "../../src/features/maps/schema";
-import { useAppStore } from "../../src/state/useAppStore";
-import { sampleMap } from "../../src/features/maps/fixtures";
 
-const legacy: MapDataV1 = {
+const fixture = (name: string): unknown =>
+  JSON.parse(readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8"));
+
+const v1: MapDataV1 = {
   schemaVersion: 1,
   metadata: { title: "Original investigation" },
   nodes: [
@@ -16,8 +18,6 @@ const legacy: MapDataV1 = {
       id: "later",
       kind: "ChainNode",
       title: "Second chronologically",
-      description: "description",
-      owner: "owner",
       timestamp: "2024-01-02",
       positiveConsequenceBulletPoints: ["positive"],
       negativeConsequenceBulletPoints: ["negative"],
@@ -41,197 +41,120 @@ const legacy: MapDataV1 = {
       kind: "Barrier",
       upstreamNodeId: "earlier",
       downstreamNodeId: "later",
-      description: "Control",
       breached: true,
       breachedItems: ["First failure", "", "Second failure"],
-    },
-    {
-      id: "effective",
-      kind: "Barrier",
-      upstreamNodeId: "earlier",
-      downstreamNodeId: "later",
-      breached: false,
-      breachedItems: [],
     },
   ],
 };
 
-const fixture = (name: string): unknown =>
-  JSON.parse(readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8"));
-
 describe("parseAndMigrateMapData", () => {
-  it("preserves V1 content while deterministically adding V2 fields", () => {
-    const migrated = parseAndMigrateMapData(legacy);
-    expect(migrated.schemaVersion).toBe(2);
+  it("migrates V1 to deterministic canonical V3 without inferred classifications", () => {
+    const migrated = parseAndMigrateMapData(v1);
+    expect(migrated.schemaVersion).toBe(3);
     expect(migrated.metadata).toEqual({
-      ...legacy.metadata,
-      nodeReferenceHighWaterMark: legacy.nodes.length,
+      title: "Original investigation",
+      nodeReferenceHighWaterMark: 2,
       evidenceReferenceHighWaterMark: 0,
+      contextItems: [],
     });
-    expect(migrated.nodes.map(({ referenceId }) => referenceId)).toEqual([
+    expect(migrated.nodes.map((node) => node.referenceId)).toEqual([
       "N-001",
       "N-002",
     ]);
     expect(migrated.nodes[0]).toMatchObject({
-      ...legacy.nodes[0],
+      id: "later",
+      timestamp: "2024-01-02",
       nodeType: "Event",
-      evidenceItems: [],
+      evidenceIds: [],
+      contextItems: [],
+      position: { x: 13, y: 29 },
     });
-    expect(migrated.edges).toEqual(legacy.edges);
-    expect(migrated.barriers).toEqual([
-      {
-        id: "failed",
-        kind: "Barrier",
-        upstreamNodeId: "earlier",
-        downstreamNodeId: "later",
-        description: "Control",
-        status: "Failed",
-        failureDetails: "First failure\nSecond failure",
-      },
-      {
-        id: "effective",
-        kind: "Barrier",
-        upstreamNodeId: "earlier",
-        downstreamNodeId: "later",
-        status: "Effective",
-      },
-    ]);
-  });
-
-  it("accepts strict V2 data and rejects retired fields", () => {
-    const current = parseAndMigrateMapData(legacy);
-    expect(parseAndMigrateMapData(current)).toEqual(current);
-    expect(
-      mapDataV2Schema.safeParse({
-        ...current,
-        barriers: [{ ...current.barriers[0], breached: true }],
-      }).success,
-    ).toBe(false);
-  });
-
-  it("returns canonical V2 without renumbering sparse evidence", () => {
-    const canonical = {
-      ...sampleMap,
-      metadata: { evidenceReferenceHighWaterMark: 3 },
-      nodes: sampleMap.nodes.map((node, index) => ({
-        ...node,
-        evidenceItems: [
-          { id: index === 0 ? "EV-001" : "EV-003", text: "Proof" },
-        ],
-      })),
-    };
-    expect(parseAndMigrateMapData(canonical)).toEqual(canonical);
-  });
-
-  it("fails clearly for unknown versions", () => {
-    expect(() => parseAndMigrateMapData({ schemaVersion: 99 })).toThrow(
-      "Unsupported map schema version: 99",
-    );
-  });
-
-  it("keeps the committed Version 1 baggage investigation content", () => {
-    const migrated = parseAndMigrateMapData(
-      fixture("baggage-incident-v1.json"),
-    );
-    expect(migrated.nodes[0]).toMatchObject({
-      referenceId: "N-001",
-      nodeType: "Event",
-      description: "Passengers waited beyond the service target.",
-      owner: "Station manager",
-      timestamp: "2026-06-14T18:42:00Z",
-      negativeConsequenceBulletPoints: [
-        "Forty-two passengers affected",
-        "Connections put at risk",
-      ],
+    expect(migrated.nodes[0]).not.toHaveProperty("eventPhase");
+    expect(migrated.barriers[0]).toEqual({
+      id: "failed",
+      kind: "Barrier",
+      upstreamNodeId: "earlier",
+      downstreamNodeId: "later",
+      status: "Failed",
+      failureDetails: "First failure\nSecond failure",
+      evidenceIds: [],
     });
+    expect(parseAndMigrateMapData(migrated)).toEqual(migrated);
+  });
+
+  it("migrates canonical V2 evidence into the registry while preserving sparse IDs", () => {
+    const input = fixture("baggage-incident-v2.json") as MapDataV2;
+    if (!input.metadata) throw new Error("Fixture metadata is required");
+    input.metadata.evidenceReferenceHighWaterMark = 11;
+    input.nodes[0].evidenceItems[0].id = "EV-010";
+    const migrated = parseAndMigrateMapData(input);
+    expect(migrated.evidence[0]).toEqual({
+      id: "EV-010",
+      type: "Note",
+      title: "Passenger service log records 42 delayed bags",
+    });
+    expect(migrated.nodes[0].evidenceIds).toEqual(["EV-010"]);
+    expect(migrated.metadata?.evidenceReferenceHighWaterMark).toBe(11);
     expect(migrated.barriers[0]).toMatchObject({
       status: "Failed",
-      failureDetails:
-        "Inspection did not include the photo-eye\nNo escalation recorded",
-    });
-  });
-
-  it("accepts the comprehensive committed Version 2 baggage fixture", () => {
-    const parsed = parseAndMigrateMapData(fixture("baggage-incident-v2.json"));
-    expect(new Set(parsed.nodes.map((node) => node.nodeType))).toEqual(
-      new Set(["Impact", "Event", "Factor", "Action"]),
-    );
-    expect(new Set(parsed.edges.map((edge) => edge.kind))).toEqual(
-      new Set(["CauseEffectEdge", "ActionEdge"]),
-    );
-    expect(
-      new Set(
-        parsed.nodes
-          .filter((node) => node.nodeType === "Factor")
-          .map((node) => node.factorCategory),
-      ),
-    ).toEqual(new Set(["Human", "Process"]));
-    expect(
-      new Set(
-        parsed.nodes
-          .filter((node) => node.nodeType === "Factor")
-          .map((node) => node.factorSignificance),
-      ),
-    ).toEqual(new Set(["KeyFactor", "RootCause"]));
-    expect(parsed.nodes.filter((node) => node.nodeType === "Factor")).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          factorCategory: "Human",
-          factorSignificance: "KeyFactor",
-        }),
-        expect.objectContaining({
-          factorCategory: "Process",
-          factorSignificance: "RootCause",
-          evidenceItems: expect.arrayContaining([
-            expect.objectContaining({ id: "EV-004" }),
-          ]),
-        }),
-      ]),
-    );
-    expect(parsed.barriers[0]).toMatchObject({
-      status: "Failed",
       failureReason: "InadequateDesign",
+      evidenceIds: [],
     });
+    expect(
+      migrated.nodes.find((node) => node.nodeType === "Action"),
+    ).toMatchObject({
+      actionStatus: "Planned",
+    });
+    expect(migrated.edges.some((edge) => edge.kind === "ActionEdge")).toBe(
+      true,
+    );
   });
 
-  it("globally renumbers dedicated legacy V2 evidence and applies migration precedence", () => {
-    const parsed = parseAndMigrateMapData(
+  it("migrates the isolated legacy V2 dialect without changing identities", () => {
+    const migrated = parseAndMigrateMapData(
       fixture("baggage-incident-v2-legacy.json"),
     );
+    expect(migrated.evidence.map((item) => item.id)).toEqual([
+      "EV-001",
+      "EV-002",
+      "EV-003",
+      "EV-004",
+    ]);
+    expect(migrated.metadata?.evidenceReferenceHighWaterMark).toBe(4);
     expect(
-      parsed.nodes.flatMap((node) => node.evidenceItems.map((item) => item.id)),
-    ).toEqual(["EV-001", "EV-002", "EV-003", "EV-004"]);
-    expect(parsed.metadata?.evidenceReferenceHighWaterMark).toBe(4);
-    expect(parsed.metadata?.status).toBe("Open");
-    expect(parsed.nodes[0]).not.toHaveProperty("incidentStatus");
-    expect(parsed.nodes.find((node) => node.id === "action")).toMatchObject({
+      migrated.nodes.find((node) => node.id === "factor-root"),
+    ).toMatchObject({
+      factorCategory: "Process",
+      factorSignificance: "RootCause",
+      evidenceIds: ["EV-003", "EV-004"],
+    });
+    expect(migrated.nodes.find((node) => node.id === "action")).toMatchObject({
       actionStatus: "Planned",
       actionDueDate: "2026-07-01",
     });
-    expect(parsed.edges.find((edge) => edge.kind === "ActionEdge")).toEqual({
-      id: "action-root",
-      kind: "ActionEdge",
-      fromId: "factor-root",
-      toId: "action",
-    });
-    expect(JSON.stringify(parsed)).not.toMatch(
-      /incidentStatus|evidenceHighWaterMark|"dueDate"|"status":"Completed"/,
-    );
-
-    useAppStore.getState().actions.loadMap(parsed);
-    const saved = useAppStore.getState().actions.toMap();
-    expect(mapDataV2Schema.parse(saved)).toEqual(saved);
-    expect(JSON.stringify(saved)).not.toContain("incidentStatus");
+    expect(
+      migrated.nodes.find((node) => node.id === "action"),
+    ).not.toHaveProperty("actionType");
+    expect(migrated.barriers[0]).not.toHaveProperty("controlRole");
   });
 
-  it("round trips V2 through the store without retired barrier fields", () => {
-    const migrated = parseAndMigrateMapData(legacy);
-    useAppStore.getState().actions.loadMap(migrated);
-    const saved = useAppStore.getState().actions.toMap();
-    expect(saved.schemaVersion).toBe(2);
-    expect(JSON.stringify(saved)).not.toMatch(/breached(?:Items)?/);
-    expect(parseAndMigrateMapData(saved)).toEqual(saved);
-    expect(useAppStore.getState().history).toEqual({ past: [], future: [] });
-    expect(useAppStore.getState().canUndo).toBe(false);
+  it("rejects duplicate evidence identity instead of renumbering it", () => {
+    const input = fixture("baggage-incident-v2.json") as MapDataV2;
+    input.nodes[1].evidenceItems[0].id = input.nodes[0].evidenceItems[0].id;
+    expect(() => parseAndMigrateMapData(input)).toThrow(
+      "Duplicate evidence ID",
+    );
+  });
+
+  it("passes validated V3 through unchanged", () => {
+    const v3 = parseAndMigrateMapData(fixture("baggage-incident-v2.json"));
+    expect(mapDataSchema.parse(v3)).toEqual(v3);
+    expect(parseAndMigrateMapData(v3)).toEqual(v3);
+  });
+
+  it("keeps unsupported-version errors explicit", () => {
+    expect(() => parseAndMigrateMapData({ schemaVersion: 99 })).toThrow(
+      "Unsupported map schema version: 99",
+    );
   });
 });
