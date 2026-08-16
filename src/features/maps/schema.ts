@@ -439,7 +439,7 @@ export const assertionStateSchema = z.enum([
   "Working",
   "Inferred",
 ]);
-export const contextDisplayModeSchema = z.enum(["Text", "Metric"]);
+export const contextDisplayModeSchema = z.enum(["Text", "Chip", "Metric"]);
 export const attachmentMimeTypeSchema = z.enum([
   "image/jpeg",
   "image/png",

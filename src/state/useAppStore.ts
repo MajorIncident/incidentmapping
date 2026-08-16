@@ -174,6 +174,8 @@ type AppState = {
       label: string,
       value: string,
       showOnCard?: boolean,
+      displayMode?: ContextItem["displayMode"],
+      unit?: string,
     ) => string | null;
     updateContext: (
       target: "incident" | string,
@@ -863,7 +865,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!get().barriers.some((item) => item.id === id)) return;
       get().actions.updateBarrierData(id, { assertionState: value });
     },
-    addContext: (target, rawLabel, rawValue, showOnCard) => {
+    addContext: (
+      target,
+      rawLabel,
+      rawValue,
+      showOnCard,
+      displayMode = "Text",
+      rawUnit,
+    ) => {
       const label = rawLabel.trim();
       const value = rawValue.trim();
       if (!label || !value) return null;
@@ -883,7 +892,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         id,
         label,
         value,
-        displayMode: "Text",
+        displayMode,
+        ...(displayMode === "Metric" && rawUnit?.trim()
+          ? { unit: rawUnit.trim() }
+          : {}),
         ...(showOnCard === undefined ? {} : { showOnCard }),
       };
       if (target === "incident")

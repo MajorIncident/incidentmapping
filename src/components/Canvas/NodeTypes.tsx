@@ -9,6 +9,7 @@ import {
   selectPinnedContext,
   timestampNeedsSeconds,
 } from "../../state/selectors";
+import { ContextPresentation } from "../Context/ContextPresentation";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 import { AssertionMarker } from "../AssertionState/AssertionState";
@@ -508,17 +509,12 @@ const ChainNodeComponent = ({
         </div>
       ) : null}
       {!isEditing && !showDetails && compactContext.length ? (
-        <dl
-          className="mt-2 space-y-1 text-[11px] text-slate-600"
-          aria-label="Pinned context"
-        >
-          {compactContext.map((item) => (
-            <div key={item.id} className="flex min-w-0 justify-between gap-2">
-              <dt className="shrink-0 font-semibold">{item.label}</dt>
-              <dd className="truncate text-right">{item.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="mt-2 text-[11px]">
+          <ContextPresentation
+            items={compactContext}
+            ariaLabel="Pinned context"
+          />
+        </div>
       ) : null}
       {!isEditing && showDetails && hasVisibleDetails ? (
         <div
@@ -535,14 +531,7 @@ const ChainNodeComponent = ({
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                 Context
               </div>
-              <dl className="space-y-1 text-[13px] text-slate-700">
-                {contextItems.map((item) => (
-                  <div key={item.id} className="flex min-w-0 gap-1.5">
-                    <dt className="shrink-0 font-semibold">{item.label}:</dt>
-                    <dd className="min-w-0 break-words">{item.value}</dd>
-                  </div>
-                ))}
-              </dl>
+              <ContextPresentation items={contextItems} variant="detail" />
             </div>
           ) : null}
           {hasPositivePoints || hasNegativePoints ? (
