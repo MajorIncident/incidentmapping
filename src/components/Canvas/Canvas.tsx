@@ -16,6 +16,7 @@ import {
   type ChainNodeData,
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
+import { BRANCH_LANE_GAP, edgeTypes } from "./IncidentEdge";
 import {
   CHAIN_NODE_HEIGHT,
   CHAIN_NODE_WIDTH,
@@ -432,6 +433,23 @@ export const Canvas = ({
       return splitEdgeAtControl(presentedEdge, matchingBarrier.id);
     });
 
+    const allRenderedNodes = [...presentedNodes, ...barrierNodes];
+    const obstacleRectangles = allRenderedNodes.map((node) => ({
+      id: node.id,
+      x: node.position.x,
+      y: node.position.y,
+      width:
+        node.width ??
+        (node.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH),
+      height:
+        node.height ??
+        (node.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT),
+    }));
+    const branches = new Map<string, typeof flowEdges>();
+    flowEdges.forEach((edge) => {
+      const key = `${edge.source}:${edge.data?.kind === "ActionEdge" ? "action" : "causal"}`;
+      branches.set(key, [...(branches.get(key) ?? []), edge]);
+    });
     const styledEdges = flowEdges.map((edge) => {
       const isAction = edge.data?.kind === "ActionEdge";
       const related = edge.data?.presentationRole === "related";
@@ -443,7 +461,23 @@ export const Canvas = ({
       const unrelated = Boolean(selectionId) && !highlighted;
       return {
         ...edge,
-        type: "step",
+        type: "incident",
+        data: {
+          ...edge.data,
+          obstacles: obstacleRectangles.filter(
+            (rectangle) =>
+              rectangle.id !== edge.source && rectangle.id !== edge.target,
+          ),
+          laneOffset:
+            ((branches
+              .get(`${edge.source}:${isAction ? "action" : "causal"}`)
+              ?.indexOf(edge) ?? 0) -
+              ((branches.get(`${edge.source}:${isAction ? "action" : "causal"}`)
+                ?.length ?? 1) -
+                1) /
+                2) *
+            BRANCH_LANE_GAP,
+        },
         className: isAction
           ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${highlighted ? " incident-edge--related" : ""}`
           : highlighted
@@ -573,6 +607,7 @@ export const Canvas = ({
   }, [reactFlow, selectionId]);
 
   const memorizedNodeTypes = useMemo(() => nodeTypes, []);
+  const memorizedEdgeTypes = useMemo(() => edgeTypes, []);
 
   return (
     <div
@@ -646,6 +681,7 @@ export const Canvas = ({
         nodes={nodes}
         edges={renderedEdges}
         nodeTypes={memorizedNodeTypes}
+        edgeTypes={memorizedEdgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2, includeHiddenNodes: true }}
         proOptions={{ hideAttribution: true }}
