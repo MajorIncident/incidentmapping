@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode, ChangeEvent } from "react";
 import { mapDataSchema } from "../../features/maps/schema";
+import { parseAndMigrateMapData } from "../../features/maps/migration";
 import {
   openFileWithPicker,
   saveFileWithPicker,
@@ -27,14 +28,11 @@ type FileMenuProps = {
 
 export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
   const { newMap, loadMap, toMap } = useAppStore((state) => state.actions);
-  const currentSignature = useAppStore((state) =>
-    JSON.stringify({
-      nodes: state.nodes,
-      edges: state.edges,
-      metadata: state.metadata,
-      barriers: state.barriers,
-    }),
-  );
+  const currentSignature = useAppStore((state) => {
+    // Derive dirty state from exactly the same canonical persisted projection as save.
+    void state.nodes;
+    return JSON.stringify(state.actions.toMap());
+  });
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -47,23 +45,10 @@ export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
   const commitLoad = useCallback(
     (raw: string) => {
       try {
-        const parsed = JSON.parse(raw);
-        const result = mapDataSchema.safeParse(parsed);
-        if (!result.success) {
-          const message = result.error.errors
-            .map((issue) => issue.message)
-            .join("\n");
-          window.alert(`Unable to open map.\n${message}`);
-          return;
-        }
-        loadMap(result.data);
+        const parsed = parseAndMigrateMapData(JSON.parse(raw));
+        loadMap(parsed);
         setSavedSignature(
-          JSON.stringify({
-            nodes: useAppStore.getState().nodes,
-            edges: useAppStore.getState().edges,
-            metadata: useAppStore.getState().metadata,
-            barriers: useAppStore.getState().barriers,
-          }),
+          JSON.stringify(useAppStore.getState().actions.toMap()),
         );
       } catch (error) {
         window.alert(`Unable to open map.\n${(error as Error).message}`);
