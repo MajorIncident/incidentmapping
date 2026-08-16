@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useLayoutEffect,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -28,6 +29,29 @@ const evidenceLabel = (id: string): string => {
   const sequence = id.match(/^EV?-(\d+)$/)?.[1];
   return sequence ? `EV-${String(Number(sequence)).padStart(3, "0")}` : "New";
 };
+
+type SectionProps = { children: React.ReactNode };
+export const CoreFields = ({ children }: SectionProps): JSX.Element => (
+  <>{children}</>
+);
+export const EvidenceSection = ({ children }: SectionProps): JSX.Element => (
+  <>{children}</>
+);
+export const ConsequencesSection = ({
+  children,
+}: SectionProps): JSX.Element => <>{children}</>;
+export const FactorClassification = ({
+  children,
+}: SectionProps): JSX.Element => <>{children}</>;
+export const ActionFields = ({ children }: SectionProps): JSX.Element => (
+  <>{children}</>
+);
+export const ControlInspector = ({ children }: SectionProps): JSX.Element => (
+  <>{children}</>
+);
+export const InspectorHeader = ({ children }: SectionProps): JSX.Element => (
+  <>{children}</>
+);
 
 export const Inspector = ({
   onClose,
@@ -99,6 +123,7 @@ export const Inspector = ({
   const positiveInputRefs = useRef(new Map<string, HTMLInputElement>());
   const negativeInputRefs = useRef(new Map<string, HTMLInputElement>());
   const evidenceInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const evidenceSelectionRef = useRef<string | null>(null);
   const positiveAddRef = useRef<HTMLButtonElement | null>(null);
   const negativeAddRef = useRef<HTMLButtonElement | null>(null);
   const evidenceAddRef = useRef<HTMLButtonElement | null>(null);
@@ -113,7 +138,7 @@ export const Inspector = ({
     [],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPendingFocus(null);
     setEvidenceDrafts([]);
     positiveInputRefs.current.clear();
@@ -130,12 +155,14 @@ export const Inspector = ({
       setTitleError(null);
       setPositiveConsequences(node.data.positiveConsequenceBulletPoints ?? []);
       setNegativeConsequences(node.data.negativeConsequenceBulletPoints ?? []);
+      const selectionChanged = evidenceSelectionRef.current !== node.id;
+      evidenceSelectionRef.current = node.id;
       setEvidenceDrafts((drafts) => [
         ...(node.data.evidenceItems ?? []).map((item) => ({
           ...item,
           persisted: true,
         })),
-        ...drafts.filter((item) => !item.persisted),
+        ...(selectionChanged ? [] : drafts.filter((item) => !item.persisted)),
       ]);
       setPositiveErrors([]);
       setNegativeErrors([]);
@@ -326,7 +353,7 @@ export const Inspector = ({
       setValues: (next: string[]) => void,
       setErrors: (next: string[]) => void,
     ) => {
-      if (!node) {
+      if (!node || useAppStore.getState().selectionId !== node.id) {
         return;
       }
 
@@ -597,7 +624,6 @@ export const Inspector = ({
 
   const ownerValue = node?.data.owner ?? "";
   const timestampValue = node?.data.timestamp ?? "";
-  const selectedEntityId = node?.id ?? barrier?.id ?? null;
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -627,13 +653,20 @@ export const Inspector = ({
         >
           <div className="flex flex-col gap-1">
             <h3 className="text-sm font-semibold text-slate-900">
-              Barrier between{" "}
+              Control between{" "}
               {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
               {downstreamNode?.data.title ?? barrier.downstreamNodeId}
             </h3>
             <p className="text-xs text-slate-500">
-              This barrier applies only to the selected connection.
+              This control applies only to the selected connection.
             </p>
+            <details className="text-xs text-slate-500">
+              <summary className="cursor-pointer">What is a Control?</summary>
+              <p className="mt-1">
+                Controls are measures intended to prevent, detect, or reduce an
+                undesirable event.
+              </p>
+            </details>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -731,7 +764,7 @@ export const Inspector = ({
                       { debounceHistory: true },
                     )
                   }
-                  placeholder="Briefly explain what happened"
+                  placeholder="Briefly explain what happened."
                 />
               </div>
             </>
@@ -757,7 +790,7 @@ export const Inspector = ({
               className={`${buttonClasses} border-rose-200 text-rose-700`}
               onClick={() => removeBarrier(barrier.id)}
             >
-              Remove Barrier
+              Remove Control
             </button>
           </div>
         </form>
@@ -793,159 +826,108 @@ export const Inspector = ({
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
         {node.data.nodeType !== "Action" ? (
-          <button
-            type="button"
-            className={`${buttonClasses} border-sky-300 bg-sky-50 text-sky-800`}
-            onClick={() => addAction(node.id)}
-          >
-            Add Action
-          </button>
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="inspector-node-type" className={labelClasses}>
+                Type
+              </label>
+              <select
+                id="inspector-node-type"
+                className={inputClasses}
+                value={node.data.nodeType ?? "Event"}
+                onChange={(event) =>
+                  setNodeType(
+                    node.id,
+                    event.target.value as NonNullable<
+                      typeof node.data.nodeType
+                    >,
+                  )
+                }
+              >
+                {(["Event", "Factor", "Impact"] as const).map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className={labelClasses}>Reference</span>
+              <span className="flex min-h-[38px] items-center text-sm font-semibold text-slate-600">
+                {node.data.referenceId ?? "Unassigned"}
+              </span>
+            </div>
+            {node.data.nodeType === "Factor" ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="inspector-factor-category"
+                    className={labelClasses}
+                  >
+                    Category
+                  </label>
+                  <select
+                    id="inspector-factor-category"
+                    className={inputClasses}
+                    value={node.data.factorCategory ?? ""}
+                    onChange={(event) =>
+                      setFactorCategory(
+                        node.id,
+                        (event.target.value ||
+                          undefined) as typeof node.data.factorCategory,
+                      )
+                    }
+                  >
+                    <option value="">Uncategorized</option>
+                    {(
+                      [
+                        "Human",
+                        "Process",
+                        "Equipment",
+                        "Technology",
+                        "Communication",
+                        "Environment",
+                        "Organizational",
+                        "Other",
+                      ] as const
+                    ).map((value) => (
+                      <option key={value} value={value}>
+                        {value === "Process"
+                          ? "Process / Procedure"
+                          : value === "Technology"
+                            ? "Technology / System"
+                            : value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="inspector-factor-significance"
+                    className={labelClasses}
+                  >
+                    Significance
+                  </label>
+                  <select
+                    id="inspector-factor-significance"
+                    className={inputClasses}
+                    value={node.data.factorSignificance ?? "Normal"}
+                    onChange={(event) =>
+                      setFactorSignificance(
+                        node.id,
+                        event.target.value as NonNullable<
+                          typeof node.data.factorSignificance
+                        >,
+                      )
+                    }
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="KeyFactor">Key Factor</option>
+                    <option value="RootCause">Root Cause</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : null}
-        <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspector-node-type" className={labelClasses}>
-              Type
-            </label>
-            <select
-              id="inspector-node-type"
-              className={inputClasses}
-              value={node.data.nodeType ?? "Event"}
-              disabled={node.data.nodeType === "Action"}
-              onChange={(event) =>
-                setNodeType(
-                  node.id,
-                  event.target.value as NonNullable<typeof node.data.nodeType>,
-                )
-              }
-            >
-              {(node.data.nodeType === "Action"
-                ? (["Action"] as const)
-                : (["Event", "Factor", "Impact"] as const)
-              ).map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={labelClasses}>Reference</span>
-            <span className="flex min-h-[38px] items-center text-sm font-semibold text-slate-600">
-              {node.data.referenceId ?? "Unassigned"}
-            </span>
-          </div>
-          {node.data.nodeType === "Factor" ? (
-            <>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="inspector-factor-category"
-                  className={labelClasses}
-                >
-                  Category
-                </label>
-                <select
-                  id="inspector-factor-category"
-                  className={inputClasses}
-                  value={node.data.factorCategory ?? "Human"}
-                  onChange={(event) =>
-                    setFactorCategory(
-                      node.id,
-                      event.target.value as NonNullable<
-                        typeof node.data.factorCategory
-                      >,
-                    )
-                  }
-                >
-                  {(
-                    [
-                      "Human",
-                      "Process",
-                      "Equipment",
-                      "Technology",
-                      "Communication",
-                      "Environment",
-                      "Organizational",
-                      "Other",
-                    ] as const
-                  ).map((value) => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="inspector-factor-significance"
-                  className={labelClasses}
-                >
-                  Significance
-                </label>
-                <select
-                  id="inspector-factor-significance"
-                  className={inputClasses}
-                  value={node.data.factorSignificance ?? "Normal"}
-                  onChange={(event) =>
-                    setFactorSignificance(
-                      node.id,
-                      event.target.value as NonNullable<
-                        typeof node.data.factorSignificance
-                      >,
-                    )
-                  }
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="KeyFactor">Key Factor</option>
-                  <option value="RootCause">Root Cause</option>
-                </select>
-              </div>
-            </>
-          ) : null}
-          {node.data.nodeType === "Action" ? (
-            <>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="inspector-action-status"
-                  className={labelClasses}
-                >
-                  Action status
-                </label>
-                <select
-                  id="inspector-action-status"
-                  className={inputClasses}
-                  value={node.data.actionStatus ?? "Proposed"}
-                  onChange={(event) =>
-                    setNodeActionStatus(
-                      node.id,
-                      event.target.value as NonNullable<
-                        typeof node.data.actionStatus
-                      >,
-                    )
-                  }
-                >
-                  <option value="Proposed">Proposed</option>
-                  <option value="Planned">Planned</option>
-                  <option value="InProgress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="inspector-action-due-date"
-                  className={labelClasses}
-                >
-                  Due date
-                </label>
-                <input
-                  id="inspector-action-due-date"
-                  type="date"
-                  className={inputClasses}
-                  value={node.data.actionDueDate ?? ""}
-                  onChange={(event) =>
-                    setNodeActionDueDate(node.id, event.target.value)
-                  }
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="inspector-title" className={labelClasses}>
             Title
@@ -995,57 +977,114 @@ export const Inspector = ({
           />
         </div>
 
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center justify-between">
-            <span className={labelClasses}>Barrier</span>
-          </div>
-          {downstreamBranches.length === 0 ? (
-            <p className="text-xs text-slate-500">
-              Add a downstream ChainNode to place a barrier.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {downstreamBranches.length > 1 ? (
-                <p className="text-sm font-medium text-slate-700">
-                  Add barrier to branch
-                </p>
-              ) : null}
-              {downstreamBranches.map((branch) => {
-                const childTitle =
-                  branch.node?.data.title ?? branch.edge.target;
-                const context =
-                  branch.count > 1
-                    ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
-                    : null;
-                return (
-                  <div
-                    key={branch.edge.id}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0 text-sm text-slate-700">
-                      <span>{childTitle}</span>
-                      {context ? (
-                        <span className="block text-xs text-slate-500">
-                          {context}
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      className={`${buttonClasses} px-2 py-1 text-xs`}
-                      disabled={Boolean(branch.barrier)}
-                      onClick={() => addBarrier(node.id, branch.edge.target)}
-                    >
-                      {branch.barrier
-                        ? `Barrier exists: ${node.data.title} → ${childTitle}`
-                        : `Add barrier: ${node.data.title} → ${childTitle}`}
-                    </button>
-                  </div>
-                );
-              })}
+        {node.data.nodeType === "Action" ? (
+          <>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="inspector-action-status" className={labelClasses}>
+                Status
+              </label>
+              <select
+                id="inspector-action-status"
+                className={inputClasses}
+                value={node.data.actionStatus ?? "Proposed"}
+                onChange={(event) =>
+                  setNodeActionStatus(
+                    node.id,
+                    event.target.value as NonNullable<
+                      typeof node.data.actionStatus
+                    >,
+                  )
+                }
+              >
+                <option value="Proposed">Proposed</option>
+                <option value="Planned">Planned</option>
+                <option value="InProgress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
             </div>
-          )}
-        </div>
+          </>
+        ) : null}
+
+        {node.data.nodeType === "Impact" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-severity" className={labelClasses}>
+              Severity
+            </label>
+            <select
+              id="inspector-severity"
+              className={inputClasses}
+              value={node.data.severity ?? ""}
+              onChange={(event) =>
+                updateNodeData(node.id, {
+                  severity: (event.target.value ||
+                    undefined) as typeof node.data.severity,
+                })
+              }
+            >
+              <option value="">Not set</option>
+              {(["Low", "Medium", "High", "Critical"] as const).map(
+                (severity) => (
+                  <option key={severity}>{severity}</option>
+                ),
+              )}
+            </select>
+          </div>
+        ) : null}
+
+        {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between">
+              <span className={labelClasses}>Controls</span>
+            </div>
+            {downstreamBranches.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Add a downstream node to place a Control.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {downstreamBranches.length > 1 ? (
+                  <p className="text-sm font-medium text-slate-700">
+                    Add Control to branch
+                  </p>
+                ) : null}
+                {downstreamBranches.map((branch) => {
+                  const childTitle =
+                    branch.node?.data.title ?? branch.edge.target;
+                  const context =
+                    branch.count > 1
+                      ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
+                      : null;
+                  return (
+                    <div
+                      key={branch.edge.id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 text-sm text-slate-700">
+                        <span>{childTitle}</span>
+                        {context ? (
+                          <span className="block text-xs text-slate-500">
+                            {context}
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className={`${buttonClasses} px-2 py-1 text-xs`}
+                        disabled={Boolean(branch.barrier)}
+                        onClick={() => addBarrier(node.id, branch.edge.target)}
+                      >
+                        {branch.barrier
+                          ? `Control exists: ${node.data.title} → ${childTitle}`
+                          : `Add Control: ${node.data.title} → ${childTitle}`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-center justify-between">
@@ -1110,179 +1149,189 @@ export const Inspector = ({
           ))}
         </div>
 
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold text-slate-900">Consequences</h3>
+        {node.data.nodeType !== "Action" ? (
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Consequences
+            </h3>
 
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <span className={labelClasses}>Positive</span>
-              <button
-                ref={positiveAddRef}
-                type="button"
-                className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={() => handleAddListItem("positive")}
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {positiveConsequences.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No positive consequences yet.
-                </p>
-              ) : null}
-              {positiveConsequences.map((item, index) => (
-                <div
-                  key={positiveItemIds.current[index]}
-                  className="flex gap-2"
+            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className={labelClasses}>Positive</span>
+                <button
+                  ref={positiveAddRef}
+                  type="button"
+                  className={`${buttonClasses} px-2 py-1 text-xs`}
+                  onClick={() => handleAddListItem("positive")}
                 >
-                  <input
-                    ref={(element) => {
-                      const id = positiveItemIds.current[index];
-                      if (element) positiveInputRefs.current.set(id, element);
-                      else positiveInputRefs.current.delete(id);
-                    }}
-                    className={`${inputClasses} ${
-                      positiveErrors[index]?.length
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
-                    value={item}
-                    onChange={(event) =>
-                      handleListChange("positive", index, event)
-                    }
-                    onBlur={() =>
-                      handleListBlur(
-                        "positive",
-                        positiveConsequences,
-                        setPositiveConsequences,
-                        setPositiveErrors,
-                      )
-                    }
-                    onKeyDown={(event) =>
-                      handleListKeyDown(event, "positive", index)
-                    }
-                    placeholder="Add a positive consequence"
-                    aria-invalid={Boolean(positiveErrors[index])}
-                    aria-describedby={
-                      positiveErrors[index]?.length
-                        ? `positive-error-${index}`
-                        : undefined
-                    }
-                  />
-                  <button
-                    type="button"
-                    className={`${buttonClasses} px-2 py-1 text-xs`}
-                    onClick={() => handleRemoveListItem("positive", index)}
-                    aria-label={`Remove positive consequence ${index + 1}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              {positiveErrors.some((error) => error.length > 0) ? (
-                <div className="flex flex-col gap-1">
-                  {positiveErrors.map((error, index) =>
-                    error.length ? (
-                      <p
-                        key={`positive-error-${index}`}
-                        id={`positive-error-${index}`}
-                        className="text-xs font-medium text-red-600"
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {positiveConsequences.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    No positive consequences yet.
+                  </p>
+                ) : null}
+                {positiveConsequences.map((item, index) =>
+                  positiveItemIds.current[index] ? (
+                    <div
+                      key={positiveItemIds.current[index]}
+                      className="flex gap-2"
+                    >
+                      <input
+                        ref={(element) => {
+                          const id = positiveItemIds.current[index];
+                          if (element)
+                            positiveInputRefs.current.set(id, element);
+                          else positiveInputRefs.current.delete(id);
+                        }}
+                        className={`${inputClasses} ${
+                          positiveErrors[index]?.length
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                            : ""
+                        }`}
+                        value={item}
+                        onChange={(event) =>
+                          handleListChange("positive", index, event)
+                        }
+                        onBlur={() =>
+                          handleListBlur(
+                            "positive",
+                            positiveConsequences,
+                            setPositiveConsequences,
+                            setPositiveErrors,
+                          )
+                        }
+                        onKeyDown={(event) =>
+                          handleListKeyDown(event, "positive", index)
+                        }
+                        placeholder="Add a positive consequence"
+                        aria-invalid={Boolean(positiveErrors[index])}
+                        aria-describedby={
+                          positiveErrors[index]?.length
+                            ? `positive-error-${index}`
+                            : undefined
+                        }
+                      />
+                      <button
+                        type="button"
+                        className={`${buttonClasses} px-2 py-1 text-xs`}
+                        onClick={() => handleRemoveListItem("positive", index)}
+                        aria-label={`Remove positive consequence ${index + 1}`}
                       >
-                        {error}
-                      </p>
-                    ) : null,
-                  )}
-                </div>
-              ) : null}
+                        Remove
+                      </button>
+                    </div>
+                  ) : null,
+                )}
+                {positiveErrors.some((error) => error.length > 0) ? (
+                  <div className="flex flex-col gap-1">
+                    {positiveErrors.map((error, index) =>
+                      error.length ? (
+                        <p
+                          key={`positive-error-${index}`}
+                          id={`positive-error-${index}`}
+                          className="text-xs font-medium text-red-600"
+                        >
+                          {error}
+                        </p>
+                      ) : null,
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className={labelClasses}>Negative</span>
+                <button
+                  ref={negativeAddRef}
+                  type="button"
+                  className={`${buttonClasses} px-2 py-1 text-xs`}
+                  onClick={() => handleAddListItem("negative")}
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {negativeConsequences.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    No negative consequences yet.
+                  </p>
+                ) : null}
+                {negativeConsequences.map((item, index) =>
+                  negativeItemIds.current[index] ? (
+                    <div
+                      key={negativeItemIds.current[index]}
+                      className="flex gap-2"
+                    >
+                      <input
+                        ref={(element) => {
+                          const id = negativeItemIds.current[index];
+                          if (element)
+                            negativeInputRefs.current.set(id, element);
+                          else negativeInputRefs.current.delete(id);
+                        }}
+                        className={`${inputClasses} ${
+                          negativeErrors[index]?.length
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                            : ""
+                        }`}
+                        value={item}
+                        onChange={(event) =>
+                          handleListChange("negative", index, event)
+                        }
+                        onBlur={() =>
+                          handleListBlur(
+                            "negative",
+                            negativeConsequences,
+                            setNegativeConsequences,
+                            setNegativeErrors,
+                          )
+                        }
+                        onKeyDown={(event) =>
+                          handleListKeyDown(event, "negative", index)
+                        }
+                        placeholder="Add a negative consequence"
+                        aria-invalid={Boolean(negativeErrors[index])}
+                        aria-describedby={
+                          negativeErrors[index]?.length
+                            ? `negative-error-${index}`
+                            : undefined
+                        }
+                      />
+                      <button
+                        type="button"
+                        className={`${buttonClasses} px-2 py-1 text-xs`}
+                        onClick={() => handleRemoveListItem("negative", index)}
+                        aria-label={`Remove negative consequence ${index + 1}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : null,
+                )}
+                {negativeErrors.some((error) => error.length > 0) ? (
+                  <div className="flex flex-col gap-1">
+                    {negativeErrors.map((error, index) =>
+                      error.length ? (
+                        <p
+                          key={`negative-error-${index}`}
+                          id={`negative-error-${index}`}
+                          className="text-xs font-medium text-red-600"
+                        >
+                          {error}
+                        </p>
+                      ) : null,
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <span className={labelClasses}>Negative</span>
-              <button
-                ref={negativeAddRef}
-                type="button"
-                className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={() => handleAddListItem("negative")}
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {negativeConsequences.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No negative consequences yet.
-                </p>
-              ) : null}
-              {negativeConsequences.map((item, index) => (
-                <div
-                  key={negativeItemIds.current[index]}
-                  className="flex gap-2"
-                >
-                  <input
-                    ref={(element) => {
-                      const id = negativeItemIds.current[index];
-                      if (element) negativeInputRefs.current.set(id, element);
-                      else negativeInputRefs.current.delete(id);
-                    }}
-                    className={`${inputClasses} ${
-                      negativeErrors[index]?.length
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
-                    value={item}
-                    onChange={(event) =>
-                      handleListChange("negative", index, event)
-                    }
-                    onBlur={() =>
-                      handleListBlur(
-                        "negative",
-                        negativeConsequences,
-                        setNegativeConsequences,
-                        setNegativeErrors,
-                      )
-                    }
-                    onKeyDown={(event) =>
-                      handleListKeyDown(event, "negative", index)
-                    }
-                    placeholder="Add a negative consequence"
-                    aria-invalid={Boolean(negativeErrors[index])}
-                    aria-describedby={
-                      negativeErrors[index]?.length
-                        ? `negative-error-${index}`
-                        : undefined
-                    }
-                  />
-                  <button
-                    type="button"
-                    className={`${buttonClasses} px-2 py-1 text-xs`}
-                    onClick={() => handleRemoveListItem("negative", index)}
-                    aria-label={`Remove negative consequence ${index + 1}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              {negativeErrors.some((error) => error.length > 0) ? (
-                <div className="flex flex-col gap-1">
-                  {negativeErrors.map((error, index) =>
-                    error.length ? (
-                      <p
-                        key={`negative-error-${index}`}
-                        id={`negative-error-${index}`}
-                        className="text-xs font-medium text-red-600"
-                      >
-                        {error}
-                      </p>
-                    ) : null,
-                  )}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        ) : null}
 
         <div className="flex flex-col gap-1">
           <label htmlFor="inspector-owner" className={labelClasses}>
@@ -1297,22 +1346,87 @@ export const Inspector = ({
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="inspector-timestamp" className={labelClasses}>
-            Timestamp
-          </label>
-          <input
-            id="inspector-timestamp"
-            className={inputClasses}
-            value={timestampValue}
-            onChange={handleTimestampChange}
-            placeholder="YYYY-MM-DDTHH:mm:ssZ"
-            aria-describedby="timestamp-help"
-          />
-          <p id="timestamp-help" className="text-xs text-slate-500">
-            Use an ISO 8601 timestamp (UTC).
-          </p>
-        </div>
+        {node.data.nodeType === "Action" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-action-due-date" className={labelClasses}>
+              Due date
+            </label>
+            <input
+              id="inspector-action-due-date"
+              type="date"
+              className={inputClasses}
+              value={node.data.actionDueDate ?? ""}
+              onChange={(event) =>
+                setNodeActionDueDate(node.id, event.target.value)
+              }
+            />
+          </div>
+        ) : null}
+
+        {node.data.nodeType !== "Action" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-timestamp" className={labelClasses}>
+              Timestamp
+            </label>
+            <input
+              id="inspector-timestamp"
+              className={inputClasses}
+              value={timestampValue}
+              onChange={handleTimestampChange}
+              placeholder="YYYY-MM-DDTHH:mm:ssZ"
+              aria-describedby="timestamp-help"
+            />
+            <p id="timestamp-help" className="text-xs text-slate-500">
+              Use an ISO 8601 timestamp (UTC).
+            </p>
+          </div>
+        ) : null}
+
+        {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+            <button
+              type="button"
+              className={`${buttonClasses} w-full border-sky-400 bg-sky-600 text-white hover:bg-sky-700`}
+              onClick={() => addAction(node.id)}
+            >
+              + Action
+            </button>
+            <p className="mt-2 text-xs text-sky-900">
+              Add a corrective action that addresses this node.
+            </p>
+          </div>
+        ) : null}
+
+        {node.data.nodeType === "Action"
+          ? (() => {
+              const addressEdge = edges.find(
+                (edge) =>
+                  edge.target === node.id && edge.data?.kind === "ActionEdge",
+              );
+              const addressed = chainNodes.find(
+                (candidate) => candidate.id === addressEdge?.source,
+              );
+              return (
+                <div className="flex flex-col gap-1">
+                  <span className={labelClasses}>Addresses</span>
+                  {addressed ? (
+                    <button
+                      type="button"
+                      className={`${buttonClasses} text-left`}
+                      onClick={() => select(addressed.id)}
+                    >
+                      {addressed.data.referenceId ?? "Unassigned"} ·{" "}
+                      {addressed.data.title}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-slate-500">
+                      No addressed node
+                    </span>
+                  )}
+                </div>
+              );
+            })()
+          : null}
 
         <div className="flex flex-col gap-2">
           <button
@@ -1378,6 +1492,7 @@ export const Inspector = ({
     title,
     titleError,
     updateBarrierData,
+    updateNodeData,
   ]);
 
   return (
@@ -1387,30 +1502,51 @@ export const Inspector = ({
       aria-labelledby="inspector-title-heading"
       onKeyDown={handleKeyDown}
     >
-      <div className="sticky top-0 z-10 flex min-h-11 items-center justify-between bg-white">
-        <h2
-          id="inspector-title-heading"
-          className="text-base font-semibold text-slate-900"
-        >
-          Inspector
-        </h2>
-        <div className="flex items-center gap-2">
-          {selectedEntityId ? (
-            <span className="text-xs text-slate-500" aria-live="polite">
-              ID: {selectedEntityId}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className={`${buttonClasses} min-h-11 min-w-11 px-2`}
-            onClick={onClose}
-            aria-label="Close inspector"
-            title="Close inspector"
+      <InspectorHeader>
+        <div className="sticky top-0 z-10 flex min-h-11 items-center justify-between bg-white">
+          <h2
+            id="inspector-title-heading"
+            className="text-base font-semibold text-slate-900"
           >
-            ×
-          </button>
+            Inspector
+          </h2>
+          <div className="flex items-center gap-2">
+            {node ? (
+              <span
+                className="text-right text-xs text-slate-500"
+                aria-live="polite"
+              >
+                <strong className="block text-slate-700">
+                  {node.data.referenceId ?? "Unassigned"} ·{" "}
+                  {node.data.nodeType ?? "Event"}
+                </strong>
+              </span>
+            ) : barrier ? (
+              <span
+                className="text-right text-xs text-slate-500"
+                aria-live="polite"
+              >
+                <strong className="block text-slate-700">Control</strong>
+                Between{" "}
+                {chainNodes.find((item) => item.id === barrier.upstreamNodeId)
+                  ?.data.referenceId ?? "Unassigned"}{" "}
+                and{" "}
+                {chainNodes.find((item) => item.id === barrier.downstreamNodeId)
+                  ?.data.referenceId ?? "Unassigned"}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className={`${buttonClasses} min-h-11 min-w-11 px-2`}
+              onClick={onClose}
+              aria-label="Close inspector"
+              title="Close inspector"
+            >
+              ×
+            </button>
+          </div>
         </div>
-      </div>
+      </InspectorHeader>
       {body}
     </aside>
   );
