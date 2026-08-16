@@ -12,6 +12,9 @@ import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
 import { canAddBelowSelection } from "../state/selectors";
 import { CaseSummary } from "../components/Presentation/CaseSummary";
+import { LensPicker } from "../components/Presentation/LensPicker";
+import { type PresentationLens } from "../features/presentation/selectors";
+import { selectCaseSummary } from "../features/presentation/caseSummary";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -21,6 +24,9 @@ export const App = (): JSX.Element => {
   const [chronologyOpen, setChronologyOpen] = useState(false);
   const [chronologyMobile, setChronologyMobile] = useState(false);
   const [showTimelineEvents, setShowTimelineEvents] = useState(false);
+  const [presentationLens, setPresentationLens] =
+    useState<PresentationLens>("Overview");
+  const [summaryOpen, setSummaryOpen] = useState(true);
   const [timelineAnnouncement, setTimelineAnnouncement] = useState("");
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
@@ -37,6 +43,13 @@ export const App = (): JSX.Element => {
   const canRedo = useAppStore((state) => state.canRedo);
   const showDetails = useAppStore((state) => state.showDetails);
   const select = useAppStore((state) => state.actions.select);
+  const nodes = useAppStore((state) => state.nodes);
+  const barriers = useAppStore((state) => state.barriers);
+  const evidence = useAppStore((state) => state.evidence);
+  const contextItems = useAppStore(
+    (state) => state.metadata?.contextItems ?? [],
+  );
+  const summary = selectCaseSummary(nodes, barriers, evidence, contextItems);
   const exitPresentation = useCallback(() => {
     select(null);
     setPresentationHintOpen(false);
@@ -142,6 +155,7 @@ export const App = (): JSX.Element => {
                   setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
                   setChronologyOpen(false);
+                  setPresentationLens("Overview");
                   setPresenting(true);
                 }}
               />
@@ -155,6 +169,8 @@ export const App = (): JSX.Element => {
                   onPresentationInteract={() => setPresentationHintOpen(false)}
                   onInspect={() => setInspectorOpen(true)}
                   showTimelineEvents={showTimelineEvents}
+                  presentationLens={presentationLens}
+                  evidence={evidence}
                 />
               </div>
               {inspectorOpen && !presenting ? (
@@ -184,14 +200,20 @@ export const App = (): JSX.Element => {
                   </aside>
                 ) : null}
                 <Legend />
-                <CaseSummary
-                  factors={useAppStore
-                    .getState()
-                    .nodes.map((node) => node.data)}
-                  controls={useAppStore.getState().barriers}
-                  contextItems={useAppStore.getState().metadata?.contextItems}
-                />
-                {chronologyOpen ? (
+                {summaryOpen ? (
+                  <CaseSummary
+                    summary={summary}
+                    mobile={chronologyMobile}
+                    onClose={
+                      chronologyMobile ? () => setSummaryOpen(false) : undefined
+                    }
+                    onSelect={(id) => {
+                      select(id);
+                      setPresentationHintOpen(false);
+                    }}
+                  />
+                ) : null}
+                {chronologyOpen || presentationLens === "Chronology" ? (
                   <Chronology
                     nodes={useAppStore.getState().nodes}
                     selectedId={selectionId}
@@ -217,6 +239,19 @@ export const App = (): JSX.Element => {
                   />
                 ) : null}
                 <div className="presentation-actions">
+                  <LensPicker
+                    value={presentationLens}
+                    onChange={(lens) => {
+                      setPresentationLens(lens);
+                      setTimelineAnnouncement(`${lens} view selected.`);
+                      setPresentationHintOpen(false);
+                    }}
+                  />
+                  {!summaryOpen ? (
+                    <button type="button" onClick={() => setSummaryOpen(true)}>
+                      Case Summary
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     aria-pressed={chronologyOpen}

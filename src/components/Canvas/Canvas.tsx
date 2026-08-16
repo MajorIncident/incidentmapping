@@ -23,6 +23,11 @@ import {
   CONTROL_NODE_HEIGHT,
   CONTROL_NODE_WIDTH,
 } from "../../features/layout/dimensions";
+import type { EvidenceItem } from "../../features/maps/schema";
+import {
+  selectLensPresentation,
+  type PresentationLens,
+} from "../../features/presentation/selectors";
 
 export const GuideContent = (): JSX.Element => (
   <>
@@ -270,12 +275,16 @@ export const Canvas = ({
   presenting = false,
   presentationShowDetails = false,
   showTimelineEvents = false,
+  presentationLens = "Overview",
+  evidence = [],
 }: {
   onInspect?: () => void;
   onPresentationInteract?: () => void;
   presenting?: boolean;
   presentationShowDetails?: boolean;
   showTimelineEvents?: boolean;
+  presentationLens?: PresentationLens;
+  evidence?: EvidenceItem[];
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -335,7 +344,7 @@ export const Canvas = ({
     const normal = chainNodes.filter(
       (node) => node.data.eventDisplay !== "ChronologyOnly",
     );
-    if (!showTimelineEvents) return normal;
+    if (!showTimelineEvents && presentationLens !== "Chronology") return normal;
     const timeline = chainNodes
       .filter((node) => node.data.eventDisplay === "ChronologyOnly")
       .slice()
@@ -360,7 +369,7 @@ export const Canvas = ({
         className: `${node.className ?? ""} timeline-event-node`,
       })),
     ];
-  }, [chainNodes, showTimelineEvents]);
+  }, [chainNodes, presentationLens, showTimelineEvents]);
   const visibleIds = useMemo(
     () => new Set(visibleChainNodes.map((node) => node.id)),
     [visibleChainNodes],
@@ -376,12 +385,20 @@ export const Canvas = ({
     if (
       selectionId &&
       !visibleIds.has(selectionId) &&
-      !barriers.some((item) => item.id === selectionId)
+      !barriers.some((item) => item.id === selectionId) &&
+      !evidence.some((item) => item.id === selectionId)
     )
       select(null);
-  }, [barriers, selectionId, select, visibleIds]);
+  }, [barriers, evidence, selectionId, select, visibleIds]);
 
   const { nodes, renderedEdges } = useMemo(() => {
+    const lensPresentation = selectLensPresentation(presentationLens, {
+      nodes: visibleChainNodes,
+      edges: visibleEdges,
+      controls: barriers,
+      evidence,
+      selectedId: selectionId,
+    });
     const presentation = deriveRelationshipPresentation(
       visibleChainNodes.map((node) => ({
         id: node.id,
@@ -395,21 +412,24 @@ export const Canvas = ({
       barriers,
       selectionId,
     );
-    const presentedNodes = visibleChainNodes.map((node) => ({
-      ...node,
-      selected: node.id === selectionId,
-      data: {
-        ...node.data,
-        graphRole: {
-          isRoot: presentation.roots.has(node.id),
-          isLeaf: presentation.leaves.has(node.id),
-          isOnSelectedPath: presentation.selectedPath.has(node.id),
-          isUnrelated: presentation.unrelated.has(node.id),
+    const presentedNodes = visibleChainNodes
+      .filter((node) => lensPresentation.visibleIds.has(node.id))
+      .map((node) => ({
+        ...node,
+        selected: node.id === selectionId,
+        data: {
+          ...node.data,
+          graphRole: {
+            isRoot: presentation.roots.has(node.id),
+            isLeaf: presentation.leaves.has(node.id),
+            isOnSelectedPath: presentation.selectedPath.has(node.id),
+            isUnrelated: presentation.unrelated.has(node.id),
+          },
+          readOnly: presenting,
+          viewShowDetails: presentationShowDetails,
         },
-        readOnly: presenting,
-        viewShowDetails: presentationShowDetails,
-      },
-    }));
+        className: `${node.className ?? ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}`,
+      }));
     const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
     const barrierNodes: Node<BarrierNodeData>[] = [];
     const flowEdges = visibleEdges.flatMap((edge) => {
@@ -485,6 +505,7 @@ export const Canvas = ({
         ),
         draggable: false,
         selectable: true,
+        className: `${lensPresentation.emphasizedIds.has(matchingBarrier.id) ? "presentation-emphasized" : ""}${lensPresentation.softenedIds.has(matchingBarrier.id) ? " presentation-softened" : ""}`,
       };
 
       barrierNodes.push(barrierNode);
@@ -561,13 +582,28 @@ export const Canvas = ({
     };
   }, [
     barriers,
+    evidence,
     visibleChainNodes,
     visibleEdges,
     measuredControlDimensions,
     presentationShowDetails,
     presenting,
+    presentationLens,
     selectionId,
   ]);
+
+  useEffect(() => {
+    if (!presenting || !selectionId) return;
+    const frame = requestAnimationFrame(() => {
+      const selected = reactFlow.getNode(selectionId);
+      if (selected)
+        void reactFlow.fitBounds(getNodesBounds([selected]), {
+          padding: 0.7,
+          duration: viewportAnimationDuration(300),
+        });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [presenting, reactFlow, selectionId]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
