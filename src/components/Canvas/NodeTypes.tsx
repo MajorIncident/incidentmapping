@@ -206,22 +206,24 @@ const ChainNodeComponent = ({
       data-selected-path={graphRole?.isOnSelectedPath || undefined}
       data-unrelated={graphRole?.isUnrelated || undefined}
     >
-      {!data.readOnly ? (
-        <>
-          <Handle
-            id="top"
-            type="target"
-            position={Position.Top}
-            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
-          />
-          <Handle
-            id="left"
-            type="target"
-            position={Position.Left}
-            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"}`}
-          />
-        </>
-      ) : null}
+      <>
+        <Handle
+          id="top"
+          type="target"
+          position={Position.Top}
+          className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""} ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+        <Handle
+          id="left"
+          type="target"
+          position={Position.Left}
+          className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"} ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+      </>
       <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
         <NodeTagMenu
           readOnly={data.readOnly}
@@ -269,22 +271,24 @@ const ChainNodeComponent = ({
           />
         ) : null}
       </div>
-      {!data.readOnly ? (
-        <>
-          <Handle
-            id="bottom"
-            type="source"
-            position={Position.Bottom}
-            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
-          />
-          <Handle
-            id="right"
-            type="source"
-            position={Position.Right}
-            className="!h-3 !w-3 !border-2 !border-white !bg-slate-400"
-          />
-        </>
-      ) : null}
+      <>
+        <Handle
+          id="bottom"
+          type="source"
+          position={Position.Bottom}
+          className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""} ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+        <Handle
+          id="right"
+          type="source"
+          position={Position.Right}
+          className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+      </>
       {isEditing ? (
         <input
           ref={inputRef}
@@ -447,22 +451,24 @@ const BarrierNodeComponent = ({
       data-testid="barrier-node"
       data-read-only={data.readOnly || undefined}
     >
-      {!data.readOnly ? (
-        <>
-          <Handle
-            id="top"
-            type="target"
-            position={Position.Top}
-            className="!bg-sky-500"
-          />
-          <Handle
-            id="bottom"
-            type="source"
-            position={Position.Bottom}
-            className="!bg-sky-500"
-          />
-        </>
-      ) : null}
+      <>
+        <Handle
+          id="top"
+          type="target"
+          position={Position.Top}
+          className={`!bg-sky-500 ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+        <Handle
+          id="bottom"
+          type="source"
+          position={Position.Bottom}
+          className={`!bg-sky-500 ${data.readOnly ? "presentation-handle" : ""}`}
+          data-presentation-handle={data.readOnly || undefined}
+          aria-hidden={data.readOnly || undefined}
+        />
+      </>
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-sky-800">
           Barrier
