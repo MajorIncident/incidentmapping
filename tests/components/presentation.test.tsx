@@ -148,7 +148,7 @@ describe("presentation mode", () => {
     expect(document.querySelectorAll("marker")).toHaveLength(0);
   });
 
-  it("keeps both causal edge segments rendered around a barrier", async () => {
+  it("keeps both causal edge segments rendered around a Control", async () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
 

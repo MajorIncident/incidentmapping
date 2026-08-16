@@ -8,7 +8,7 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("Holding", { exact: true })).toHaveCount(0);
-  await expect(page.getByTestId("barrier-node")).toHaveCount(0);
+  await expect(page.getByTestId("control-node")).toHaveCount(0);
   await expect(page.getByText("Follow-up Event", { exact: true })).toHaveCount(
     0,
   );
@@ -39,7 +39,7 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 });
 
-test("chooses a non-first downstream branch when adding a barrier", async ({
+test("chooses a non-first downstream branch when adding a Control", async ({
   page,
 }) => {
   await page.goto("/");
@@ -97,20 +97,20 @@ test("chooses a non-first downstream branch when adding a barrier", async ({
     buffer: Buffer.from(JSON.stringify(map)),
   });
 
-  await expect(page.getByText("Add barrier to branch")).toBeVisible();
+  await expect(page.getByText("Add Control to branch")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add barrier: Parent → First child" }),
+    page.getByRole("button", { name: "Add Control: Parent → First child" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Add barrier: Parent → Second child" })
+    .getByRole("button", { name: "Add Control: Parent → Second child" })
     .click();
 
   await expect(
     page.getByRole("heading", {
-      name: "Barrier between Parent and Second child",
+      name: "Control between Parent and Second child",
     }),
   ).toBeVisible();
-  await expect(page.getByTestId("barrier-node")).toHaveCount(1);
+  await expect(page.getByTestId("control-node")).toHaveCount(1);
 });
 
 test("creating another child focuses the parent and complete sibling group", async ({

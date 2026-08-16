@@ -147,7 +147,7 @@ describe("Inspector and keyboard workflows", () => {
     });
   });
 
-  it("focuses a new barrier description, updates its card live, and undoes it as one edit", async () => {
+  it("focuses a new Control purpose, updates its card live, and undoes it as one edit", async () => {
     const mapWithoutBarrier = { ...sampleMap, barriers: [] };
     act(() => {
       useAppStore.getState().actions.loadMap(mapWithoutBarrier);
@@ -168,19 +168,19 @@ describe("Inspector and keyboard workflows", () => {
 
     const user = userEvent.setup();
     await user.type(description, "Firewall active");
-    expect(screen.getByTestId("barrier-node")).toHaveTextContent(
+    expect(screen.getByTestId("control-node")).toHaveTextContent(
       "Firewall active",
     );
 
     act(() => {
       useAppStore.getState().actions.undo();
     });
-    expect(screen.getByTestId("barrier-node")).toHaveTextContent(
+    expect(screen.getByTestId("control-node")).toHaveTextContent(
       "No control purpose provided.",
     );
   });
 
-  it("lists every downstream branch and creates a barrier on a chosen non-first child", async () => {
+  it("lists every downstream branch and creates a Control on a chosen non-first child", async () => {
     act(() => {
       useAppStore.getState().actions.loadMap({
         schemaVersion: 1,
