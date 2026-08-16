@@ -34,6 +34,11 @@ describe("App initial canvas", () => {
       }
     });
     const root = useAppStore.getState().nodes[0];
+    expect(root.data).toMatchObject({
+      title: "Undesirable outcome",
+      nodeType: "Impact",
+      referenceId: "N-001",
+    });
     app.unmount();
     const RootNode = nodeTypes.ChainNode;
     render(

@@ -57,6 +57,9 @@ export const Inspector = ({
   const setNodeActionStatus = useAppStore(
     (state) => state.actions.setNodeActionStatus,
   );
+  const setNodeActionDueDate = useAppStore(
+    (state) => state.actions.setNodeActionDueDate,
+  );
   const addEvidence = useAppStore((state) => state.actions.addEvidence);
   const updateEvidence = useAppStore((state) => state.actions.updateEvidence);
   const removeEvidence = useAppStore((state) => state.actions.removeEvidence);
@@ -807,6 +810,7 @@ export const Inspector = ({
               id="inspector-node-type"
               className={inputClasses}
               value={node.data.nodeType ?? "Event"}
+              disabled={node.data.nodeType === "Action"}
               onChange={(event) =>
                 setNodeType(
                   node.id,
@@ -814,11 +818,12 @@ export const Inspector = ({
                 )
               }
             >
-              {(["Event", "Factor", "Impact", "Action"] as const).map(
-                (value) => (
-                  <option key={value}>{value}</option>
-                ),
-              )}
+              {(node.data.nodeType === "Action"
+                ? (["Action"] as const)
+                : (["Event", "Factor", "Impact"] as const)
+              ).map((value) => (
+                <option key={value}>{value}</option>
+              ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
@@ -893,30 +898,52 @@ export const Inspector = ({
             </>
           ) : null}
           {node.data.nodeType === "Action" ? (
-            <div className="col-span-2 flex flex-col gap-1">
-              <label htmlFor="inspector-action-status" className={labelClasses}>
-                Action status
-              </label>
-              <select
-                id="inspector-action-status"
-                className={inputClasses}
-                value={node.data.actionStatus ?? "Proposed"}
-                onChange={(event) =>
-                  setNodeActionStatus(
-                    node.id,
-                    event.target.value as NonNullable<
-                      typeof node.data.actionStatus
-                    >,
-                  )
-                }
-              >
-                <option value="Proposed">Proposed</option>
-                <option value="Planned">Planned</option>
-                <option value="InProgress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
+            <>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="inspector-action-status"
+                  className={labelClasses}
+                >
+                  Action status
+                </label>
+                <select
+                  id="inspector-action-status"
+                  className={inputClasses}
+                  value={node.data.actionStatus ?? "Proposed"}
+                  onChange={(event) =>
+                    setNodeActionStatus(
+                      node.id,
+                      event.target.value as NonNullable<
+                        typeof node.data.actionStatus
+                      >,
+                    )
+                  }
+                >
+                  <option value="Proposed">Proposed</option>
+                  <option value="Planned">Planned</option>
+                  <option value="InProgress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="inspector-action-due-date"
+                  className={labelClasses}
+                >
+                  Due date
+                </label>
+                <input
+                  id="inspector-action-due-date"
+                  type="date"
+                  className={inputClasses}
+                  value={node.data.actionDueDate ?? ""}
+                  onChange={(event) =>
+                    setNodeActionDueDate(node.id, event.target.value)
+                  }
+                />
+              </div>
+            </>
           ) : null}
         </div>
         <div className="flex flex-col gap-1">
@@ -1344,6 +1371,7 @@ export const Inspector = ({
     setFactorCategory,
     setFactorSignificance,
     setNodeActionStatus,
+    setNodeActionDueDate,
     setNodeType,
     select,
     timestampValue,

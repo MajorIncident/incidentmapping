@@ -4,6 +4,15 @@ import { useAppStore } from "../../src/state/useAppStore";
 const expectCleanRoot = (state: ReturnType<typeof useAppStore.getState>) => {
   expect(state.nodes).toHaveLength(1);
   expect(state.edges).toEqual([]);
+  expect(state.nodes[0].data).toMatchObject({
+    title: "Undesirable outcome",
+    referenceId: "N-001",
+    nodeType: "Impact",
+  });
+  expect(state.metadata).toMatchObject({
+    nodeReferenceHighWaterMark: 1,
+    evidenceReferenceHighWaterMark: 0,
+  });
   expect(state.barriers).toEqual([]);
   expect(state.selectionId).toBe(state.nodes[0].id);
   expect(state.editingId).toBe(state.nodes[0].id);

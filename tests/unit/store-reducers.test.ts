@@ -61,7 +61,9 @@ describe("useAppStore actions", () => {
     const root = first.nodes[0];
     expect(first.nodes).toHaveLength(1);
     expect(root.data).toMatchObject({
-      title: "New incident",
+      title: "Undesirable outcome",
+      nodeType: "Impact",
+      referenceId: "N-001",
       description: "",
       positiveConsequenceBulletPoints: [],
       negativeConsequenceBulletPoints: [],
@@ -619,5 +621,75 @@ describe("useAppStore actions", () => {
     expect(useAppStore.getState().nodes.map((node) => node.position)).toEqual(
       organized,
     );
+  });
+
+  it("allocates evidence globally from reconciled metadata in one history entry", () => {
+    const { actions } = useAppStore.getState();
+    const firstNode = actions.addChild() as string;
+    const secondNode = actions.addSibling(firstNode) as string;
+    useAppStore.setState((state) => ({
+      metadata: { ...state.metadata, evidenceReferenceHighWaterMark: 1 },
+      nodes: state.nodes.map((node) =>
+        node.id === firstNode
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                evidenceItems: [{ id: "EV-009", text: "Imported" }],
+              },
+            }
+          : node,
+      ),
+    }));
+    const historyLength = useAppStore.getState().history.past.length;
+
+    expect(actions.addEvidence(secondNode, "Global evidence")).toBe("EV-010");
+    expect(
+      useAppStore.getState().metadata?.evidenceReferenceHighWaterMark,
+    ).toBe(10);
+    expect(useAppStore.getState().history.past).toHaveLength(historyLength + 1);
+    actions.undo();
+    expect(
+      useAppStore.getState().metadata?.evidenceReferenceHighWaterMark,
+    ).toBe(1);
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === secondNode)?.data
+        .evidenceItems,
+    ).toEqual([]);
+    actions.redo();
+    expect(
+      actions.toMap().nodes.find((node) => node.id === secondNode)
+        ?.evidenceItems,
+    ).toEqual([{ id: "EV-010", text: "Global evidence" }]);
+  });
+
+  it("restricts generic type changes to causal nodes and clears factor fields", () => {
+    const { actions } = useAppStore.getState();
+    const causalId = actions.addChild() as string;
+    actions.setNodeType(causalId, "Factor");
+    expect(useAppStore.getState().nodes[0].data).toMatchObject({
+      nodeType: "Factor",
+      factorSignificance: "Normal",
+    });
+    expect(useAppStore.getState().nodes[0].data.factorCategory).toBeUndefined();
+    actions.setFactorCategory(causalId, "Human");
+    actions.setNodeType(causalId, "Impact");
+    expect(useAppStore.getState().nodes[0].data.factorCategory).toBeUndefined();
+    expect(
+      useAppStore.getState().nodes[0].data.factorSignificance,
+    ).toBeUndefined();
+    actions.setNodeType(causalId, "Action");
+    expect(useAppStore.getState().nodes[0].data.nodeType).toBe("Impact");
+
+    const actionId = actions.addAction(causalId) as string;
+    actions.setNodeType(actionId, "Event");
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === actionId)?.data
+        .nodeType,
+    ).toBe("Action");
+    actions.setNodeActionDueDate(actionId, " 2026-09-01 ");
+    expect(
+      actions.toMap().nodes.find((node) => node.id === actionId)?.actionDueDate,
+    ).toBe("2026-09-01");
   });
 });
