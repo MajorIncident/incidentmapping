@@ -39,10 +39,20 @@ const expectInvestigationOnCanvas = async (
   await expect(canvas.getByText("Impact", { exact: true })).toBeVisible();
   await expect(canvas.getByText("Event", { exact: true })).toBeVisible();
   await expect(canvas.getByText("Root Cause", { exact: true })).toBeVisible();
-  await expect(canvas.getByText("Procedure", { exact: true })).toBeVisible();
+  await expect(
+    canvas.getByText("Process / Procedure", { exact: true }),
+  ).toBeVisible();
   await expect(canvas.getByText("Planned", { exact: true })).toBeVisible();
+  await expect(
+    canvas.getByText("Maintenance lead", { exact: true }),
+  ).toBeVisible();
+  await expect(canvas.getByText(/Due Jul 1, 2026/)).toBeVisible();
   await expect(canvas.getByText("Pre-opening belt inspection")).toBeVisible();
   await expect(canvas.getByText("Failed", { exact: true })).toBeVisible();
+  await expect(
+    canvas.getByText("Failure reason: Inadequate Design"),
+  ).toBeVisible();
+  await expect(canvas.getByText("Evidence").first()).toBeVisible();
 };
 
 test("complete baggage investigation remains understandable after save and reopen", async ({

@@ -14,21 +14,23 @@ export const NodeTagMenu = <T extends string>({
   onChange,
   className = "",
   readOnly = false,
+  placeholder,
 }: {
   label: string;
-  value: T;
+  value?: T;
   options: readonly NodeTagOption<T>[];
   onChange: (value: T) => void;
   className?: string;
   readOnly?: boolean;
+  placeholder?: string;
 }): JSX.Element => {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const current =
-    options.find((option) => option.value === value) ?? options[0];
+  const current = options.find((option) => option.value === value);
+  const displayLabel = current?.label ?? placeholder ?? options[0].label;
 
   useEffect(() => {
     if (!open) return;
@@ -44,9 +46,9 @@ export const NodeTagMenu = <T extends string>({
     return (
       <span
         className={`node-tag ${className}`}
-        aria-label={`${label}: ${current.label}`}
+        aria-label={`${label}: ${displayLabel}`}
       >
-        {current.label}
+        {displayLabel}
       </span>
     );
   }
@@ -74,7 +76,7 @@ export const NodeTagMenu = <T extends string>({
         ref={buttonRef}
         type="button"
         className={`node-tag ${className}`}
-        aria-label={`${label}: ${current.label}`}
+        aria-label={`${label}: ${displayLabel}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -87,7 +89,7 @@ export const NodeTagMenu = <T extends string>({
           if (event.key === "Escape") setOpen(false);
         }}
       >
-        {current.label}
+        {displayLabel}
         <span aria-hidden="true" className="ml-1 text-[9px]">
           ▾
         </span>

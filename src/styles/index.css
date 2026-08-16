@@ -30,12 +30,39 @@
   .node-reference {
     @apply text-[10px] font-semibold tabular-nums tracking-wide text-slate-400;
   }
+  .node-metadata-row {
+    @apply flex min-h-5 items-center justify-between gap-3 border-t border-slate-100 pt-1 first:border-t-0 first:pt-0;
+  }
+  .node-metadata-row strong,
+  .node-metadata-row time {
+    @apply text-right font-semibold text-slate-700;
+  }
   .node-tag-menu {
     @apply absolute left-0 top-full z-50 mt-1 min-w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-xl;
   }
   .node-tag-menu-item {
     @apply flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 focus:bg-sky-50 focus:outline-none;
   }
+}
+
+.chain-node-card[data-node-type="Action"] {
+  @apply border-slate-300 bg-slate-50 shadow-sm;
+}
+.chain-node-card[data-unrelated="true"] {
+  opacity: 0.62;
+  filter: saturate(0.7);
+}
+.chain-node-card[data-selected-path="true"] {
+  @apply !border-slate-400 ring-2 ring-slate-300;
+}
+.chain-node-card[data-significance="KeyFactor"] {
+  @apply border-amber-400;
+}
+.chain-node-card[data-significance="RootCause"] {
+  @apply border-rose-500;
+}
+.chain-node-card:where(.ring-4) {
+  @apply !border-sky-700;
 }
 
 :root {

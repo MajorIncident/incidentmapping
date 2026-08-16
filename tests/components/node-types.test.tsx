@@ -3,13 +3,38 @@ import type { NodeProps } from "reactflow";
 import { ReactFlowProvider } from "reactflow";
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeTypes } from "../../src/components/Canvas/NodeTypes";
-import { useAppStore, type ChainNodeData } from "../../src/state/useAppStore";
+import {
+  useAppStore,
+  type BarrierNodeData,
+  type ChainNodeData,
+} from "../../src/state/useAppStore";
 
 const defaultData: ChainNodeData = {
   title: "Incident",
   description: "",
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
+};
+
+const renderBarrierNode = (data: Partial<BarrierNodeData> = {}) => {
+  const BarrierNode = nodeTypes.Barrier;
+  return render(
+    <ReactFlowProvider>
+      <BarrierNode
+        {...({
+          id: "control-1",
+          data: {
+            kind: "Barrier",
+            upstreamNodeId: "a",
+            downstreamNodeId: "b",
+            status: "Effective",
+            ...data,
+          },
+          selected: false,
+        } as NodeProps<BarrierNodeData>)}
+      />
+    </ReactFlowProvider>,
+  );
 };
 
 const renderChainNode = (
@@ -176,4 +201,91 @@ describe("ChainNode details", () => {
       );
     },
   );
+
+  it("shows only populated impact metadata and concise evidence support", () => {
+    renderChainNode({
+      nodeType: "Impact",
+      severity: "Critical",
+      evidenceItems: [{ id: "EV-014", text: "Dispatch log" }],
+    });
+    expect(screen.getByText("Critical")).toBeVisible();
+    expect(screen.getByLabelText("1 evidence items")).toHaveTextContent("1");
+    expect(screen.getByText("EV-014")).toBeVisible();
+  });
+
+  it("omits empty impact severity", () => {
+    renderChainNode({ nodeType: "Impact" });
+    expect(screen.queryByText("Severity")).not.toBeInTheDocument();
+  });
+
+  it("formats an event timestamp as readable local time", () => {
+    renderChainNode({ nodeType: "Event", timestamp: "2026-06-14T18:31:00Z" });
+    const time = screen.getByText(/Jun 14, 2026/);
+    expect(time).toHaveAttribute("datetime", "2026-06-14T18:31:00Z");
+    expect(time).not.toHaveTextContent("T18:31:00Z");
+  });
+
+  it("shows the category placeholder, expanded labels, and neutral Normal state", () => {
+    const { rerender } = renderChainNode({ nodeType: "Factor" });
+    expect(
+      screen.getByRole("button", { name: "Factor category: Category" }),
+    ).toBeVisible();
+    expect(screen.queryByText("Normal")).not.toBeInTheDocument();
+    rerender(
+      <ReactFlowProvider>
+        {(() => {
+          const FactorNode = nodeTypes.ChainNode;
+          return (
+            <FactorNode
+              {...({
+                id: "node-1",
+                data: {
+                  ...defaultData,
+                  nodeType: "Factor",
+                  factorCategory: "Process",
+                },
+                selected: false,
+              } as NodeProps<ChainNodeData>)}
+            />
+          );
+        })()}
+      </ReactFlowProvider>,
+    );
+    expect(screen.getByText("Process / Procedure")).toBeVisible();
+  });
+
+  it("shows distinct important-factor tags", () => {
+    renderChainNode({ nodeType: "Factor", factorSignificance: "RootCause" });
+    expect(screen.getByText("Root Cause")).toBeVisible();
+  });
+
+  it("shows secondary action status, owner, and a locally formatted due date", () => {
+    renderChainNode({
+      nodeType: "Action",
+      actionStatus: "InProgress",
+      owner: "Maintenance lead",
+      actionDueDate: "2026-07-01",
+    });
+    expect(screen.getByText("In Progress")).toBeVisible();
+    expect(screen.getByText("Maintenance lead")).toBeVisible();
+    expect(screen.getByText("Due Jul 1, 2026")).toHaveAttribute(
+      "datetime",
+      "2026-07-01",
+    );
+  });
+
+  it("uses Control terminology and maps failure reason without compact details", () => {
+    act(() => useAppStore.getState().actions.setShowDetails(false));
+    renderBarrierNode({
+      status: "Failed",
+      failureReason: "InadequateDesign",
+      failureDetails: "Long diagnostic explanation",
+    });
+    expect(screen.getByText("CONTROL")).toBeVisible();
+    expect(screen.getByText("Failed")).toBeVisible();
+    expect(screen.getByText("Failure reason: Inadequate Design")).toBeVisible();
+    expect(
+      screen.queryByText("Long diagnostic explanation"),
+    ).not.toBeInTheDocument();
+  });
 });
