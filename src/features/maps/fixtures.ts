@@ -1,8 +1,8 @@
-import type { MapDataV2 as MapData } from "./schema";
+import type { MapData } from "./schema";
 
 export const sampleMap: MapData = {
-  schemaVersion: 2,
-  metadata: { title: "Sample Incident Chain" },
+  schemaVersion: 3,
+  metadata: { title: "Sample Incident Chain", contextItems: [] },
   nodes: [
     {
       id: "root",
@@ -12,7 +12,8 @@ export const sampleMap: MapData = {
       title: "Root Event",
       positiveConsequenceBulletPoints: [],
       negativeConsequenceBulletPoints: [],
-      evidenceItems: [],
+      evidenceIds: [],
+      contextItems: [],
       position: { x: 0, y: 0 },
     },
     {
@@ -23,7 +24,8 @@ export const sampleMap: MapData = {
       title: "Follow-up Event",
       positiveConsequenceBulletPoints: [],
       negativeConsequenceBulletPoints: [],
-      evidenceItems: [],
+      evidenceIds: [],
+      contextItems: [],
       position: { x: 0, y: 160 },
     },
   ],
@@ -43,14 +45,17 @@ export const sampleMap: MapData = {
       downstreamNodeId: "child",
       description: "Firewall between services",
       status: "Effective",
+      evidenceIds: [],
     },
   ],
+  evidence: [],
 };
 
 export const emptyMap: MapData = {
-  schemaVersion: 2,
-  metadata: { title: "Untitled Map" },
+  schemaVersion: 3,
+  metadata: { title: "Untitled Map", contextItems: [] },
   nodes: [],
   edges: [],
   barriers: [],
+  evidence: [],
 };
