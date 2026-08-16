@@ -74,7 +74,10 @@ type AppState = {
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
-    addBarrier: (upstreamId?: string) => string | null;
+    addBarrier: (
+      upstreamNodeId: string,
+      downstreamNodeId: string,
+    ) => string | null;
     setMapTitle: (title: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
@@ -285,10 +288,10 @@ const computeParentId = (edges: Edge[], childId: string): string | null => {
   return parentEdge ? parentEdge.source : null;
 };
 
-const findFirstDownstreamEdge = (
+export const findDownstreamEdges = (
   edges: Edge[],
   upstreamId: string,
-): Edge | null => edges.find((edge) => edge.source === upstreamId) ?? null;
+): Edge[] => edges.filter((edge) => edge.source === upstreamId);
 
 /** Creates the initial event for an interactive map without mutating a fixture. */
 export const createRootNode = (): ChainNode => ({
@@ -628,25 +631,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
-    addBarrier: (upstreamId) => {
-      const targetUpstreamId = upstreamId ?? get().selectionId ?? undefined;
-      if (!targetUpstreamId) {
-        return null;
-      }
+    addBarrier: (upstreamNodeId, downstreamNodeId) => {
       const prevSnapshot = snapshotFromState(get());
       let createdId: string | null = null;
       set((state) => {
-        const downstreamEdge = findFirstDownstreamEdge(
+        const matchingEdge = findDownstreamEdges(
           state.edges,
-          targetUpstreamId,
-        );
-        if (!downstreamEdge) {
+          upstreamNodeId,
+        ).find((edge) => edge.target === downstreamNodeId);
+        if (!matchingEdge) {
           return {};
         }
         const alreadyExists = state.barriers.some(
           (barrier) =>
-            barrier.upstreamNodeId === targetUpstreamId &&
-            barrier.downstreamNodeId === downstreamEdge.target,
+            barrier.upstreamNodeId === upstreamNodeId &&
+            barrier.downstreamNodeId === downstreamNodeId,
         );
         if (alreadyExists) {
           return {};
@@ -658,8 +657,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           {
             id: barrierId,
             kind: "Barrier" as const,
-            upstreamNodeId: targetUpstreamId,
-            downstreamNodeId: downstreamEdge.target,
+            upstreamNodeId,
+            downstreamNodeId,
             breached: true,
             breachedItems: [],
           },

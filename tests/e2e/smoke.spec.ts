@@ -39,6 +39,80 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 });
 
+test("chooses a non-first downstream branch when adding a barrier", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const map = {
+    schemaVersion: 1,
+    metadata: { title: "Branched incident" },
+    nodes: [
+      {
+        id: "parent",
+        kind: "ChainNode",
+        title: "Parent",
+        position: { x: 0, y: 0 },
+        positiveConsequenceBulletPoints: [],
+        negativeConsequenceBulletPoints: [],
+      },
+      {
+        id: "first-child",
+        kind: "ChainNode",
+        title: "First child",
+        position: { x: -200, y: 200 },
+        positiveConsequenceBulletPoints: [],
+        negativeConsequenceBulletPoints: [],
+      },
+      {
+        id: "second-child",
+        kind: "ChainNode",
+        title: "Second child",
+        position: { x: 200, y: 200 },
+        positiveConsequenceBulletPoints: [],
+        negativeConsequenceBulletPoints: [],
+      },
+    ],
+    edges: [
+      {
+        id: "first-edge",
+        kind: "CauseEffectEdge",
+        fromId: "parent",
+        toId: "first-child",
+      },
+      {
+        id: "second-edge",
+        kind: "CauseEffectEdge",
+        fromId: "parent",
+        toId: "second-child",
+      },
+    ],
+    barriers: [],
+  };
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: /^Open/ }).click();
+  const chooser = await fileChooserPromise;
+  await chooser.setFiles({
+    name: "branches.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(map)),
+  });
+
+  await expect(page.getByText("Add barrier to branch")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add barrier: Parent → First child" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add barrier: Parent → Second child" })
+    .click();
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Barrier between Parent and Second child",
+    }),
+  ).toBeVisible();
+  await expect(page.getByTestId("barrier-node")).toHaveCount(1);
+});
+
 test("creating another child focuses the parent and complete sibling group", async ({
   page,
 }) => {
