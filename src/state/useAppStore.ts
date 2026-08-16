@@ -44,6 +44,8 @@ export type ChainNodeData = {
   };
   /** Ephemeral view-only flag. This field is never serialized. */
   readOnly?: boolean;
+  /** Ephemeral detail visibility resolved by the canvas for this view. */
+  viewShowDetails?: boolean;
 };
 
 export type BarrierNodeData = {
@@ -55,6 +57,8 @@ export type BarrierNodeData = {
   failureReason?: Barrier["failureReason"];
   failureDetails?: string;
   readOnly?: boolean;
+  /** Ephemeral detail visibility resolved by the canvas for this view. */
+  viewShowDetails?: boolean;
   graphRole?: {
     isOnSelectedPath: boolean;
     isUnrelated: boolean;

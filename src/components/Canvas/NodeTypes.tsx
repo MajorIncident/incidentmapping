@@ -103,7 +103,10 @@ const ChainNodeComponent = ({
   );
   const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
   const viewportRequest = useAppStore((state) => state.viewportRequest);
-  const showDetails = useAppStore((state) => state.showDetails);
+  const editorShowDetails = useAppStore((state) => state.showDetails);
+  const showDetails = data.readOnly
+    ? (data.viewShowDetails ?? false)
+    : editorShowDetails;
   const editingId = useAppStore((state) => state.editingId);
   const isEditing = editingId === id;
   const [value, setValue] = useState(data.title);
@@ -476,6 +479,7 @@ const ChainNodeComponent = ({
       ) : null}
       {!isEditing &&
       !showDetails &&
+      !data.readOnly &&
       (hasPositivePoints || hasNegativePoints) ? (
         <div className="mt-2 flex gap-1.5" aria-label="Consequences">
           {hasPositivePoints ? (
@@ -532,7 +536,10 @@ const BarrierNodeComponent = ({
   } as const;
   const description = data.description?.trim();
   const failureDetails = data.failureDetails?.trim();
-  const showDetails = useAppStore((state) => state.showDetails);
+  const editorShowDetails = useAppStore((state) => state.showDetails);
+  const showDetails = data.readOnly
+    ? (data.viewShowDetails ?? false)
+    : editorShowDetails;
   const failureReason = data.failureReason?.replace(/([a-z])([A-Z])/g, "$1 $2");
 
   return (
@@ -577,10 +584,14 @@ const BarrierNodeComponent = ({
           {data.status}
         </span>
       </header>
-      <p className="mt-1 text-sm text-slate-700">
-        {description ?? "No control purpose provided."}
-      </p>
-      {data.status !== "Effective" && data.failureReason ? (
+      {!data.readOnly || showDetails ? (
+        <p className="mt-1 whitespace-pre-line text-sm text-slate-700">
+          {description ?? "No control purpose provided."}
+        </p>
+      ) : null}
+      {(!data.readOnly || showDetails) &&
+      data.status !== "Effective" &&
+      data.failureReason ? (
         <p className="mt-2 text-xs font-semibold text-slate-700">
           Failure reason: {failureReason}
         </p>

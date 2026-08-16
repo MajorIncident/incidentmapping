@@ -205,10 +205,12 @@ export const Canvas = ({
   onInspect,
   onPresentationInteract,
   presenting = false,
+  presentationShowDetails = false,
 }: {
   onInspect?: () => void;
   onPresentationInteract?: () => void;
   presenting?: boolean;
+  presentationShowDetails?: boolean;
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -255,6 +257,7 @@ export const Canvas = ({
           isUnrelated: presentation.unrelated.has(node.id),
         },
         readOnly: presenting,
+        viewShowDetails: presentationShowDetails,
       },
     }));
     const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
@@ -299,6 +302,7 @@ export const Canvas = ({
           failureReason: matchingBarrier.failureReason,
           failureDetails: matchingBarrier.failureDetails,
           readOnly: presenting,
+          viewShowDetails: presentationShowDetails,
           graphRole: {
             isOnSelectedPath: presentation.selectedPath.has(matchingBarrier.id),
             isUnrelated: presentation.unrelated.has(matchingBarrier.id),
@@ -366,7 +370,14 @@ export const Canvas = ({
       nodes: [...presentedNodes, ...barrierNodes],
       renderedEdges: styledEdges,
     };
-  }, [barriers, chainNodes, edges, presenting, selectionId]);
+  }, [
+    barriers,
+    chainNodes,
+    edges,
+    presentationShowDetails,
+    presenting,
+    selectionId,
+  ]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {

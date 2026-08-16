@@ -41,6 +41,40 @@ const actionMap: MapData = {
   barriers: [],
 };
 
+const detailedMap: MapData = {
+  ...actionMap,
+  nodes: actionMap.nodes.map((node) =>
+    node.id === "root"
+      ? {
+          ...node,
+          description: "A detailed event description",
+          timestamp: "2024-01-02T12:30",
+          evidenceItems: [{ id: "EV-1", text: "Detailed evidence line" }],
+          negativeConsequenceBulletPoints: ["Detailed consequence"],
+        }
+      : node.id === "action"
+        ? {
+            ...node,
+            owner: "Safety team",
+            actionDueDate: "2025-03-04",
+            evidenceItems: [{ id: "EV-2", text: "Action evidence line" }],
+          }
+        : node,
+  ),
+  barriers: [
+    {
+      id: "barrier-root-child",
+      kind: "Barrier",
+      upstreamNodeId: "root",
+      downstreamNodeId: "child",
+      description: "Control purpose details",
+      status: "Failed",
+      failureReason: "NotFollowed",
+      failureDetails: "Control failure details",
+    },
+  ],
+};
+
 describe("presentation mode", () => {
   beforeAll(() => {
     vi.stubGlobal(
@@ -231,4 +265,55 @@ describe("presentation mode", () => {
     );
     expect(screen.getByRole("button", { name: "Present map" })).toBeVisible();
   });
+
+  it.each([true, false])(
+    "starts compact without changing editor detail visibility (%s)",
+    async (editorShowDetails) => {
+      act(() => {
+        useAppStore.getState().actions.loadMap(detailedMap);
+        useAppStore.getState().actions.setShowDetails(editorShowDetails);
+      });
+      render(<App />);
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Present map" }),
+      );
+      const detailsButton = screen.getByRole("button", {
+        name: "Show Details",
+      });
+      expect(detailsButton).toHaveAttribute("aria-pressed", "false");
+      expect(screen.queryByTestId("node-details")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Detailed evidence line"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Detailed consequence"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Control purpose details"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Control failure details"),
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText("1 evidence items")).toHaveLength(2);
+      expect(screen.getByText("Safety team")).toBeVisible();
+      expect(screen.getByText("Planned")).toBeVisible();
+      expect(screen.getByText(/Due Mar 4, 2025/)).toBeVisible();
+      expect(screen.getByTestId("control-node")).toHaveTextContent("Failed");
+
+      await userEvent.click(detailsButton);
+      expect(
+        screen.getByRole("button", { name: "Hide Details" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("Detailed evidence line")).toBeVisible();
+      expect(screen.getByText("Detailed consequence")).toBeVisible();
+      expect(screen.getByText("Control purpose details")).toBeVisible();
+      expect(screen.getByText("Control failure details")).toBeVisible();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Exit Presentation/i }),
+      );
+      expect(useAppStore.getState().showDetails).toBe(editorShowDetails);
+    },
+  );
 });
