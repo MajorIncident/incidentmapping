@@ -252,6 +252,33 @@ describe("presentation mode", () => {
     expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
   });
 
+  it("centers a rendered Control between endpoint centers", async () => {
+    render(<App />);
+
+    const renderedNodes = await waitFor(() => {
+      const elements = ["root", "child", "barrier-root-child"].map((id) =>
+        document.querySelector<HTMLElement>(
+          `.react-flow__node[data-id="${id}"]`,
+        ),
+      );
+      expect(elements.every(Boolean)).toBe(true);
+      return elements as HTMLElement[];
+    });
+    const coordinates = renderedNodes.map((element) => {
+      const match = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(
+        element.style.transform,
+      );
+      expect(match).not.toBeNull();
+      return { x: Number(match![1]), y: Number(match![2]) };
+    });
+    const [upstream, downstream, control] = coordinates;
+
+    // The 240x140 Chain Node and 220x120 Control nominal sizes produce a
+    // ten-pixel offset from the midpoint of the endpoint top-left positions.
+    expect(control.x).toBe((upstream.x + downstream.x) / 2 + 10);
+    expect(control.y).toBe((upstream.y + downstream.y) / 2 + 10);
+  });
+
   it("keeps the horizontal ActionEdge rendered", async () => {
     act(() => useAppStore.getState().actions.loadMap(actionMap));
     render(<App />);

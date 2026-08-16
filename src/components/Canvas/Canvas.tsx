@@ -14,6 +14,12 @@ import {
   type ChainNodeData,
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
+import {
+  CHAIN_NODE_HEIGHT,
+  CHAIN_NODE_WIDTH,
+  CONTROL_NODE_HEIGHT,
+  CONTROL_NODE_WIDTH,
+} from "../../features/layout/dimensions";
 
 export const GuideContent = (): JSX.Element => (
   <>
@@ -311,10 +317,22 @@ export const Canvas = ({
         position: {
           x:
             upstream.position.x +
-            (downstream.position.x - upstream.position.x) / 2,
+            (upstream.width ?? CHAIN_NODE_WIDTH) / 2 +
+            (downstream.position.x +
+              (downstream.width ?? CHAIN_NODE_WIDTH) / 2 -
+              (upstream.position.x +
+                (upstream.width ?? CHAIN_NODE_WIDTH) / 2)) /
+              2 -
+            CONTROL_NODE_WIDTH / 2,
           y:
             upstream.position.y +
-            (downstream.position.y - upstream.position.y) / 2,
+            (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
+            (downstream.position.y +
+              (downstream.height ?? CHAIN_NODE_HEIGHT) / 2 -
+              (upstream.position.y +
+                (upstream.height ?? CHAIN_NODE_HEIGHT) / 2)) /
+              2 -
+            CONTROL_NODE_HEIGHT / 2,
         },
         draggable: false,
         selectable: true,
