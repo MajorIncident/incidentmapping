@@ -7,7 +7,8 @@
     "location": "North Terminal — Belt 4",
     "severity": "High",
     "status": "Open",
-    "nodeReferenceHighWaterMark": 8
+    "nodeReferenceHighWaterMark": 5,
+    "evidenceReferenceHighWaterMark": 4
   },
   "nodes": [
     {
@@ -25,15 +26,11 @@
       "negativeConsequenceBulletPoints": ["Connections put at risk"],
       "evidenceItems": [
         {
-          "id": "E-1",
+          "id": "EV-001",
           "text": "Passenger service log records 42 delayed bags"
         }
       ],
-      "evidenceHighWaterMark": 1,
-      "position": {
-        "x": 0,
-        "y": 0
-      }
+      "position": { "x": 0, "y": 0 }
     },
     {
       "id": "event",
@@ -48,15 +45,11 @@
       "negativeConsequenceBulletPoints": ["Bags accumulated at induction"],
       "evidenceItems": [
         {
-          "id": "E-1",
+          "id": "EV-002",
           "text": "Belt controller log: photo-eye fault at 18:31"
         }
       ],
-      "evidenceHighWaterMark": 1,
-      "position": {
-        "x": 0,
-        "y": 240
-      }
+      "position": { "x": 0, "y": 240 }
     },
     {
       "id": "factor-human",
@@ -69,10 +62,7 @@
       "positiveConsequenceBulletPoints": [],
       "negativeConsequenceBulletPoints": [],
       "evidenceItems": [],
-      "position": {
-        "x": -240,
-        "y": 480
-      }
+      "position": { "x": -240, "y": 480 }
     },
     {
       "id": "factor-root",
@@ -81,25 +71,21 @@
       "nodeType": "Factor",
       "title": "Inspection omitted photo-eye test",
       "description": "The opening checklist did not require a functional sensor test.",
-      "factorCategory": "Procedure",
+      "factorCategory": "Process",
       "factorSignificance": "RootCause",
       "positiveConsequenceBulletPoints": [],
       "negativeConsequenceBulletPoints": [],
       "evidenceItems": [
         {
-          "id": "E-1",
+          "id": "EV-003",
           "text": "Approved checklist revision 7 has no photo-eye step"
         },
         {
-          "id": "E-2",
+          "id": "EV-004",
           "text": "Technician interview confirms visual-only check"
         }
       ],
-      "evidenceHighWaterMark": 2,
-      "position": {
-        "x": 240,
-        "y": 480
-      }
+      "position": { "x": 240, "y": 480 }
     },
     {
       "id": "action",
@@ -109,109 +95,11 @@
       "title": "Add functional photo-eye check",
       "owner": "Maintenance lead",
       "actionStatus": "Planned",
+      "actionDueDate": "2026-07-01",
       "positiveConsequenceBulletPoints": [],
       "negativeConsequenceBulletPoints": [],
       "evidenceItems": [],
-      "position": {
-        "x": 520,
-        "y": 480
-      }
-    },
-    {
-      "id": "factor-equipment",
-      "kind": "ChainNode",
-      "referenceId": "N-006",
-      "nodeType": "Factor",
-      "title": "Photo-eye lens was contaminated",
-      "factorCategory": "Equipment",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": -520,
-        "y": 720
-      }
-    },
-    {
-      "id": "factor-equipment",
-      "kind": "ChainNode",
-      "referenceId": "N-006",
-      "nodeType": "Factor",
-      "title": "Photo-eye lens was contaminated",
-      "factorCategory": "Equipment",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": -520,
-        "y": 720
-      }
-    },
-    {
-      "id": "factor-environment",
-      "kind": "ChainNode",
-      "referenceId": "N-007",
-      "nodeType": "Factor",
-      "title": "Ramp rain increased sensor contamination",
-      "factorCategory": "Environment",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": -280,
-        "y": 720
-      }
-    },
-    {
-      "id": "factor-equipment",
-      "kind": "ChainNode",
-      "referenceId": "N-006",
-      "nodeType": "Factor",
-      "title": "Photo-eye lens was contaminated",
-      "factorCategory": "Equipment",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": -520,
-        "y": 720
-      }
-    },
-    {
-      "id": "factor-environment",
-      "kind": "ChainNode",
-      "referenceId": "N-007",
-      "nodeType": "Factor",
-      "title": "Ramp rain increased sensor contamination",
-      "factorCategory": "Environment",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": -280,
-        "y": 720
-      }
-    },
-    {
-      "id": "factor-organization",
-      "kind": "ChainNode",
-      "referenceId": "N-008",
-      "nodeType": "Factor",
-      "title": "Checklist governance had no assigned reviewer",
-      "factorCategory": "Organization",
-      "factorSignificance": "Normal",
-      "positiveConsequenceBulletPoints": [],
-      "negativeConsequenceBulletPoints": [],
-      "evidenceItems": [],
-      "position": {
-        "x": 520,
-        "y": 720
-      }
+      "position": { "x": 520, "y": 480 }
     }
   ],
   "edges": [
@@ -237,45 +125,7 @@
       "id": "action-root",
       "kind": "ActionEdge",
       "fromId": "factor-root",
-      "toId": "action",
-      "status": "Planned",
-      "dueDate": "2026-07-01"
-    },
-    {
-      "id": "cause-event-factor-equipment",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-equipment"
-    },
-    {
-      "id": "cause-event-factor-equipment",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-equipment"
-    },
-    {
-      "id": "cause-event-factor-environment",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-environment"
-    },
-    {
-      "id": "cause-event-factor-equipment",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-equipment"
-    },
-    {
-      "id": "cause-event-factor-environment",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-environment"
-    },
-    {
-      "id": "cause-event-factor-organization",
-      "kind": "CauseEffectEdge",
-      "fromId": "event",
-      "toId": "factor-organization"
+      "toId": "action"
     }
   ],
   "barriers": [
@@ -286,7 +136,7 @@
       "downstreamNodeId": "factor-root",
       "description": "Pre-opening belt inspection",
       "status": "Failed",
-      "failureReason": "Inadequate",
+      "failureReason": "InadequateDesign",
       "failureDetails": "Checklist covered visible damage but not functional sensor response."
     }
   ]

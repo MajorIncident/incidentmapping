@@ -20,8 +20,7 @@ before writing it.
 ## Persisted, derived, and ephemeral state
 
 Persisted state consists of metadata, chain nodes and their domain fields and
-positions, discriminated relationship edges, barriers, and allocation
-high-water marks. `toMap()` derives this state from the runtime graph and strips
+positions, discriminated relationship edges, barriers, and global allocation high-water marks. Evidence numbering is map-wide rather than node-local; Action status and due date belong to Action nodes rather than relationship edges. `toMap()` derives this state from the runtime graph and strips
 React Flow rendering data.
 
 Ephemeral UI state is never serialized: selection and inline editing IDs,
@@ -88,3 +87,7 @@ history and serialization. Layout unit tests protect semantic filtering and
 coordinate invariance. Component tests protect adaptive/read-only rendering,
 and focused Playwright journeys verify that an understandable investigation
 survives actual save and reopen.
+
+## Trusted graph boundary
+
+The migration boundary uses separate V1, legacy-V2 compatibility, and canonical V2 schemas. Legacy V2 normalization deterministically renumbers evidence in node/evidence array order and applies ActionEdge accountability fields to the target node only when the node has no explicit value. Canonical graph validation then enforces identifier uniqueness, endpoint existence, causal/control pair consistency, Action isolation and single-parent ownership, and relationship-pair uniqueness. The persisted `Barrier` discriminator remains unchanged even though the UI presents barriers as Controls.

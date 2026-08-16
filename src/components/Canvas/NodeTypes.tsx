@@ -13,10 +13,13 @@ const nodeTypeOptions = ["Event", "Factor", "Impact", "Action"].map(
 );
 const factorCategoryOptions = [
   "Human",
+  "Process",
   "Equipment",
+  "Technology",
+  "Communication",
   "Environment",
-  "Procedure",
-  "Organization",
+  "Organizational",
+  "Other",
 ].map((value) => ({
   value: value as NonNullable<ChainNodeData["factorCategory"]>,
   label: value,

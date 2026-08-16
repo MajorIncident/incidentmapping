@@ -25,8 +25,8 @@ const buttonClasses =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent disabled:cursor-not-allowed disabled:opacity-60";
 
 const evidenceLabel = (id: string): string => {
-  const sequence = id.match(/^E-(\d+)$/)?.[1];
-  return sequence ? `EV-${String(Number(sequence)).padStart(2, "0")}` : "New";
+  const sequence = id.match(/^EV?-(\d+)$/)?.[1];
+  return sequence ? `EV-${String(Number(sequence)).padStart(3, "0")}` : "New";
 };
 
 export const Inspector = ({
@@ -693,15 +693,19 @@ export const Inspector = ({
                   <option value="">Select a reason</option>
                   {(
                     [
-                      "Absent",
-                      "Inadequate",
-                      "NotUsed",
-                      "Failed",
+                      "NotFollowed",
+                      "Bypassed",
+                      "IncorrectConfiguration",
+                      "SystemFailure",
+                      "InadequateDesign",
+                      "Unavailable",
+                      "NotInPlace",
                       "Unknown",
+                      "Other",
                     ] as const
                   ).map((reason) => (
                     <option key={reason} value={reason}>
-                      {reason === "NotUsed" ? "Not Used" : reason}
+                      {reason.replace(/([a-z])([A-Z])/g, "$1 $2")}
                     </option>
                   ))}
                 </select>
@@ -848,10 +852,13 @@ export const Inspector = ({
                   {(
                     [
                       "Human",
+                      "Process",
                       "Equipment",
+                      "Technology",
+                      "Communication",
                       "Environment",
-                      "Procedure",
-                      "Organization",
+                      "Organizational",
+                      "Other",
                     ] as const
                   ).map((value) => (
                     <option key={value}>{value}</option>
