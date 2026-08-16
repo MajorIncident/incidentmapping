@@ -145,6 +145,17 @@ describe("presentation mode", () => {
       expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
     );
     expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
+    fireEvent.click(document.querySelector(".react-flow__node-Barrier")!);
+    const relatedSegments = document.querySelectorAll(
+      ".react-flow__edge.incident-edge--related:not(.incident-edge--action)",
+    );
+    expect(relatedSegments).toHaveLength(2);
+    relatedSegments.forEach((segment) => {
+      expect(segment).not.toHaveClass("incident-edge--unrelated");
+      expect(segment.querySelector(".react-flow__edge-path")).toHaveStyle({
+        stroke: "#475569",
+      });
+    });
     expect(document.querySelectorAll("marker")).toHaveLength(0);
   });
 
@@ -178,6 +189,10 @@ describe("presentation mode", () => {
     ).toBeInTheDocument();
     expect(document.querySelectorAll("marker")).toHaveLength(0);
     expect(actionEdge).toHaveClass("incident-edge--action");
+    expect(actionEdge?.querySelector(".react-flow__edge-path")).toHaveStyle({
+      stroke: "#94a3b8",
+      strokeDasharray: "5 5",
+    });
   });
 
   it("dismisses its ephemeral hint and selects review elements without opening the Inspector", async () => {

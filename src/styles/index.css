@@ -59,7 +59,7 @@
   filter: saturate(0.7);
 }
 .chain-node-card[data-selected-path="true"] {
-  @apply !border-slate-400 ring-2 ring-slate-300;
+  @apply ring-2 ring-slate-300;
 }
 .chain-node-card[data-significance="KeyFactor"] {
   @apply border-amber-400;
@@ -316,7 +316,8 @@ select:focus-visible {
   opacity: 0.32;
 }
 
-.incident-edge--upstream path.react-flow__edge-path {
+.incident-edge--related:not(.incident-edge--action) path.react-flow__edge-path {
+  stroke: #475569;
   stroke-linecap: round;
 }
 
