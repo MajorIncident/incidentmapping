@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { parseAndMigrateMapData } from "../../src/features/maps/migration";
 import { mapDataSchema, type MapDataV1 } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
+import { sampleMap } from "../../src/features/maps/fixtures";
 
 const legacy: MapDataV1 = {
   schemaVersion: 1,
@@ -103,6 +104,20 @@ describe("parseAndMigrateMapData", () => {
         barriers: [{ ...current.barriers[0], breached: true }],
       }).success,
     ).toBe(false);
+  });
+
+  it("returns canonical V2 without renumbering sparse evidence", () => {
+    const canonical = {
+      ...sampleMap,
+      metadata: { evidenceReferenceHighWaterMark: 3 },
+      nodes: sampleMap.nodes.map((node, index) => ({
+        ...node,
+        evidenceItems: [
+          { id: index === 0 ? "EV-001" : "EV-003", text: "Proof" },
+        ],
+      })),
+    };
+    expect(parseAndMigrateMapData(canonical)).toEqual(canonical);
   });
 
   it("fails clearly for unknown versions", () => {
@@ -214,6 +229,24 @@ describe("parseAndMigrateMapData", () => {
     expect(JSON.stringify(parsed)).not.toMatch(
       /evidenceHighWaterMark|"dueDate"|"status":"Completed"/,
     );
+  });
+
+  it("accepts legacy node incident status but discards it in favor of metadata status", () => {
+    const input = fixture("baggage-incident-v2.json") as {
+      metadata: { status?: string };
+      nodes: Array<Record<string, unknown>>;
+    };
+    input.metadata.status = "Closed";
+    input.nodes[0].incidentStatus = "Open";
+
+    const parsed = parseAndMigrateMapData(input);
+    expect(parsed.metadata?.status).toBe("Closed");
+    expect(parsed.nodes[0]).not.toHaveProperty("incidentStatus");
+
+    useAppStore.getState().actions.loadMap(parsed);
+    const saved = useAppStore.getState().actions.toMap();
+    expect(JSON.stringify(saved)).not.toContain("incidentStatus");
+    expect(mapDataSchema.parse(saved)).toEqual(saved);
   });
 
   it("round trips V2 through the store without retired barrier fields", () => {

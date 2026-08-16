@@ -21,7 +21,6 @@
       "owner": "Station manager",
       "timestamp": "2026-06-14T18:42:00Z",
       "severity": "High",
-      "incidentStatus": "Open",
       "positiveConsequenceBulletPoints": ["All bags were traced"],
       "negativeConsequenceBulletPoints": ["Connections put at risk"],
       "evidenceItems": [

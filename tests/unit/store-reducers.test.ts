@@ -663,6 +663,30 @@ describe("useAppStore actions", () => {
     ).toEqual([{ id: "EV-010", text: "Global evidence" }]);
   });
 
+  it("preserves sparse evidence through save and reload before allocating the next ID", () => {
+    const canonical = {
+      ...sampleMap,
+      metadata: { evidenceReferenceHighWaterMark: 3 },
+      nodes: sampleMap.nodes.map((node, index) => ({
+        ...node,
+        evidenceItems: [
+          { id: index === 0 ? "EV-001" : "EV-003", text: "Imported" },
+        ],
+      })),
+    };
+    const { actions } = useAppStore.getState();
+    actions.loadMap(canonical);
+    const saved = actions.toMap();
+    expect(
+      saved.nodes.flatMap((node) => node.evidenceItems.map(({ id }) => id)),
+    ).toEqual(["EV-001", "EV-003"]);
+    expect(saved.metadata?.evidenceReferenceHighWaterMark).toBe(3);
+
+    actions.loadMap(saved);
+    expect(actions.addEvidence("root", "New evidence")).toBe("EV-004");
+    expect(actions.toMap().metadata?.evidenceReferenceHighWaterMark).toBe(4);
+  });
+
   it("restricts generic type changes to causal nodes and clears factor fields", () => {
     const { actions } = useAppStore.getState();
     const causalId = actions.addChild() as string;

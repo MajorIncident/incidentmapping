@@ -104,7 +104,6 @@ export const chainNodeSchema = strictObject({
   owner: z.string().optional(),
   timestamp: z.string().optional(),
   severity: severitySchema.optional(),
-  incidentStatus: incidentStatusSchema.optional(),
   factorCategory: factorCategorySchema.optional(),
   factorSignificance: factorSignificanceSchema.optional(),
   actionStatus: actionStatusSchema.optional(),

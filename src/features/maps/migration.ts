@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   actionStatusSchema,
   barrierStatusSchema,
-  chainNodeSchema,
   incidentStatusSchema,
   mapDataSchema,
   mapDataV1Schema,
@@ -14,9 +13,19 @@ const versionEnvelope = z.object({ schemaVersion: z.number() });
 
 // Version 2 files written before the current contract have retired fields and
 // enum spellings. Keep their input shape isolated from canonical V2 output.
-const legacyV2NodeSchema = chainNodeSchema
-  .omit({ factorCategory: true, evidenceItems: true, actionDueDate: true })
-  .extend({
+const legacyV2NodeSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal("ChainNode"),
+    referenceId: z.string().min(1),
+    nodeType: z.enum(["Event", "Factor", "Impact", "Action"]),
+    title: z.string().min(1),
+    description: z.string().optional(),
+    owner: z.string().optional(),
+    timestamp: z.string().optional(),
+    severity: severitySchema.optional(),
+    // Retired node-level investigation status is accepted only at this boundary.
+    incidentStatus: incidentStatusSchema.optional(),
     factorCategory: z
       .enum([
         "Human",
@@ -37,7 +46,12 @@ const legacyV2NodeSchema = chainNodeSchema
         .strict(),
     ),
     evidenceHighWaterMark: z.number().int().nonnegative().optional(),
+    factorSignificance: z.enum(["Normal", "KeyFactor", "RootCause"]).optional(),
+    actionStatus: actionStatusSchema.optional(),
     actionDueDate: z.string().optional(),
+    positiveConsequenceBulletPoints: z.array(z.string()),
+    negativeConsequenceBulletPoints: z.array(z.string()),
+    position: z.object({ x: z.number(), y: z.number() }).strict(),
   })
   .strict();
 const legacyV2EdgeSchema = z.discriminatedUnion("kind", [
@@ -137,7 +151,12 @@ const normalizeV2 = (input: unknown): MapData => {
   const legacy = legacyV2Schema.parse(input);
   let evidenceNumber = 0;
   const nodes = legacy.nodes.map(
-    ({ evidenceHighWaterMark: _retired, factorCategory, ...node }) => ({
+    ({
+      evidenceHighWaterMark: _retired,
+      incidentStatus: _discardedNodeStatus,
+      factorCategory,
+      ...node
+    }) => ({
       ...node,
       ...(factorCategory
         ? {
@@ -224,6 +243,10 @@ export const migrateMapDataV1 = (input: unknown): MapData => {
 export const parseAndMigrateMapData = (input: unknown): MapData => {
   const { schemaVersion } = versionEnvelope.parse(input);
   if (schemaVersion === 1) return migrateMapDataV1(input);
-  if (schemaVersion === 2) return normalizeV2(input);
+  if (schemaVersion === 2) {
+    const canonical = mapDataSchema.safeParse(input);
+    if (canonical.success) return canonical.data;
+    return normalizeV2(input);
+  }
   throw new Error(`Unsupported map schema version: ${schemaVersion}`);
 };

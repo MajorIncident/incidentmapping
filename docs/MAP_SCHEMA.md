@@ -36,7 +36,6 @@ ChainNode {
   owner?: string;
   timestamp?: string;
   severity?: 'Low' | 'Medium' | 'High' | 'Critical';
-  incidentStatus?: 'Draft' | 'Open' | 'InProgress' | 'Closed';
   factorCategory?: 'Human' | 'Process' | 'Equipment' | 'Technology' | 'Communication' | 'Environment' | 'Organizational' | 'Other';
   factorSignificance?: 'Normal' | 'KeyFactor' | 'RootCause';
   actionStatus?: 'Proposed' | 'Planned' | 'InProgress' | 'Completed' | 'Cancelled';
@@ -114,4 +113,4 @@ data-shape compatibility; it is not a claim of regulatory compliance.
 
 Validation rejects duplicate node IDs/references, edge IDs, control IDs, and globally duplicated evidence IDs. Every relationship and control endpoint must exist. Controls (persisted with legacy `kind: 'Barrier'`) must match a causal source/target pair. Causal relationships cannot touch Actions. Each Action has exactly one incoming ActionEdge from a non-Action source, and duplicate causal or source/action pairs are invalid.
 
-Legacy V2 is parsed through an explicit compatibility schema. Evidence is renumbered in persisted order. Retired ActionEdge `status` and `dueDate` move to the target Action only when its node-owned field is absent, so explicit Action values win. Canonical serialization never includes node evidence counters or ActionEdge accountability fields.
+Legacy V2 is parsed through an explicit compatibility schema only after canonical validation fails. Evidence is renumbered in persisted order only on that legacy path. Retired node-level `incidentStatus` is discarded because `metadata.status` is authoritative. Retired ActionEdge `status` and `dueDate` move to the target Action only when its node-owned field is absent, so explicit Action values win. Canonical serialization never includes node status, node evidence counters, or ActionEdge accountability fields.
