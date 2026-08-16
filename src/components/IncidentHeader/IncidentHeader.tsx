@@ -4,6 +4,7 @@ import { useAppStore } from "../../state/useAppStore";
 import { EditableMapTitle } from "../Canvas/EditableMapTitle";
 import { ContextEditor } from "../Context/ContextEditor";
 import { selectPinnedContext } from "../../state/selectors";
+import { ContextPresentation } from "../Context/ContextPresentation";
 
 const severities = ["Low", "Medium", "High", "Critical"] as const;
 const statuses = ["Draft", "Open", "InProgress", "Closed"] as const;
@@ -38,7 +39,7 @@ export const IncidentHeader = ({
   ].filter(Boolean);
   const pinnedContext = selectPinnedContext(metadata?.contextItems ?? []).slice(
     0,
-    2,
+    4,
   );
 
   return (
@@ -62,17 +63,10 @@ export const IncidentHeader = ({
         ))}
       </div>
       {pinnedContext.length ? (
-        <dl
-          className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600"
-          aria-label="Pinned incident context"
-        >
-          {pinnedContext.map((item) => (
-            <div key={item.id} className="flex min-w-0 gap-1">
-              <dt className="font-semibold">{item.label}:</dt>
-              <dd className="max-w-40 truncate">{item.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <ContextPresentation
+          items={pinnedContext}
+          ariaLabel="Pinned incident context"
+        />
       ) : null}
       {!readOnly ? (
         <button

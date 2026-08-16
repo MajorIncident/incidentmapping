@@ -189,6 +189,7 @@ export const App = (): JSX.Element => {
                     .getState()
                     .nodes.map((node) => node.data)}
                   controls={useAppStore.getState().barriers}
+                  contextItems={useAppStore.getState().metadata?.contextItems}
                 />
                 {chronologyOpen ? (
                   <Chronology

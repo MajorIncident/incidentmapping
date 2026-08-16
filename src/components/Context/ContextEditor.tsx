@@ -1,5 +1,8 @@
 import { useId, useState } from "react";
-import type { ContextItem } from "../../features/maps/schema";
+import type {
+  ContextDisplayMode,
+  ContextItem,
+} from "../../features/maps/schema";
 import { useAppStore } from "../../state/useAppStore";
 
 export const contextHelpText =
@@ -14,12 +17,18 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
   const actions = useAppStore((state) => state.actions);
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
+  const [displayMode, setDisplayMode] = useState<ContextDisplayMode>("Text");
+  const [unit, setUnit] = useState("");
   const [error, setError] = useState(false);
   const addItem = () => {
     if (!label.trim() || !value.trim()) return setError(true);
-    if (actions.addContext(target, label, value)) {
+    if (
+      actions.addContext(target, label, value, undefined, displayMode, unit)
+    ) {
       setLabel("");
       setValue("");
+      setDisplayMode("Text");
+      setUnit("");
       setError(false);
     }
   };
@@ -50,7 +59,7 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
               className="flex min-w-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
               data-testid="context-row"
             >
-              <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-1 gap-2">
                 <label
                   className="min-w-0 text-xs font-medium text-slate-600"
                   htmlFor={`${uid}-${item.id}-label`}
@@ -87,6 +96,40 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
                     }}
                   />
                 </label>
+                <label className="min-w-0 text-xs font-medium text-slate-600">
+                  Display mode {index + 1}
+                  <select
+                    className={fieldClasses}
+                    aria-label={`Context item ${index + 1} display mode`}
+                    value={item.displayMode}
+                    onChange={(event) => {
+                      const next = event.target.value as ContextDisplayMode;
+                      actions.updateContext(target, item.id, {
+                        displayMode: next,
+                        ...(next !== "Metric" ? { unit: undefined } : {}),
+                      });
+                    }}
+                  >
+                    <option>Text</option>
+                    <option>Chip</option>
+                    <option>Metric</option>
+                  </select>
+                </label>
+                {item.displayMode === "Metric" ? (
+                  <label className="min-w-0 text-xs font-semibold text-slate-800">
+                    Unit {index + 1} (optional)
+                    <input
+                      className={fieldClasses}
+                      aria-label={`Context item ${index + 1} unit`}
+                      defaultValue={item.unit ?? ""}
+                      onBlur={(event) =>
+                        actions.updateContext(target, item.id, {
+                          unit: event.currentTarget.value.trim() || undefined,
+                        })
+                      }
+                    />
+                  </label>
+                ) : null}
               </div>
               <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <button
@@ -130,6 +173,33 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
             onKeyDown={enterAdds}
           />
         </label>
+        <label className="text-xs font-medium text-slate-600">
+          Display mode
+          <select
+            className={fieldClasses}
+            value={displayMode}
+            onChange={(event) => {
+              const next = event.target.value as ContextDisplayMode;
+              setDisplayMode(next);
+              if (next !== "Metric") setUnit("");
+            }}
+          >
+            <option>Text</option>
+            <option>Chip</option>
+            <option>Metric</option>
+          </select>
+        </label>
+        {displayMode === "Metric" ? (
+          <label className="text-xs font-semibold text-slate-800">
+            Unit (optional)
+            <input
+              className={fieldClasses}
+              value={unit}
+              onChange={(event) => setUnit(event.target.value)}
+              onKeyDown={enterAdds}
+            />
+          </label>
+        ) : null}
         <label
           className="text-xs font-medium text-slate-600"
           htmlFor={`${uid}-new-value`}
