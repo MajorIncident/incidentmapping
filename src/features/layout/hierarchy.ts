@@ -14,6 +14,8 @@ export const VERTICAL_GAP = 64;
 export const CONTROL_VERTICAL_MARGIN = 32;
 export const CONTROL_HORIZONTAL_MARGIN = 32;
 const TREE_GAP = 96;
+/** Space kept around cards and the lanes used to route their edges. */
+export const OBJECT_CLEARANCE = 32;
 /** Separates unconnected chronology from the causal forest. */
 export const CHRONOLOGY_LANE_GAP = TREE_GAP;
 export const ACTION_HORIZONTAL_GAP = 64;
@@ -346,6 +348,195 @@ export const layoutHierarchy = <Data>(
     causalRight = treeLeft + widths.get(id)!;
     treeLeft = causalRight + TREE_GAP;
   });
+
+  type LayoutRectangle = {
+    id: string;
+    owner: string;
+    associated: ReadonlySet<string>;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  const descendants = new Map<string, Set<string>>();
+  const getDescendants = (id: string): Set<string> => {
+    const cached = descendants.get(id);
+    if (cached) return cached;
+    const result = new Set([id]);
+    for (const child of forestChildren.get(id) ?? []) {
+      getDescendants(child).forEach((descendant) => result.add(descendant));
+    }
+    descendants.set(id, result);
+    return result;
+  };
+  roots.forEach(getDescendants);
+
+  const parentById = new Map<string, string>();
+  forestChildren.forEach((children, parent) =>
+    children.forEach((child) => parentById.set(child, parent)),
+  );
+  const shiftSubtree = (id: string, amount: number) => {
+    const shifted = getDescendants(id);
+    shifted.forEach((nodeId) => {
+      const position = positions.get(nodeId);
+      if (position)
+        positions.set(nodeId, { ...position, x: position.x + amount });
+      for (const action of actionsBySource.get(nodeId) ?? []) {
+        const actionPosition = actionPositions.get(action.id);
+        if (actionPosition)
+          actionPositions.set(action.id, {
+            ...actionPosition,
+            x: actionPosition.x + amount,
+          });
+      }
+    });
+  };
+  const recenterAncestors = (id: string) => {
+    let parent = parentById.get(id);
+    while (parent) {
+      const children = forestChildren.get(parent) ?? [];
+      if (children.length) {
+        const first = children[0];
+        const last = children[children.length - 1];
+        const firstNode = byId.get(first)!;
+        const lastNode = byId.get(last)!;
+        const firstSize = getNodeSize(firstNode, showDetails);
+        const lastSize = getNodeSize(lastNode, showDetails);
+        const parentSize = getNodeSize(byId.get(parent)!, showDetails);
+        const center =
+          (positions.get(first)!.x +
+            firstSize.width / 2 +
+            (positions.get(last)!.x + lastSize.width / 2)) /
+          2;
+        const old = positions.get(parent)!;
+        const nextX = snapPosition({
+          x: center - parentSize.width / 2,
+          y: 0,
+        }).x;
+        const delta = nextX - old.x;
+        positions.set(parent, { ...old, x: nextX });
+        for (const action of actionsBySource.get(parent) ?? []) {
+          const actionPosition = actionPositions.get(action.id);
+          if (actionPosition)
+            actionPositions.set(action.id, {
+              ...actionPosition,
+              x: actionPosition.x + delta,
+            });
+        }
+      }
+      parent = parentById.get(parent);
+    }
+  };
+  const rectangles = (): LayoutRectangle[] => {
+    const result: LayoutRectangle[] = [];
+    causalNodes.forEach((node) => {
+      const size = getNodeSize(node, showDetails);
+      const position = positions.get(node.id)!;
+      result.push({
+        id: `node:${node.id}`,
+        owner: node.id,
+        associated: new Set([node.id]),
+        ...position,
+        ...size,
+      });
+      for (const action of actionsBySource.get(node.id) ?? []) {
+        const actionSize = getNodeSize(action, showDetails);
+        result.push({
+          id: `action:${action.id}`,
+          owner: node.id,
+          associated: new Set([node.id]),
+          ...actionPositions.get(action.id)!,
+          ...actionSize,
+        });
+      }
+    });
+    barrierEdges.forEach((barrier, index) => {
+      const upstream = byId.get(barrier.upstreamNodeId);
+      const downstream = byId.get(barrier.downstreamNodeId);
+      const upstreamPosition = positions.get(barrier.upstreamNodeId);
+      const downstreamPosition = positions.get(barrier.downstreamNodeId);
+      if (!upstream || !downstream || !upstreamPosition || !downstreamPosition)
+        return;
+      const upstreamSize = getNodeSize(upstream, showDetails);
+      const downstreamSize = getNodeSize(downstream, showDetails);
+      const size = (barrier.id && controlDimensions[barrier.id]) || {
+        width: CONTROL_NODE_WIDTH,
+        height: CONTROL_NODE_HEIGHT,
+      };
+      result.push({
+        id: `control:${barrier.id ?? index}`,
+        owner: barrier.downstreamNodeId,
+        associated: new Set([barrier.upstreamNodeId, barrier.downstreamNodeId]),
+        x:
+          (upstreamPosition.x +
+            upstreamSize.width / 2 +
+            downstreamPosition.x +
+            downstreamSize.width / 2) /
+            2 -
+          size.width / 2,
+        y:
+          (upstreamPosition.y +
+            upstreamSize.height / 2 +
+            downstreamPosition.y +
+            downstreamSize.height / 2) /
+            2 -
+          size.height / 2,
+        ...size,
+      });
+    });
+    return result;
+  };
+  const verticallyClose = (a: LayoutRectangle, b: LayoutRectangle) =>
+    a.y < b.y + b.height + OBJECT_CLEARANCE &&
+    a.y + a.height + OBJECT_CLEARANCE > b.y;
+
+  // Validate the concrete visual objects rather than trusting a scalar tree
+  // width.  Each correction moves a complete branch, then recenters its
+  // ancestors; rebuilding the rectangles also recomputes Control and edge-lane
+  // positions. Stable ordering and snapped corrections make this idempotent.
+  for (let pass = 0; pass < causalNodes.length * 8 + 8; pass += 1) {
+    const objects = rectangles().sort(
+      (a, b) => a.x - b.x || a.y - b.y || a.id.localeCompare(b.id),
+    );
+    let correction: { owner: string; amount: number } | undefined;
+    for (
+      let leftIndex = 0;
+      leftIndex < objects.length && !correction;
+      leftIndex += 1
+    ) {
+      const left = objects[leftIndex];
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < objects.length;
+        rightIndex += 1
+      ) {
+        const right = objects[rightIndex];
+        if (!verticallyClose(left, right)) continue;
+        if (
+          left.owner === right.owner ||
+          left.associated.has(right.owner) ||
+          right.associated.has(left.owner)
+        )
+          continue;
+        const amount = left.x + left.width + OBJECT_CLEARANCE - right.x;
+        if (amount > 0 && !getDescendants(right.owner).has(left.owner)) {
+          correction = {
+            owner: right.owner,
+            amount: Math.ceil(amount / GRID_SIZE) * GRID_SIZE,
+          };
+          break;
+        }
+      }
+    }
+    if (!correction) break;
+    shiftSubtree(correction.owner, correction.amount);
+    recenterAncestors(correction.owner);
+  }
+
+  causalRight = Math.max(
+    causalRight,
+    ...rectangles().map((rectangle) => rectangle.x + rectangle.width),
+  );
 
   // Timestamped Events without any causal relationship form a separate visual
   // chronology. Their order and spacing convey time only; no edges are added.
