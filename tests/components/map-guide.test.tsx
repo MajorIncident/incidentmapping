@@ -11,4 +11,9 @@ describe("map guide", () => {
       0,
     );
   });
+
+  it("keeps disclosure controls out of the always-visible map guide", () => {
+    render(<GuideContent />);
+    expect(screen.getByLabelText("Map key").querySelector("button")).toBeNull();
+  });
 });

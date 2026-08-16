@@ -150,31 +150,18 @@ describe("presentation mode", () => {
     expect(screen.getByLabelText("Incident header")).toBeVisible();
     const legend = screen.getByLabelText("Presentation legend");
     expect(legend).toBeVisible();
-    expect(
-      legend.querySelectorAll("button, a, [role], [tabindex]"),
-    ).toHaveLength(0);
-    for (const heading of ["Nodes", "Analysis", "Controls"]) {
-      expect(
-        screen.getByRole("heading", { name: heading }),
-      ).toBeInTheDocument();
-    }
-    for (const label of [
-      "Impact",
-      "Event",
-      "Factor",
-      "Action",
-      "Key Factor",
-      "Root Cause",
-      "Effective",
-      "Degraded",
-      "Failed",
-      "Missing",
-    ]) {
-      expect(legend).toHaveTextContent(label);
-    }
-    expect(legend).not.toHaveTextContent("Top Event");
-    expect(legend).not.toHaveTextContent("Root Cause / failed control");
-    expect(legend.querySelectorAll('[aria-hidden="true"]')).toHaveLength(10);
+    expect(legend.querySelectorAll("button")).toHaveLength(1);
+    expect(legend.querySelectorAll("a, [role], [tabindex]")).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "Nodes" })).toBeInTheDocument();
+    expect(legend).toHaveTextContent("Event");
+    expect(legend).toHaveTextContent("Control");
+    expect(legend).not.toHaveTextContent("Impact");
+    expect(legend).not.toHaveTextContent("Root Cause");
+    expect(legend).not.toHaveTextContent("Failed");
+    expect(screen.getByRole("button", { name: /Legend/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
     const handles = document.querySelectorAll(".react-flow__handle");
     expect(handles.length).toBeGreaterThan(0);
     handles.forEach((handle) => {
@@ -200,6 +187,55 @@ describe("presentation mode", () => {
       });
     });
     expect(document.querySelectorAll("marker")).toHaveLength(0);
+  });
+
+  it("discloses only classifications present on the map by keyboard", async () => {
+    const classifiedMap: MapData = {
+      ...actionMap,
+      nodes: actionMap.nodes.map((node) =>
+        node.id === "root"
+          ? { ...node, eventPhase: "Detection" as const }
+          : node.id === "action"
+            ? { ...node, actionType: "Corrective" as const }
+            : node,
+      ),
+      barriers: [
+        {
+          id: "classified-control",
+          kind: "Barrier",
+          upstreamNodeId: "root",
+          downstreamNodeId: "child",
+          description: "Alarm",
+          status: "Failed",
+          controlRole: "Detective",
+          evidenceIds: [],
+        },
+      ],
+    };
+    act(() => useAppStore.getState().actions.loadMap(classifiedMap));
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+
+    const toggle = screen.getByRole("button", { name: /Legend/ });
+    toggle.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("heading", { name: "Event Phase" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Control Role and Status" }),
+    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Action Type" })).toBeVisible();
+    const legend = screen.getByLabelText("Presentation legend");
+    for (const value of ["Detection", "Detective", "Failed", "Corrective"])
+      expect(legend).toHaveTextContent(value);
+    for (const unused of ["Recovery", "Effective", "Immediate"])
+      expect(legend).not.toHaveTextContent(unused);
+    expect(
+      legend.querySelectorAll("li button, li a, li [tabindex]"),
+    ).toHaveLength(0);
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   it("keeps both causal edge segments rendered around a Control", async () => {
