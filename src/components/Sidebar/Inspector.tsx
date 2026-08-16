@@ -118,6 +118,9 @@ export const Inspector = ({
   const setNodeActionStatus = useAppStore(
     (state) => state.actions.setNodeActionStatus,
   );
+  const setEventPhase = useAppStore((state) => state.actions.setEventPhase);
+  const setActionType = useAppStore((state) => state.actions.setActionType);
+  const setControlRole = useAppStore((state) => state.actions.setControlRole);
   const setNodeActionDueDate = useAppStore(
     (state) => state.actions.setNodeActionDueDate,
   );
@@ -637,6 +640,33 @@ export const Inspector = ({
           </div>
 
           <div className="flex flex-col gap-1">
+            <label htmlFor="barrier-control-role" className={labelClasses}>
+              Control Role
+            </label>
+            <select
+              id="barrier-control-role"
+              className={inputClasses}
+              value={barrier.controlRole ?? ""}
+              onChange={(event) =>
+                setControlRole(
+                  barrier.id,
+                  (event.target.value ||
+                    undefined) as typeof barrier.controlRole,
+                )
+              }
+            >
+              <option value="">Not set</option>
+              {(["Preventive", "Detective", "Mitigating"] as const).map(
+                (role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
             <label htmlFor="barrier-description" className={labelClasses}>
               Control Purpose
             </label>
@@ -818,6 +848,40 @@ export const Inspector = ({
                 ))}
               </select>
             </div>
+            {node.data.nodeType === "Event" ? (
+              <div className="flex flex-col gap-1">
+                <label htmlFor="inspector-event-phase" className={labelClasses}>
+                  Event Phase
+                </label>
+                <select
+                  id="inspector-event-phase"
+                  className={inputClasses}
+                  value={node.data.eventPhase ?? ""}
+                  onChange={(event) =>
+                    setEventPhase(
+                      node.id,
+                      (event.target.value ||
+                        undefined) as typeof node.data.eventPhase,
+                    )
+                  }
+                >
+                  <option value="">Not set</option>
+                  {(
+                    [
+                      "Precursor",
+                      "Incident",
+                      "Detection",
+                      "Response",
+                      "Recovery",
+                    ] as const
+                  ).map((phase) => (
+                    <option key={phase} value={phase}>
+                      {phase}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-1">
               <span className={labelClasses}>Reference</span>
               <span className="flex min-h-[38px] items-center text-sm font-semibold text-slate-600">
@@ -895,6 +959,30 @@ export const Inspector = ({
                 </div>
               </>
             ) : null}
+          </div>
+        ) : null}
+        {node.data.nodeType === "Action" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-action-type" className={labelClasses}>
+              Action Type
+            </label>
+            <select
+              id="inspector-action-type"
+              className={inputClasses}
+              value={node.data.actionType ?? ""}
+              onChange={(event) =>
+                setActionType(
+                  node.id,
+                  (event.target.value ||
+                    undefined) as typeof node.data.actionType,
+                )
+              }
+            >
+              <option value="">Not set</option>
+              <option value="Immediate">Immediate / Containment</option>
+              <option value="Corrective">Corrective</option>
+              <option value="Preventive">Preventive</option>
+            </select>
           </div>
         ) : null}
         <div className="flex flex-col gap-1">
@@ -1395,6 +1483,9 @@ export const Inspector = ({
     setNodeActionStatus,
     setNodeActionDueDate,
     setNodeType,
+    setEventPhase,
+    setActionType,
+    setControlRole,
     select,
     timestampValue,
     title,

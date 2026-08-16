@@ -65,6 +65,20 @@ describe("Inspector and keyboard workflows", () => {
     });
   });
 
+  it("edits Event Phase with the exact persisted enum value", async () => {
+    const user = userEvent.setup();
+    const id = await renderSelectedNode();
+    const phase = screen.getByRole("combobox", { name: "Event Phase" });
+
+    await user.selectOptions(phase, "Response");
+
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === id)?.data
+        .eventPhase,
+    ).toBe("Response");
+    expect(screen.queryByRole("combobox", { name: "Action Type" })).toBeNull();
+  });
+
   it("shows inspector fields for the selected node and updates metadata", async () => {
     const { actions } = useAppStore.getState();
     let id: string | null = null;

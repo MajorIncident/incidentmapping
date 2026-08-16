@@ -340,6 +340,57 @@ describe("ChainNode details", () => {
     );
   });
 
+  it("shows classification tags only as selected edit controls", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderChainNode(
+      { nodeType: "Action", actionType: "Immediate" },
+      true,
+    );
+    const actionType = screen.getByRole("button", {
+      name: "Action type: Immediate / Containment",
+    });
+    expect(actionType).toHaveClass("node-tag--classification");
+    actionType.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("menu", { name: "Action type" })).toBeVisible();
+    expect(
+      screen.getByRole("menuitemradio", { name: "Corrective" }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu", { name: "Action type" })).toBeNull();
+    unmount();
+
+    renderChainNode(
+      { nodeType: "Event", eventPhase: "Detection", readOnly: true },
+      false,
+    );
+    expect(screen.getByLabelText("Event phase: Detection").tagName).toBe(
+      "SPAN",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Event phase/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("only offers an unset action type while the action is selected", () => {
+    const { unmount } = renderChainNode({ nodeType: "Action" }, false);
+    expect(screen.queryByText("Set action type")).not.toBeInTheDocument();
+    unmount();
+    renderChainNode({ nodeType: "Action" }, true);
+    expect(
+      screen.getByRole("button", { name: "Action type: Set action type" }),
+    ).toBeVisible();
+  });
+
+  it("keeps the Control status dominant over its muted role", () => {
+    renderBarrierNode({ status: "Failed", controlRole: "Detective" });
+    expect(screen.getByText("Failed")).toHaveClass("font-semibold");
+    expect(screen.getByLabelText("Control role: Detective")).toHaveClass(
+      "node-tag--classification",
+      "node-tag--readonly",
+    );
+  });
+
   it("uses Control terminology and maps failure reason without compact details", () => {
     act(() => useAppStore.getState().actions.setShowDetails(false));
     renderBarrierNode({
