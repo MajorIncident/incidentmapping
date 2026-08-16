@@ -1,7 +1,7 @@
 const MIME_JSON = "application/json";
 
 export type OpenFileResult = {
-  contents: string;
+  contents: ArrayBuffer;
   handle: FileSystemFileHandle;
 };
 
@@ -25,14 +25,17 @@ export const openFileWithPicker = async (): Promise<OpenFileResult | null> => {
       types: [
         {
           description: "Incident Map",
-          accept: { [MIME_JSON]: [".json"] },
+          accept: {
+            "application/vnd.incidentmap+zip": [".incidentmap"],
+            [MIME_JSON]: [".json"],
+          },
         },
       ],
       excludeAcceptAllOption: true,
       multiple: false,
     });
     const file = await handle.getFile();
-    const contents = await file.text();
+    const contents = await file.arrayBuffer();
     return { contents, handle };
   } catch (error) {
     if ((error as DOMException).name === "AbortError") {
@@ -43,7 +46,7 @@ export const openFileWithPicker = async (): Promise<OpenFileResult | null> => {
 };
 
 export const saveFileWithPicker = async (
-  contents: string,
+  contents: Blob | ArrayBuffer | string,
   options: { handle?: FileSystemFileHandle; suggestedName?: string } = {},
 ): Promise<FileSystemFileHandle | null> => {
   if (!supportsFileSystemAccess()) {
@@ -59,11 +62,11 @@ export const saveFileWithPicker = async (
     const fileHandle =
       options.handle ??
       (await savePicker?.({
-        suggestedName: options.suggestedName ?? "incident-map.json",
+        suggestedName: options.suggestedName ?? "incident-map.incidentmap",
         types: [
           {
             description: "Incident Map",
-            accept: { [MIME_JSON]: [".json"] },
+            accept: { "application/vnd.incidentmap+zip": [".incidentmap"] },
           },
         ],
       }));
@@ -73,7 +76,9 @@ export const saveFileWithPicker = async (
     }
 
     const writable = await fileHandle.createWritable();
-    await writable.write(new Blob([contents], { type: MIME_JSON }));
+    await writable.write(
+      contents instanceof Blob ? contents : new Blob([contents]),
+    );
     await writable.close();
 
     return fileHandle;

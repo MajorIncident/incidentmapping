@@ -1,10 +1,14 @@
 const MIME_JSON = "application/json";
 
-export const triggerJsonDownload = (
+export const triggerDownload = (
   filename: string,
-  contents: string,
+  contents: BlobPart,
+  mimeType = MIME_JSON,
 ): void => {
-  const blob = new Blob([contents], { type: MIME_JSON });
+  const blob =
+    contents instanceof Blob
+      ? contents
+      : new Blob([contents], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -15,10 +19,13 @@ export const triggerJsonDownload = (
   URL.revokeObjectURL(url);
 };
 
-export const readFile = (file: File): Promise<string> =>
+export const triggerJsonDownload = (filename: string, contents: string): void =>
+  triggerDownload(filename, contents);
+
+export const readFile = (file: File): Promise<ArrayBuffer> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
     reader.onerror = () => reject(reader.error);
-    reader.readAsText(file, "utf-8");
+    reader.readAsArrayBuffer(file);
   });

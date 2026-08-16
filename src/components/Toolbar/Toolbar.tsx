@@ -127,6 +127,13 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
       </button>
       <Menu label="File" icon="file">
         <Item
+          icon="export"
+          onClick={props.onExportJson}
+          aria-label="Export map metadata as JSON"
+        >
+          Export JSON
+        </Item>
+        <Item
           icon="open"
           onClick={() => void props.onOpen()}
           aria-label="Open an existing map"
