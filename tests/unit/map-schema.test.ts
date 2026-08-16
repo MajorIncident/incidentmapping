@@ -35,4 +35,15 @@ describe("mapDataSchema", () => {
     valid.nodes[0].evidenceItems = [{ id: "opaque-id", text: "   " }];
     expect(mapDataSchema.safeParse(valid).success).toBe(false);
   });
+
+  it.each(["Effective", "Degraded", "Failed", "Missing"] as const)(
+    "accepts the %s barrier status without retired fields",
+    (status) => {
+      const barrier = { ...sampleMap.barriers[0], status };
+      const parsed = mapDataSchema.parse({ ...sampleMap, barriers: [barrier] });
+      expect(parsed.barriers[0].status).toBe(status);
+      expect(parsed.barriers[0]).not.toHaveProperty("breached");
+      expect(parsed.barriers[0]).not.toHaveProperty("breachedItems");
+    },
+  );
 });

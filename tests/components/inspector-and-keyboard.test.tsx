@@ -159,10 +159,12 @@ describe("Inspector and keyboard workflows", () => {
     });
 
     const description = await screen.findByRole("textbox", {
-      name: /^Description$/i,
+      name: /^Control Purpose$/i,
     });
     await waitFor(() => expect(description).toHaveFocus());
-    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
+      "Failed",
+    );
 
     const user = userEvent.setup();
     await user.type(description, "Firewall active");
@@ -174,7 +176,7 @@ describe("Inspector and keyboard workflows", () => {
       useAppStore.getState().actions.undo();
     });
     expect(screen.getByTestId("barrier-node")).toHaveTextContent(
-      "No barrier description provided.",
+      "No control purpose provided.",
     );
   });
 
@@ -372,5 +374,33 @@ describe("Inspector and keyboard workflows", () => {
       "placeholder",
       "Add a positive consequence",
     );
+  });
+
+  it("shows failure fields only for non-effective statuses and preserves their values", async () => {
+    act(() => useAppStore.getState().actions.loadMap(sampleMap));
+    act(() => useAppStore.getState().actions.select("barrier-root-child"));
+    render(
+      <ReactFlowProvider>
+        <Inspector />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.queryByLabelText("Why Did It Fail?")).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "Degraded");
+    await userEvent.selectOptions(
+      screen.getByLabelText("Why Did It Fail?"),
+      "Inadequate",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Failure Details"),
+      "Coverage gap",
+    );
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "Effective");
+    expect(screen.queryByLabelText("Failure Details")).not.toBeInTheDocument();
+    expect(useAppStore.getState().barriers[0]).toMatchObject({
+      status: "Effective",
+      failureReason: "Inadequate",
+      failureDetails: "Coverage gap",
+    });
   });
 });

@@ -397,19 +397,26 @@ const BarrierNodeComponent = ({
   data,
   selected,
 }: NodeProps<BarrierNodeData>): JSX.Element => {
-  const bulletPoints = data.breachedItems ?? [];
-  const bulletVisible = data.breached && bulletPoints.length > 0;
-  const badgeText = data.breached ? "Breached" : "Holding";
-  const badgeClasses = data.breached
-    ? "bg-rose-100 text-rose-700 border-rose-300"
-    : "bg-emerald-100 text-emerald-700 border-emerald-300";
+  const treatments = {
+    Effective: "border-emerald-400 bg-emerald-50",
+    Degraded: "border-amber-400 bg-amber-50",
+    Failed: "border-rose-400 bg-rose-50",
+    Missing: "border-slate-400 bg-slate-50",
+  } as const;
+  const badgeClasses = {
+    Effective: "bg-emerald-100 text-emerald-700 border-emerald-300",
+    Degraded: "bg-amber-100 text-amber-800 border-amber-300",
+    Failed: "bg-rose-100 text-rose-700 border-rose-300",
+    Missing: "bg-slate-200 text-slate-700 border-slate-400",
+  } as const;
   const description = data.description?.trim();
+  const failureDetails = data.failureDetails?.trim();
 
   return (
     <div
       className={`${barrierClasses} ${
         selected ? "ring-2 ring-canvas-accent" : "ring-0"
-      } ${data.breached ? "border-rose-500 bg-rose-50" : "border-sky-500 bg-sky-50"}`}
+      } ${treatments[data.status]}`}
       data-testid="barrier-node"
     >
       <Handle
@@ -429,29 +436,24 @@ const BarrierNodeComponent = ({
           Barrier
         </div>
         <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClasses}`}
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClasses[data.status]}`}
         >
-          {badgeText}
+          {data.status}
         </span>
       </div>
       <p className="mt-1 text-sm text-slate-700">
-        {description ?? "No barrier description provided."}
+        {description ?? "No control purpose provided."}
       </p>
-      {bulletVisible ? (
-        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-rose-700">
-          {bulletPoints.map((point, index) => (
-            <li
-              key={`${data.upstreamNodeId}-${data.downstreamNodeId}-${index}`}
-            >
-              {point}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm text-slate-600">
-          {data.breached ? "No breach items recorded." : "Barrier intact."}
+      {data.status !== "Effective" && data.failureReason ? (
+        <p className="mt-2 text-xs font-semibold text-slate-700">
+          Why it failed: {data.failureReason}
         </p>
-      )}
+      ) : null}
+      {data.status !== "Effective" && failureDetails ? (
+        <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
+          {failureDetails}
+        </p>
+      ) : null}
     </div>
   );
 };
