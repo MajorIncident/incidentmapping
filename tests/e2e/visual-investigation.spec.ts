@@ -72,8 +72,18 @@ test("complete baggage investigation remains understandable after save and reope
     page.getByRole("button", { name: /Exit Presentation/ }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Add Event" })).toHaveCount(0);
+  await expect(page.locator(".react-flow__controls")).toHaveCount(0);
+  const edgePath = page.locator(".react-flow__edge-path").first();
+  await expect(edgePath).toBeVisible();
+  await expect(edgePath).toHaveAttribute("d", /\S+/);
+  await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
   await expectInvestigationOnCanvas(page);
   await page.getByRole("button", { name: /Exit Presentation/ }).click();
+  await expect(page.getByRole("button", { name: "Add Event" })).toBeVisible();
+  await expect(
+    page.locator(".react-flow__handle:visible").first(),
+  ).toBeVisible();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "File menu" }).click();

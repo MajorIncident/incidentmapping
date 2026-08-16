@@ -1,23 +1,100 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../../src/app/App";
-import { emptyMap } from "../../src/features/maps/fixtures";
+import { sampleMap } from "../../src/features/maps/fixtures";
+import type { MapData } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
+
+const actionMap: MapData = {
+  ...sampleMap,
+  nodes: [
+    ...sampleMap.nodes,
+    {
+      id: "action",
+      kind: "ChainNode",
+      referenceId: "N-003",
+      nodeType: "Action",
+      title: "Prevent recurrence",
+      actionStatus: "Planned",
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      evidenceItems: [],
+      position: { x: 260, y: 160 },
+    },
+  ],
+  edges: [
+    ...sampleMap.edges,
+    {
+      id: "edge-child-action",
+      kind: "ActionEdge",
+      fromId: "child",
+      toId: "action",
+    },
+  ],
+  barriers: [],
+};
 
 describe("presentation mode", () => {
   beforeAll(() => {
     vi.stubGlobal(
+      "DOMMatrixReadOnly",
+      class {
+        m22 = 1;
+      },
+    );
+    vi.stubGlobal(
       "ResizeObserver",
       class {
-        observe(): void {}
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element): void {
+          this.callback(
+            [
+              {
+                target,
+                contentRect: target.getBoundingClientRect(),
+              } as ResizeObserverEntry,
+            ],
+            this as unknown as ResizeObserver,
+          );
+        }
         disconnect(): void {}
         unobserve(): void {}
       },
     );
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: Element) {
+        const isNode = this.classList.contains("react-flow__node");
+        const width = isNode ? 220 : 1000;
+        const height = isNode ? 100 : 800;
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: width,
+          bottom: height,
+          width,
+          height,
+          toJSON: () => ({}),
+        };
+      },
+    );
+    Object.defineProperties(HTMLElement.prototype, {
+      offsetWidth: { configurable: true, get: () => 220 },
+      offsetHeight: { configurable: true, get: () => 100 },
+    });
   });
 
-  beforeEach(() => act(() => useAppStore.getState().actions.loadMap(emptyMap)));
+  beforeEach(() =>
+    act(() => useAppStore.getState().actions.loadMap(sampleMap)),
+  );
 
   it("removes editing chrome while retaining review context", async () => {
     render(<App />);
@@ -32,7 +109,51 @@ describe("presentation mode", () => {
     expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Incident header")).toBeVisible();
     expect(screen.getByLabelText("Presentation legend")).toBeVisible();
-    expect(document.querySelectorAll(".react-flow__handle")).toHaveLength(0);
+    const handles = document.querySelectorAll(".react-flow__handle");
+    expect(handles.length).toBeGreaterThan(0);
+    handles.forEach((handle) => {
+      expect(handle).toHaveClass("presentation-handle");
+      expect(handle).toHaveAttribute("data-presentation-handle", "true");
+      expect(handle).toHaveAttribute("aria-hidden", "true");
+    });
+
+    await waitFor(() =>
+      expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
+    );
+    expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
+    document.querySelectorAll(".react-flow__edge-path").forEach((path) => {
+      expect(path).toHaveAttribute("marker-end");
+    });
+  });
+
+  it("keeps both causal edge segments rendered around a barrier", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+
+    expect(document.querySelectorAll(".react-flow__node-Barrier")).toHaveLength(
+      1,
+    );
+    await waitFor(() =>
+      expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
+    );
+    expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
+  });
+
+  it("keeps the horizontal ActionEdge rendered", async () => {
+    act(() => useAppStore.getState().actions.loadMap(actionMap));
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+
+    const actionEdge = await waitFor(() => {
+      const edge = document.querySelector(
+        ".react-flow__edge.incident-edge--action",
+      );
+      expect(edge).toBeInTheDocument();
+      return edge;
+    });
+    expect(
+      actionEdge?.querySelector(".react-flow__edge-path"),
+    ).toBeInTheDocument();
   });
 
   it("exits by button and Escape without changing map data or history", async () => {
