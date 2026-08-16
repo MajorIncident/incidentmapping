@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { EvidenceType } from "../../features/maps/schema";
-import { selectEvidenceLinkCounts } from "../../state/selectors";
+import {
+  selectEvidenceLinkedEntityLabels,
+  selectEvidenceLinkCounts,
+} from "../../state/selectors";
 import { useAppStore } from "../../state/useAppStore";
 
 const types: EvidenceType[] = [
@@ -147,6 +150,12 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
             {item.description ? (
               <p className="mt-1 text-slate-600">{item.description}</p>
             ) : null}
+            <p className="mt-1 text-xs text-slate-500">
+              Linked to:{" "}
+              {selectEvidenceLinkedEntityLabels(item.id, nodes, controls).join(
+                ", ",
+              )}
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"

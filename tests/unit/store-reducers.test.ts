@@ -304,6 +304,7 @@ describe("useAppStore actions", () => {
     expect(state.barriers).toContainEqual(
       expect.objectContaining({
         id: barrierId,
+        referenceId: "C-001",
         status: "Failed",
       }),
     );
@@ -312,6 +313,32 @@ describe("useAppStore actions", () => {
       entityId: barrierId,
       field: "barrier-description",
     });
+  });
+
+  it("normalizes Control allocation and never reuses deleted references", () => {
+    useAppStore.getState().actions.loadMap({
+      ...sampleMap,
+      metadata: {
+        ...sampleMap.metadata,
+        controlReferenceHighWaterMark: 0,
+      },
+      barriers: [{ ...sampleMap.barriers[0], referenceId: "C-007" }],
+    });
+    expect(useAppStore.getState().metadata?.controlReferenceHighWaterMark).toBe(
+      7,
+    );
+
+    const { actions } = useAppStore.getState();
+    actions.removeBarrier("barrier-root-child");
+    expect(actions.addBarrier("root", "child")).toBeTruthy();
+    expect(useAppStore.getState().barriers[0]?.referenceId).toBe("C-008");
+    expect(actions.addBarrier("root", "child")).toBeNull();
+
+    const reference = useAppStore.getState().barriers[0]?.referenceId;
+    const id = useAppStore.getState().barriers[0]!.id;
+    actions.updateBarrierData(id, { status: "Degraded" });
+    expect(useAppStore.getState().barriers[0]?.referenceId).toBe(reference);
+    expect(actions.toMap().barriers[0]?.referenceId).toBe("C-008");
   });
 
   it("creates barriers only for an explicit existing branch and prevents duplicates per edge", () => {

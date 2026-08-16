@@ -404,6 +404,10 @@ export const Canvas = ({
           status: matchingBarrier.status,
           failureReason: matchingBarrier.failureReason,
           failureDetails: matchingBarrier.failureDetails,
+          referenceId: matchingBarrier.referenceId,
+          controlRole: matchingBarrier.controlRole,
+          assertionState: matchingBarrier.assertionState,
+          evidenceIds: [...matchingBarrier.evidenceIds],
           readOnly: presenting,
           viewShowDetails: presentationShowDetails,
           graphRole: {

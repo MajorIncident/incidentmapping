@@ -1,5 +1,5 @@
 import type { Node } from "reactflow";
-import type { ChainNodeData } from "./useAppStore";
+import type { BarrierNodeData, ChainNodeData } from "./useAppStore";
 import type { ContextItem, EvidenceItem } from "../features/maps/schema";
 import type { EventPhase } from "../features/maps/schema";
 
@@ -44,6 +44,20 @@ export const selectEvidenceLinkCounts = (
           .length,
     ]),
   );
+
+/** Human-facing entities linked to an evidence item, never persistence UUIDs. */
+export const selectEvidenceLinkedEntityLabels = (
+  evidenceId: string,
+  nodes: Node<ChainNodeData>[],
+  controls: Array<Pick<BarrierNodeData, "referenceId" | "evidenceIds">>,
+): string[] => [
+  ...nodes
+    .filter((node) => (node.data.evidenceIds ?? []).includes(evidenceId))
+    .map((node) => node.data.referenceId ?? "Unassigned node"),
+  ...controls
+    .filter((control) => (control.evidenceIds ?? []).includes(evidenceId))
+    .map((control) => control.referenceId ?? "Unassigned control"),
+];
 
 export const selectPinnedContext = (items: ContextItem[]) =>
   items.filter((item) => item.showOnCard).map((item) => ({ ...item }));

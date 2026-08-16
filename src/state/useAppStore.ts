@@ -241,6 +241,16 @@ type AppState = {
 
 const MOVE_DEBOUNCE_MS = 200;
 const TEXT_EDIT_DEBOUNCE_MS = 500;
+const CONTROL_REFERENCE_PATTERN = /^C-(\d{3,})$/;
+
+const controlReferenceNumber = (referenceId?: string): number => {
+  const match = referenceId?.match(CONTROL_REFERENCE_PATTERN);
+  const value = match ? Number(match[1]) : 0;
+  return Number.isSafeInteger(value) && value > 0 ? value : 0;
+};
+
+const formatControlReference = (value: number) =>
+  `C-${String(value).padStart(3, "0")}`;
 
 let moveDebounceActive = false;
 let nextEditorFocusRequestId = 1;
@@ -626,7 +636,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           controlReferenceHighWaterMark: Math.max(
             map.metadata?.controlReferenceHighWaterMark ?? 0,
             ...map.barriers.map((item) =>
-              Number(item.referenceId.match(/^C-(\d+)$/)?.[1] ?? 0),
+              controlReferenceNumber(item.referenceId),
             ),
           ),
           attachmentReferenceHighWaterMark: Math.max(
@@ -1475,6 +1485,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           return {};
         }
         const barrierId = createId("barrier");
+        const nextControlReference =
+          (state.metadata?.controlReferenceHighWaterMark ?? 0) + 1;
+        const nextMetadata = {
+          ...(state.metadata ?? {}),
+          controlReferenceHighWaterMark: nextControlReference,
+        };
         createdId = barrierId;
         const nextBarriers = [
           ...state.barriers,
@@ -1483,7 +1499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             kind: "Barrier" as const,
             upstreamNodeId,
             downstreamNodeId,
-            referenceId: `C-${String((state.metadata?.controlReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
+            referenceId: formatControlReference(nextControlReference),
             status: "Failed" as const,
             evidenceIds: [],
           },
@@ -1491,6 +1507,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const candidate = {
           ...state,
           barriers: nextBarriers,
+          metadata: nextMetadata,
           selectionId: barrierId,
           editingId: null,
           editorFocusRequest: {
@@ -1507,11 +1524,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         );
         return {
           barriers: nextBarriers,
-          metadata: {
-            ...(state.metadata ?? {}),
-            controlReferenceHighWaterMark:
-              (state.metadata?.controlReferenceHighWaterMark ?? 0) + 1,
-          },
+          metadata: nextMetadata,
           selectionId: barrierId,
           editingId: null,
           editorFocusRequest: candidate.editorFocusRequest,

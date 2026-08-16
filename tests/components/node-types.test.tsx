@@ -383,7 +383,18 @@ describe("ChainNode details", () => {
   });
 
   it("keeps the Control status dominant over its muted role", () => {
-    renderBarrierNode({ status: "Failed", controlRole: "Detective" });
+    renderBarrierNode({
+      referenceId: "C-002",
+      status: "Failed",
+      controlRole: "Detective",
+    });
+
+    expect(screen.getByText(/CONTROL/).parentElement).toHaveTextContent(
+      "CONTROL · C-002",
+    );
+    expect(screen.getByTestId("control-node")).toHaveAccessibleName(
+      "C-002 Control, Detective, Failed",
+    );
     expect(screen.getByText("Failed")).toHaveClass("font-semibold");
     expect(screen.getByLabelText("Control role: Detective")).toHaveClass(
       "node-tag--classification",
