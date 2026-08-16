@@ -414,31 +414,39 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.getByText("This field is required.")).toBeVisible();
   });
 
-  it("adds evidence with Enter, preserves its label, and removes blank edits", async () => {
+  it("creates typed evidence atomically and unlinks without deleting it", async () => {
     const nodeId = await renderSelectedNode();
     const user = userEvent.setup();
     const evidenceHeading = screen.getByRole("heading", { name: "Evidence" });
     const section = evidenceHeading.parentElement?.parentElement as HTMLElement;
-    await user.click(within(section).getByRole("button", { name: "Add" }));
+    await user.click(
+      within(section).getByRole("button", { name: "Add Evidence" }),
+    );
+    await user.selectOptions(
+      within(section).getByLabelText("Type"),
+      "SystemLog",
+    );
+    await user.type(within(section).getByLabelText("Title"), "Witness account");
+    await user.type(within(section).getByLabelText("Source"), "Dispatch");
+    await user.click(
+      screen.getAllByRole("button", { name: "Add Evidence" })[1],
+    );
 
-    const first = screen.getByPlaceholderText("Add supporting evidence");
-    expect(first).toHaveFocus();
-    await user.type(first, "  Witness account  {Enter}");
+    expect(useAppStore.getState().evidence[0]).toMatchObject({
+      id: "EV-001",
+      type: "SystemLog",
+      title: "Witness account",
+    });
+    expect(
+      screen.getByText(/EV-001 · System Log · Witness account/),
+    ).toBeVisible();
 
-    const inputs = screen.getAllByPlaceholderText("Add supporting evidence");
-    expect(inputs).toHaveLength(2);
-    expect(inputs[1]).toHaveFocus();
-    expect(useAppStore.getState().nodes[0].data.evidenceItems).toEqual([
-      { id: "EV-001", text: "Witness account" },
-    ]);
-    expect(screen.getByText("EV-001")).toBeVisible();
-
-    await user.clear(inputs[0]);
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
     expect(
       useAppStore.getState().nodes.find((candidate) => candidate.id === nodeId)
-        ?.data.evidenceItems,
+        ?.data.evidenceIds,
     ).toEqual([]);
+    expect(useAppStore.getState().evidence).toHaveLength(1);
   });
 
   it("focuses Add after removing the only empty item and the previous input otherwise", async () => {

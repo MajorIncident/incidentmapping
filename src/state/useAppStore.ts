@@ -160,6 +160,10 @@ type AppState = {
       contextId: string,
     ) => void;
     createEvidence: (item: Omit<EvidenceItem, "id">) => string | null;
+    createAndLinkEvidence: (
+      target: { kind: "node" | "control"; id: string },
+      item: Omit<EvidenceItem, "id">,
+    ) => string | null;
     editEvidence: (
       id: string,
       patch: Partial<Omit<EvidenceItem, "id">>,
@@ -832,6 +836,54 @@ export const useAppStore = create<AppState>((set, get) => ({
             evidenceReferenceHighWaterMark: highWater + 1,
           },
           history,
+          canUndo: true,
+          canRedo: false,
+        };
+      });
+      return id;
+    },
+    createAndLinkEvidence: (target, input) => {
+      const title = input.title.trim();
+      const state = get();
+      const targetExists =
+        target.kind === "node"
+          ? state.nodes.some((node) => node.id === target.id)
+          : state.barriers.some((control) => control.id === target.id);
+      if (!title || !targetExists) return null;
+      const highWater = Math.max(
+        state.metadata?.evidenceReferenceHighWaterMark ?? 0,
+        ...state.evidence.map((item) =>
+          Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
+        ),
+      );
+      const id = `EV-${String(highWater + 1).padStart(3, "0")}`;
+      const prev = snapshotFromState(state);
+      set((current) => {
+        const nodes = current.nodes.map((node) =>
+          target.kind === "node" && node.id === target.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  evidenceIds: [...(node.data.evidenceIds ?? []), id],
+                },
+              }
+            : node,
+        );
+        const barriers = current.barriers.map((control) =>
+          target.kind === "control" && control.id === target.id
+            ? { ...control, evidenceIds: [...control.evidenceIds, id] }
+            : control,
+        );
+        return {
+          nodes,
+          barriers,
+          evidence: [...current.evidence, { ...input, title, id }],
+          metadata: {
+            ...(current.metadata ?? {}),
+            evidenceReferenceHighWaterMark: highWater + 1,
+          },
+          history: updateHistoryState(current, prev, true),
           canUndo: true,
           canRedo: false,
         };

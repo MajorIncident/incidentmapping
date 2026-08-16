@@ -287,7 +287,9 @@ describe("presentation mode", () => {
       await userEvent.click(
         screen.getByRole("button", { name: "Present map" }),
       );
-      const detailsButton = screen.getByRole("button", {
+      // Presentation mode changes the rendered React Flow node data. Await UI
+      // transitions after user events instead of asserting against stale cards.
+      const detailsButton = await screen.findByRole("button", {
         name: "Show Details",
       });
       expect(detailsButton).toHaveAttribute("aria-pressed", "false");
@@ -312,12 +314,12 @@ describe("presentation mode", () => {
 
       await userEvent.click(detailsButton);
       expect(
-        screen.getByRole("button", { name: "Hide Details" }),
+        await screen.findByRole("button", { name: "Hide Details" }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByText("Detailed evidence line")).toBeVisible();
-      expect(screen.getByText("Detailed consequence")).toBeVisible();
-      expect(screen.getByText("Control purpose details")).toBeVisible();
-      expect(screen.getByText("Control failure details")).toBeVisible();
+      expect(await screen.findByText("Detailed evidence line")).toBeVisible();
+      expect(await screen.findByText("Detailed consequence")).toBeVisible();
+      expect(await screen.findByText("Control purpose details")).toBeVisible();
+      expect(await screen.findByText("Control failure details")).toBeVisible();
 
       await userEvent.click(
         screen.getByRole("button", { name: /Exit Presentation/i }),

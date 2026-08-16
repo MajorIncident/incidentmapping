@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useReactFlow } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
+import { EvidenceSection } from "../Evidence/EvidenceSection";
 
 export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
@@ -68,16 +69,8 @@ const textAreaClasses =
 const buttonClasses =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent disabled:cursor-not-allowed disabled:opacity-60";
 
-const evidenceLabel = (id: string): string => {
-  const sequence = id.match(/^EV?-(\d+)$/)?.[1];
-  return sequence ? `EV-${String(Number(sequence)).padStart(3, "0")}` : "New";
-};
-
 type SectionProps = { children: React.ReactNode };
 export const CoreFields = ({ children }: SectionProps): JSX.Element => (
-  <>{children}</>
-);
-export const EvidenceSection = ({ children }: SectionProps): JSX.Element => (
   <>{children}</>
 );
 export const ConsequencesSection = ({
@@ -127,9 +120,6 @@ export const Inspector = ({
   const setNodeActionDueDate = useAppStore(
     (state) => state.actions.setNodeActionDueDate,
   );
-  const addEvidence = useAppStore((state) => state.actions.addEvidence);
-  const updateEvidence = useAppStore((state) => state.actions.updateEvidence);
-  const removeEvidence = useAppStore((state) => state.actions.removeEvidence);
   const addBarrier = useAppStore((state) => state.actions.addBarrier);
   const addAction = useAppStore((state) => state.actions.addAction);
   const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
@@ -152,9 +142,6 @@ export const Inspector = ({
   const [negativeConsequences, setNegativeConsequences] = useState<string[]>(
     [],
   );
-  const [evidenceDrafts, setEvidenceDrafts] = useState<
-    Array<{ id: string; text: string; persisted: boolean }>
-  >([]);
   const [barrierDescription, setBarrierDescription] = useState("");
   const [positiveErrors, setPositiveErrors] = useState<string[]>([]);
   const [negativeErrors, setNegativeErrors] = useState<string[]>([]);
@@ -165,13 +152,10 @@ export const Inspector = ({
   const negativeItemIds = useRef<string[]>([]);
   const positiveInputRefs = useRef(new Map<string, HTMLInputElement>());
   const negativeInputRefs = useRef(new Map<string, HTMLInputElement>());
-  const evidenceInputRefs = useRef(new Map<string, HTMLInputElement>());
-  const evidenceSelectionRef = useRef<string | null>(null);
   const positiveAddRef = useRef<HTMLButtonElement | null>(null);
   const negativeAddRef = useRef<HTMLButtonElement | null>(null);
-  const evidenceAddRef = useRef<HTMLButtonElement | null>(null);
   const [pendingFocus, setPendingFocus] = useState<{
-    listType: "positive" | "negative" | "evidence";
+    listType: "positive" | "negative";
     itemId: string | null;
   } | null>(null);
 
@@ -183,10 +167,8 @@ export const Inspector = ({
 
   useLayoutEffect(() => {
     setPendingFocus(null);
-    setEvidenceDrafts([]);
     positiveInputRefs.current.clear();
     negativeInputRefs.current.clear();
-    evidenceInputRefs.current.clear();
     positiveItemIds.current = [];
     negativeItemIds.current = [];
   }, [selectionId]);
@@ -208,15 +190,6 @@ export const Inspector = ({
           ? (node.data.negativeConsequenceBulletPoints ?? [])
           : [],
       );
-      const selectionChanged = evidenceSelectionRef.current !== node.id;
-      evidenceSelectionRef.current = node.id;
-      setEvidenceDrafts((drafts) => [
-        ...(node.data.evidenceItems ?? []).map((item) => ({
-          ...item,
-          persisted: true,
-        })),
-        ...(selectionChanged ? [] : drafts.filter((item) => !item.persisted)),
-      ]);
       setPositiveErrors([]);
       setNegativeErrors([]);
       if (
@@ -251,7 +224,6 @@ export const Inspector = ({
       setTitleError(null);
       setPositiveConsequences([]);
       setNegativeConsequences([]);
-      setEvidenceDrafts([]);
       setPositiveErrors([]);
       setNegativeErrors([]);
       positiveItemIds.current = [];
@@ -291,26 +263,17 @@ export const Inspector = ({
     const inputRefs =
       pendingFocus.listType === "positive"
         ? positiveInputRefs.current
-        : pendingFocus.listType === "negative"
-          ? negativeInputRefs.current
-          : evidenceInputRefs.current;
+        : negativeInputRefs.current;
     const addButton =
       pendingFocus.listType === "positive"
         ? positiveAddRef.current
-        : pendingFocus.listType === "negative"
-          ? negativeAddRef.current
-          : evidenceAddRef.current;
+        : negativeAddRef.current;
     (pendingFocus.itemId
       ? inputRefs.get(pendingFocus.itemId)
       : addButton
     )?.focus();
     setPendingFocus(null);
-  }, [
-    pendingFocus,
-    positiveConsequences,
-    negativeConsequences,
-    evidenceDrafts,
-  ]);
+  }, [pendingFocus, positiveConsequences, negativeConsequences]);
 
   const handleTitleCommit = useCallback(() => {
     if (!node) {
@@ -614,65 +577,6 @@ export const Inspector = ({
     ],
   );
 
-  const handleAddEvidence = useCallback(() => {
-    const id = `draft-${nextListItemId.current++}`;
-    setEvidenceDrafts((items) => [
-      ...items,
-      { id, text: "", persisted: false },
-    ]);
-    setPendingFocus({ listType: "evidence", itemId: id });
-  }, []);
-
-  const commitEvidence = useCallback(
-    (id: string, createAnother = false) => {
-      if (!node) return;
-      const draft = evidenceDrafts.find((item) => item.id === id);
-      if (!draft) return;
-      const text = draft.text.trim();
-      if (!text) {
-        if (draft.persisted) removeEvidence(node.id, id);
-        setEvidenceDrafts((items) => items.filter((item) => item.id !== id));
-        return;
-      }
-      if (draft.persisted) {
-        updateEvidence(node.id, id, text);
-        setEvidenceDrafts((items) =>
-          items.map((item) => (item.id === id ? { ...item, text } : item)),
-        );
-      } else {
-        const persistedId = addEvidence(node.id, text);
-        if (persistedId) {
-          setEvidenceDrafts((items) => items.filter((item) => item.id !== id));
-        }
-      }
-      if (createAnother) handleAddEvidence();
-    },
-    [
-      addEvidence,
-      evidenceDrafts,
-      handleAddEvidence,
-      node,
-      removeEvidence,
-      updateEvidence,
-    ],
-  );
-
-  const handleRemoveEvidence = useCallback(
-    (id: string) => {
-      const index = evidenceDrafts.findIndex((item) => item.id === id);
-      const draft = evidenceDrafts[index];
-      if (!node || !draft) return;
-      if (draft.persisted) removeEvidence(node.id, id);
-      const remaining = evidenceDrafts.filter((item) => item.id !== id);
-      setEvidenceDrafts(remaining);
-      setPendingFocus({
-        listType: "evidence",
-        itemId: remaining[index - 1]?.id ?? null,
-      });
-    },
-    [evidenceDrafts, node, removeEvidence],
-  );
-
   const handleCenter = useCallback(() => {
     if (!selectionId) {
       return;
@@ -831,6 +735,8 @@ export const Inspector = ({
               </div>
             </>
           ) : null}
+
+          <EvidenceSection target={{ kind: "control", id: barrier.id }} />
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -1148,68 +1054,7 @@ export const Inspector = ({
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">Evidence</h3>
-            <button
-              ref={evidenceAddRef}
-              type="button"
-              className={`${buttonClasses} px-2 py-1 text-xs`}
-              onClick={handleAddEvidence}
-            >
-              Add
-            </button>
-          </div>
-          {evidenceDrafts.length === 0 ? (
-            <p className="text-xs text-slate-500">No evidence yet.</p>
-          ) : null}
-          {evidenceDrafts.map((item) => (
-            <div key={item.id} className="flex items-center gap-2">
-              <span className="w-12 shrink-0 text-[11px] font-semibold text-slate-500">
-                {evidenceLabel(item.id)}
-              </span>
-              <input
-                ref={(element) => {
-                  if (element) evidenceInputRefs.current.set(item.id, element);
-                  else evidenceInputRefs.current.delete(item.id);
-                }}
-                className={inputClasses}
-                value={item.text}
-                placeholder="Add supporting evidence"
-                aria-label={`${evidenceLabel(item.id)} evidence`}
-                onChange={(event) => {
-                  const text = event.target.value;
-                  setEvidenceDrafts((items) =>
-                    items.map((candidate) =>
-                      candidate.id === item.id
-                        ? { ...candidate, text }
-                        : candidate,
-                    ),
-                  );
-                }}
-                onBlur={() => commitEvidence(item.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    commitEvidence(item.id, true);
-                  }
-                  if (event.key === "Backspace" && !event.currentTarget.value) {
-                    event.preventDefault();
-                    handleRemoveEvidence(item.id);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={() => handleRemoveEvidence(item.id)}
-                aria-label={`Remove ${evidenceLabel(item.id)} evidence`}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-        </div>
+        <EvidenceSection target={{ kind: "node", id: node.id }} />
 
         {node.data.nodeType === "Impact" || node.data.nodeType === "Event" ? (
           <div className="flex flex-col gap-3">
@@ -1521,16 +1366,12 @@ export const Inspector = ({
     handleBarrierDescriptionBlur,
     handleCenter,
     handleDescriptionBlur,
-    handleAddEvidence,
-    commitEvidence,
-    evidenceDrafts,
     handleFocusTitle,
     handleListBlur,
     handleListChange,
     handleListKeyDown,
     handleOwnerChange,
     handleRemoveListItem,
-    handleRemoveEvidence,
     handleSubmit,
     handleTimestampChange,
     handleTitleCommit,
