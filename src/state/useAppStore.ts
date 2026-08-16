@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
   ChainNode,
+  ContextItem,
+  EvidenceItem,
   MapData,
   RelationshipEdge,
 } from "../features/maps/schema";
@@ -28,6 +30,7 @@ export type ChainNodeData = {
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
   evidenceItems?: Array<{ id: string; text: string }>;
+  evidenceIds?: string[];
   contextItems?: ChainNode["contextItems"];
   severity?: ChainNode["severity"];
   factorCategory?: ChainNode["factorCategory"];
@@ -57,6 +60,8 @@ export type BarrierNodeData = {
   status: RuntimeBarrier["status"];
   failureReason?: RuntimeBarrier["failureReason"];
   failureDetails?: string;
+  controlRole?: RuntimeBarrier["controlRole"];
+  evidenceIds?: string[];
   readOnly?: boolean;
   /** Ephemeral detail visibility resolved by the canvas for this view. */
   viewShowDetails?: boolean;
@@ -79,6 +84,7 @@ type HistoryEntry = {
   edges: Edge[];
   metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
+  evidence: EvidenceItem[];
   selectionId: string | null;
 };
 
@@ -92,6 +98,7 @@ type AppState = {
   edges: Edge[];
   metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
+  evidence: EvidenceItem[];
   selectionId: string | null;
   editingId: string | null;
   showDetails: boolean;
@@ -133,6 +140,35 @@ type AppState = {
       value?: ChainNode["actionStatus"],
     ) => void;
     setNodeActionDueDate: (id: string, dueDate?: string) => void;
+    setEventPhase: (id: string, value?: ChainNode["eventPhase"]) => void;
+    setActionType: (id: string, value?: ChainNode["actionType"]) => void;
+    setControlRole: (id: string, value?: RuntimeBarrier["controlRole"]) => void;
+    addContext: (
+      target: "incident" | string,
+      label: string,
+      value: string,
+      showOnCard?: boolean,
+    ) => string | null;
+    updateContext: (
+      target: "incident" | string,
+      contextId: string,
+      patch: Partial<Omit<ContextItem, "id">>,
+    ) => boolean;
+    deleteContext: (target: "incident" | string, contextId: string) => void;
+    toggleContextShowOnCard: (
+      target: "incident" | string,
+      contextId: string,
+    ) => void;
+    createEvidence: (item: Omit<EvidenceItem, "id">) => string | null;
+    editEvidence: (
+      id: string,
+      patch: Partial<Omit<EvidenceItem, "id">>,
+    ) => boolean;
+    linkEvidenceToNode: (nodeId: string, evidenceId: string) => boolean;
+    unlinkEvidenceFromNode: (nodeId: string, evidenceId: string) => void;
+    linkEvidenceToControl: (controlId: string, evidenceId: string) => boolean;
+    unlinkEvidenceFromControl: (controlId: string, evidenceId: string) => void;
+    deleteEvidence: (evidenceId: string) => void;
     addEvidence: (nodeId: string, text: string) => string | null;
     updateEvidence: (
       nodeId: string,
@@ -161,7 +197,12 @@ type AppState = {
       patch: Partial<
         Pick<
           RuntimeBarrier,
-          "status" | "failureReason" | "failureDetails" | "description"
+          | "status"
+          | "failureReason"
+          | "failureDetails"
+          | "description"
+          | "controlRole"
+          | "evidenceIds"
         >
       >,
       options?: { debounceHistory?: boolean },
@@ -223,6 +264,7 @@ const chainNodeToReactNode = (
       const item = evidence.find((candidate) => candidate.id === id)!;
       return { id, text: item.title };
     }),
+    evidenceIds: [...node.evidenceIds],
     contextItems: node.contextItems.map((item) => ({ ...item })),
     severity: node.severity,
     factorCategory: node.factorCategory,
@@ -260,7 +302,10 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     timestamp: node.data.timestamp,
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
-    evidenceIds: (node.data.evidenceItems ?? []).map((item) => item.id),
+    evidenceIds: [
+      ...(node.data.evidenceIds ??
+        (node.data.evidenceItems ?? []).map((item) => item.id)),
+    ],
     contextItems: (node.data.contextItems ?? []).map((item) => ({ ...item })),
     severity: node.data.severity,
     factorCategory: node.data.factorCategory,
@@ -292,6 +337,8 @@ const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => {
       evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({
         ...item,
       })),
+      evidenceIds: [...(node.data.evidenceIds ?? [])],
+      contextItems: (node.data.contextItems ?? []).map((item) => ({ ...item })),
     },
   };
 };
@@ -303,13 +350,26 @@ const cloneEdge = (edge: Edge): Edge => ({
 
 const cloneBarrier = (barrier: RuntimeBarrier): RuntimeBarrier => ({
   ...barrier,
+  evidenceIds: [...barrier.evidenceIds],
 });
+
+const cloneEvidence = (item: EvidenceItem): EvidenceItem => ({ ...item });
+const cloneMetadata = (metadata: RuntimeMetadata | undefined) =>
+  metadata
+    ? {
+        ...metadata,
+        contextItems: (metadata.contextItems ?? []).map((item) => ({
+          ...item,
+        })),
+      }
+    : undefined;
 
 const snapshotFromState = (state: AppState): HistoryEntry => ({
   nodes: state.nodes.map(cloneNode),
   edges: state.edges.map(cloneEdge),
-  metadata: state.metadata ? { ...state.metadata } : undefined,
+  metadata: cloneMetadata(state.metadata),
   barriers: state.barriers.map(cloneBarrier),
+  evidence: state.evidence.map(cloneEvidence),
   selectionId: state.selectionId,
 });
 
@@ -342,8 +402,9 @@ const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
 const applyHistorySnapshot = (snapshot: HistoryEntry) => ({
   nodes: snapshot.nodes.map(cloneNode),
   edges: snapshot.edges.map(cloneEdge),
-  metadata: snapshot.metadata ? { ...snapshot.metadata } : undefined,
+  metadata: cloneMetadata(snapshot.metadata),
   barriers: snapshot.barriers.map(cloneBarrier),
+  evidence: snapshot.evidence.map(cloneEvidence),
   selectionId: snapshot.selectionId,
 });
 
@@ -458,6 +519,7 @@ export const createNewMapState = () => {
     edges: mapEdgesToReactEdges(map),
     metadata: map.metadata ? { ...map.metadata } : undefined,
     barriers: map.barriers ? [...map.barriers] : [],
+    evidence: map.evidence.map(cloneEvidence),
     selectionId: rootId,
     editingId: rootId,
     showDetails: true,
@@ -512,6 +574,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ),
         },
         barriers: map.barriers.map(cloneBarrier),
+        evidence: map.evidence.map(cloneEvidence),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
@@ -524,11 +587,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     },
     toMap: () => {
-      const { nodes, edges, metadata, barriers } = get();
+      const { nodes, edges, metadata, barriers, evidence } = get();
       return {
         schemaVersion: 3,
         metadata: metadata
-          ? { ...metadata, contextItems: metadata.contextItems ?? [] }
+          ? {
+              ...metadata,
+              contextItems: (metadata.contextItems ?? []).map((item) => ({
+                ...item,
+              })),
+            }
           : undefined,
         nodes: serializeNodes(nodes),
         edges: edges.map(
@@ -562,13 +630,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             evidenceIds: [...barrier.evidenceIds],
           };
         }),
-        evidence: nodes.flatMap((node) =>
-          (node.data.evidenceItems ?? []).map((item) => ({
-            id: item.id,
-            type: "Note" as const,
-            title: item.text,
-          })),
-        ),
+        evidence: evidence.map(cloneEvidence),
       };
     },
     addChainNode: (options) => {
@@ -590,6 +652,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const prevSnapshot = snapshotFromState(get());
       set((state) => {
         const metadata = { ...(state.metadata ?? {}), ...normalized };
+        if (normalized.contextItems)
+          metadata.contextItems = normalized.contextItems.map((item) => ({
+            ...item,
+          }));
         for (const key of Object.keys(metadata) as Array<
           keyof typeof metadata
         >) {
@@ -615,97 +681,339 @@ export const useAppStore = create<AppState>((set, get) => ({
         value === "Action"
       )
         return;
+      // Causal-type conversion preserves universal narrative, Context and Evidence
+      // fields, but drops every classification that is invalid for the destination.
       get().actions.updateNodeData(id, {
         nodeType: value,
         factorCategory: undefined,
         factorSignificance: value === "Factor" ? "Normal" : undefined,
+        eventPhase: value === "Event" ? node.data.eventPhase : undefined,
+        actionType: undefined,
+        actionStatus: undefined,
+        actionDueDate: undefined,
       });
     },
-    setFactorCategory: (id, value) =>
-      get().actions.updateNodeData(id, { factorCategory: value }),
-    setFactorSignificance: (id, value) =>
-      get().actions.updateNodeData(id, { factorSignificance: value }),
-    setNodeActionStatus: (id, value) =>
-      get().actions.updateNodeData(id, { actionStatus: value }),
-    setNodeActionDueDate: (id, dueDate) =>
-      get().actions.updateNodeData(id, {
-        actionDueDate: dueDate?.trim() || undefined,
-      }),
-    addEvidence: (nodeId, value) => {
-      const text = value.trim();
-      if (!text) return null;
-      const node = get().nodes.find((item) => item.id === nodeId);
-      if (!node) return null;
+    setFactorCategory: (id, value) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Factor"
+      )
+        get().actions.updateNodeData(id, { factorCategory: value });
+    },
+    setFactorSignificance: (id, value) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Factor"
+      )
+        get().actions.updateNodeData(id, { factorSignificance: value });
+    },
+    setNodeActionStatus: (id, value) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Action"
+      )
+        get().actions.updateNodeData(id, { actionStatus: value });
+    },
+    setNodeActionDueDate: (id, dueDate) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Action"
+      )
+        get().actions.updateNodeData(id, {
+          actionDueDate: dueDate?.trim() || undefined,
+        });
+    },
+    setEventPhase: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (node?.data.nodeType !== "Event") return;
+      get().actions.updateNodeData(id, { eventPhase: value });
+    },
+    setActionType: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (node?.data.nodeType !== "Action") return;
+      get().actions.updateNodeData(id, { actionType: value });
+    },
+    setControlRole: (id, value) => {
+      if (!get().barriers.some((item) => item.id === id)) return;
+      get().actions.updateBarrierData(id, { controlRole: value });
+    },
+    addContext: (target, rawLabel, rawValue, showOnCard) => {
+      const label = rawLabel.trim();
+      const value = rawValue.trim();
+      if (!label || !value) return null;
+      const state = get();
+      const node = state.nodes.find((item) => item.id === target);
+      if (target !== "incident" && (!node || node.data.nodeType === "Action"))
+        return null;
+      const used = new Set(
+        [
+          ...(state.metadata?.contextItems ?? []),
+          ...state.nodes.flatMap((item) => item.data.contextItems ?? []),
+        ].map((item) => item.id),
+      );
+      let id = createId("context");
+      while (used.has(id)) id = createId("context");
+      const item: ContextItem = {
+        id,
+        label,
+        value,
+        ...(showOnCard === undefined ? {} : { showOnCard }),
+      };
+      if (target === "incident")
+        get().actions.updateMetadata({
+          contextItems: [...(state.metadata?.contextItems ?? []), item],
+        });
+      else
+        get().actions.updateNodeData(target, {
+          contextItems: [...(node!.data.contextItems ?? []), item],
+        });
+      return id;
+    },
+    updateContext: (target, contextId, patch) => {
+      const items =
+        target === "incident"
+          ? (get().metadata?.contextItems ?? [])
+          : (get().nodes.find((item) => item.id === target)?.data
+              .contextItems ?? []);
+      if (!items.some((item) => item.id === contextId)) return false;
+      const next = items.map((item) =>
+        item.id === contextId
+          ? {
+              ...item,
+              ...patch,
+              label: patch.label?.trim() || item.label,
+              value: patch.value?.trim() || item.value,
+            }
+          : item,
+      );
+      if (target === "incident")
+        get().actions.updateMetadata({ contextItems: next });
+      else get().actions.updateNodeData(target, { contextItems: next });
+      return true;
+    },
+    deleteContext: (target, contextId) => {
+      const items =
+        target === "incident"
+          ? (get().metadata?.contextItems ?? [])
+          : (get().nodes.find((item) => item.id === target)?.data
+              .contextItems ?? []);
+      const next = items.filter((item) => item.id !== contextId);
+      if (next.length === items.length) return;
+      if (target === "incident")
+        get().actions.updateMetadata({ contextItems: next });
+      else get().actions.updateNodeData(target, { contextItems: next });
+    },
+    toggleContextShowOnCard: (target, contextId) => {
+      const items =
+        target === "incident"
+          ? (get().metadata?.contextItems ?? [])
+          : (get().nodes.find((item) => item.id === target)?.data
+              .contextItems ?? []);
+      const item = items.find((candidate) => candidate.id === contextId);
+      if (!item) return;
+      get().actions.updateContext(target, contextId, {
+        showOnCard: !item.showOnCard,
+      });
+    },
+    createEvidence: (input) => {
+      const title = input.title.trim();
+      if (!title) return null;
+      const state = get();
       const highWater = Math.max(
-        get().metadata?.evidenceReferenceHighWaterMark ?? 0,
-        ...get().nodes.flatMap((candidate) =>
-          (candidate.data.evidenceItems ?? []).map((item) =>
+        state.metadata?.evidenceReferenceHighWaterMark ?? 0,
+        ...state.evidence.map((item) =>
+          Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
+        ),
+      );
+      const id = `EV-${String(highWater + 1).padStart(3, "0")}`;
+      const prev = snapshotFromState(state);
+      set((current) => {
+        const history = updateHistoryState(current, prev, true);
+        return {
+          evidence: [...current.evidence, { ...input, title, id }],
+          metadata: {
+            ...(current.metadata ?? {}),
+            evidenceReferenceHighWaterMark: highWater + 1,
+          },
+          history,
+          canUndo: true,
+          canRedo: false,
+        };
+      });
+      return id;
+    },
+    editEvidence: (id, patch) => {
+      const item = get().evidence.find((candidate) => candidate.id === id);
+      if (!item) return false;
+      const normalized = {
+        ...patch,
+        ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+      };
+      if (normalized.title === "") return false;
+      const prev = snapshotFromState(get());
+      set((state) => {
+        const evidence = state.evidence.map((candidate) =>
+          candidate.id === id ? { ...candidate, ...normalized } : candidate,
+        );
+        if (JSON.stringify(evidence) === JSON.stringify(state.evidence))
+          return {};
+        const history = updateHistoryState(state, prev, true, {
+          debounce: "text",
+          debounceKey: `registry:${id}`,
+        });
+        const nodes = state.nodes.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            evidenceItems: node.data.evidenceItems?.map((linked) =>
+              linked.id === id && normalized.title
+                ? { ...linked, text: normalized.title }
+                : linked,
+            ),
+          },
+        }));
+        return { evidence, nodes, history, canUndo: true, canRedo: false };
+      });
+      return true;
+    },
+    linkEvidenceToNode: (nodeId, evidenceId) => {
+      const state = get();
+      const node = state.nodes.find((item) => item.id === nodeId);
+      if (
+        !node ||
+        !state.evidence.some((item) => item.id === evidenceId) ||
+        (node.data.evidenceIds ?? []).includes(evidenceId)
+      )
+        return false;
+      get().actions.updateNodeData(nodeId, {
+        evidenceIds: [...(node.data.evidenceIds ?? []), evidenceId],
+      });
+      return true;
+    },
+    unlinkEvidenceFromNode: (nodeId, evidenceId) => {
+      const node = get().nodes.find((item) => item.id === nodeId);
+      if (node?.data.evidenceIds?.includes(evidenceId))
+        get().actions.updateNodeData(nodeId, {
+          evidenceIds: node.data.evidenceIds.filter((id) => id !== evidenceId),
+          evidenceItems: (node.data.evidenceItems ?? []).filter(
+            (item) => item.id !== evidenceId,
+          ),
+        });
+    },
+    linkEvidenceToControl: (controlId, evidenceId) => {
+      const state = get();
+      const control = state.barriers.find((item) => item.id === controlId);
+      if (
+        !control ||
+        !state.evidence.some((item) => item.id === evidenceId) ||
+        control.evidenceIds.includes(evidenceId)
+      )
+        return false;
+      get().actions.updateBarrierData(controlId, {
+        evidenceIds: [...control.evidenceIds, evidenceId],
+      });
+      return true;
+    },
+    unlinkEvidenceFromControl: (controlId, evidenceId) => {
+      const control = get().barriers.find((item) => item.id === controlId);
+      if (control?.evidenceIds.includes(evidenceId))
+        get().actions.updateBarrierData(controlId, {
+          evidenceIds: control.evidenceIds.filter((id) => id !== evidenceId),
+        });
+    },
+    deleteEvidence: (evidenceId) => {
+      const state = get();
+      if (!state.evidence.some((item) => item.id === evidenceId)) return;
+      const prev = snapshotFromState(state);
+      set((current) => {
+        const nodes = current.nodes.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            evidenceIds: (node.data.evidenceIds ?? []).filter(
+              (id) => id !== evidenceId,
+            ),
+            evidenceItems: (node.data.evidenceItems ?? []).filter(
+              (item) => item.id !== evidenceId,
+            ),
+          },
+        }));
+        const barriers = current.barriers.map((item) => ({
+          ...item,
+          evidenceIds: item.evidenceIds.filter((id) => id !== evidenceId),
+        }));
+        const history = updateHistoryState(current, prev, true);
+        return {
+          evidence: current.evidence.filter((item) => item.id !== evidenceId),
+          nodes,
+          barriers,
+          history,
+          canUndo: true,
+          canRedo: false,
+        };
+      });
+    },
+    addEvidence: (nodeId, value) => {
+      const title = value.trim();
+      const state = get();
+      if (!title || !state.nodes.some((item) => item.id === nodeId))
+        return null;
+      const highWater = Math.max(
+        state.metadata?.evidenceReferenceHighWaterMark ?? 0,
+        ...state.evidence.map((item) =>
+          Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
+        ),
+        ...state.nodes.flatMap((node) =>
+          (node.data.evidenceItems ?? []).map((item) =>
             Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
           ),
         ),
       );
       const id = `EV-${String(highWater + 1).padStart(3, "0")}`;
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        const nodes = state.nodes.map((candidate) =>
-          candidate.id === nodeId
+      const prev = snapshotFromState(state);
+      set((current) => {
+        const nodes = current.nodes.map((node) =>
+          node.id === nodeId
             ? {
-                ...candidate,
+                ...node,
                 data: {
-                  ...candidate.data,
+                  ...node.data,
+                  evidenceIds: [...(node.data.evidenceIds ?? []), id],
                   evidenceItems: [
-                    ...(candidate.data.evidenceItems ?? []),
-                    { id, text },
+                    ...(node.data.evidenceItems ?? []),
+                    { id, text: title },
                   ],
                 },
               }
-            : candidate,
+            : node,
         );
-        const metadata = {
-          ...(state.metadata ?? {}),
-          evidenceReferenceHighWaterMark: highWater + 1,
+        const history = updateHistoryState(current, prev, true);
+        return {
+          nodes,
+          evidence: [...current.evidence, { id, type: "Note", title }],
+          metadata: {
+            ...(current.metadata ?? {}),
+            evidenceReferenceHighWaterMark: highWater + 1,
+          },
+          history,
+          canUndo: true,
+          canRedo: false,
         };
-        const history = updateHistoryState(state, prevSnapshot, true);
-        return { nodes, metadata, history, canUndo: true, canRedo: false };
       });
       return id;
     },
-    updateEvidence: (nodeId, evidenceId, value) => {
-      const node = get().nodes.find((item) => item.id === nodeId);
-      if (!node) return false;
-      const text = value.trim();
-      if (!text) {
-        get().actions.removeEvidence(nodeId, evidenceId);
-        return false;
-      }
-      const evidenceItems = (node.data.evidenceItems ?? []).map((item) =>
-        item.id === evidenceId ? { ...item, text } : item,
-      );
-      if (!evidenceItems.some((item) => item.id === evidenceId)) return false;
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        const nodes = state.nodes.map((candidate) =>
-          candidate.id === nodeId
-            ? { ...candidate, data: { ...candidate.data, evidenceItems } }
-            : candidate,
-        );
-        const history = updateHistoryState(state, prevSnapshot, true, {
-          debounce: "text",
-          debounceKey: `evidence:${nodeId}:${evidenceId}`,
-        });
-        return { nodes, history, canUndo: true, canRedo: false };
-      });
-      return true;
-    },
-    removeEvidence: (nodeId, evidenceId) => {
-      const node = get().nodes.find((item) => item.id === nodeId);
-      if (!node) return;
-      get().actions.updateNodeData(nodeId, {
-        evidenceItems: (node.data.evidenceItems ?? []).filter(
-          (item) => item.id !== evidenceId,
-        ),
-      });
-    },
+    updateEvidence: (nodeId, evidenceId, value) =>
+      get().nodes.some(
+        (node) =>
+          node.id === nodeId &&
+          (
+            node.data.evidenceIds ??
+            node.data.evidenceItems?.map((item) => item.id) ??
+            []
+          ).includes(evidenceId),
+      )
+        ? value.trim()
+          ? get().actions.editEvidence(evidenceId, { title: value })
+          : (get().actions.unlinkEvidenceFromNode(nodeId, evidenceId), false)
+        : false,
+    removeEvidence: (nodeId, evidenceId) =>
+      get().actions.unlinkEvidenceFromNode(nodeId, evidenceId),
     addChild: (parentId) => {
       const initialParentId = parentId ?? get().selectionId ?? undefined;
       const newNodeId = createId("node");
@@ -724,9 +1032,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            eventPhase: "Incident",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
+            evidenceIds: [],
+            contextItems: [],
           },
         };
         const outgoingChildCount = parentNode
@@ -858,6 +1169,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
+            evidenceIds: [],
+            contextItems: [],
           },
         };
         const edge: Edge = {
@@ -934,9 +1247,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            eventPhase: "Incident",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
+            evidenceIds: [],
+            contextItems: [],
           },
         };
         const nextNodes = [...state.nodes, newNode];
@@ -1432,12 +1748,48 @@ export const useAppStore = create<AppState>((set, get) => ({
                 : value,
             ]),
           ) as typeof patch;
+          const destinationType =
+            normalizedPatch.nodeType ?? node.data.nodeType;
+          if (
+            normalizedPatch.eventPhase !== undefined &&
+            destinationType !== "Event"
+          )
+            delete normalizedPatch.eventPhase;
+          if (destinationType !== "Action") {
+            if (normalizedPatch.actionType !== undefined)
+              delete normalizedPatch.actionType;
+            if (normalizedPatch.actionStatus !== undefined)
+              delete normalizedPatch.actionStatus;
+            if (normalizedPatch.actionDueDate !== undefined)
+              delete normalizedPatch.actionDueDate;
+          }
+          if (destinationType !== "Factor") {
+            if (normalizedPatch.factorCategory !== undefined)
+              delete normalizedPatch.factorCategory;
+            if (normalizedPatch.factorSignificance !== undefined)
+              delete normalizedPatch.factorSignificance;
+          }
           const nextData = {
             ...node.data,
             ...normalizedPatch,
             ...(normalizedPatch.evidenceItems
               ? {
                   evidenceItems: normalizedPatch.evidenceItems.map((item) => ({
+                    ...item,
+                  })),
+                }
+              : {}),
+            ...(normalizedPatch.evidenceIds
+              ? {
+                  evidenceIds: [...new Set(normalizedPatch.evidenceIds)].filter(
+                    (evidenceId) =>
+                      state.evidence.some((item) => item.id === evidenceId),
+                  ),
+                }
+              : {}),
+            ...(normalizedPatch.contextItems
+              ? {
+                  contextItems: normalizedPatch.contextItems.map((item) => ({
                     ...item,
                   })),
                 }
@@ -1568,6 +1920,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const applied = applyHistorySnapshot(previous);
         applied.metadata = {
           ...(applied.metadata ?? {}),
+          contextItems: applied.metadata?.contextItems ?? [],
           nodeReferenceHighWaterMark: Math.max(
             applied.metadata?.nodeReferenceHighWaterMark ?? 0,
             state.metadata?.nodeReferenceHighWaterMark ?? 0,
@@ -1597,6 +1950,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const applied = applyHistorySnapshot(next);
         applied.metadata = {
           ...(applied.metadata ?? {}),
+          contextItems: applied.metadata?.contextItems ?? [],
           nodeReferenceHighWaterMark: Math.max(
             applied.metadata?.nodeReferenceHighWaterMark ?? 0,
             state.metadata?.nodeReferenceHighWaterMark ?? 0,
