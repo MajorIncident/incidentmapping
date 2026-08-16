@@ -15,7 +15,7 @@ import {
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
 
-const GuideContent = (): JSX.Element => (
+export const GuideContent = (): JSX.Element => (
   <>
     <p className="map-guide__intro">
       Start with the <strong>Impact</strong> at the top. Investigators work

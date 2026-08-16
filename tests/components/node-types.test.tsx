@@ -1,4 +1,5 @@
 import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { NodeProps } from "reactflow";
 import { ReactFlowProvider } from "reactflow";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -257,6 +258,71 @@ describe("ChainNode details", () => {
   it("shows distinct important-factor tags", () => {
     renderChainNode({ nodeType: "Factor", factorSignificance: "RootCause" });
     expect(screen.getByText("Root Cause")).toBeVisible();
+  });
+
+  it("promotes a selected Normal Factor from its card and hides Normal when unselected", async () => {
+    const user = userEvent.setup();
+    const { actions } = useAppStore.getState();
+    actions.newMap();
+    const id = useAppStore.getState().nodes[0].id;
+    actions.finishEditing();
+    actions.setNodeType(id, "Factor");
+    const data = useAppStore.getState().nodes[0].data;
+    const FactorNode = nodeTypes.ChainNode;
+    const { rerender } = render(
+      <ReactFlowProvider>
+        <FactorNode
+          {...({ id, data, selected: true } as NodeProps<ChainNodeData>)}
+        />
+      </ReactFlowProvider>,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Factor significance: Set significance",
+      }),
+    );
+    await user.click(screen.getByRole("menuitemradio", { name: /Root Cause/ }));
+    expect(useAppStore.getState().nodes[0].data.factorSignificance).toBe(
+      "RootCause",
+    );
+
+    actions.undo();
+    const normalData = useAppStore.getState().nodes[0].data;
+    expect(normalData.factorSignificance).toBe("Normal");
+    rerender(
+      <ReactFlowProvider>
+        <FactorNode
+          {...({
+            id,
+            data: normalData,
+            selected: false,
+          } as NodeProps<ChainNodeData>)}
+        />
+      </ReactFlowProvider>,
+    );
+    expect(screen.queryByText("Significance")).not.toBeInTheDocument();
+  });
+
+  it("renders editable tags as buttons and read-only tags as spans", () => {
+    const { unmount } = renderChainNode({ nodeType: "Factor" }, true);
+    expect(screen.getByLabelText("Factor category: Category").tagName).toBe(
+      "BUTTON",
+    );
+    expect(screen.getByLabelText("Factor category: Category")).toHaveClass(
+      "node-tag--interactive",
+    );
+    unmount();
+    renderChainNode(
+      { nodeType: "Factor", factorSignificance: "KeyFactor", readOnly: true },
+      false,
+    );
+    expect(
+      screen.getByLabelText("Factor significance: Key Factor").tagName,
+    ).toBe("SPAN");
+    expect(
+      screen.getByLabelText("Factor significance: Key Factor"),
+    ).toHaveClass("node-tag--readonly");
   });
 
   it("shows secondary action status, owner, and a locally formatted due date", () => {

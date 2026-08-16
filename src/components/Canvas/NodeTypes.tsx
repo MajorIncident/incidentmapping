@@ -343,13 +343,15 @@ const ChainNodeComponent = ({
               />
             </div>
           ) : null}
-          {data.nodeType === "Factor" && significance !== "Normal" ? (
+          {data.nodeType === "Factor" &&
+          (significance !== "Normal" || selected) ? (
             <div className="node-metadata-row">
               <span>Significance</span>
               <NodeTagMenu
                 readOnly={data.readOnly}
                 label="Factor significance"
-                value={significance}
+                value={significance === "Normal" ? undefined : significance}
+                placeholder="Set significance"
                 options={significanceOptions}
                 onChange={(next) => setFactorSignificance(id, next)}
                 className={`node-tag--${significance.toLowerCase()}`}
