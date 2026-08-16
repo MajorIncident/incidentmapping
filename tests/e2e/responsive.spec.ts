@@ -48,14 +48,15 @@ for (const width of [375, 768, 1280]) {
     });
     await expect(legend).toBeVisible();
     await expect(legend.getByRole("heading", { name: "Nodes" })).toBeVisible();
+    await expect(legend).not.toContainText("Root Cause");
+    const toggle = legend.getByRole("button", { name: /Legend/ });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(
-      legend.getByRole("heading", { name: "Analysis" }),
+      legend.getByRole("heading", { name: "Control Role and Status" }),
     ).toBeVisible();
-    await expect(
-      legend.getByRole("heading", { name: "Controls" }),
-    ).toBeVisible();
-    await expect(legend).toContainText("Root Cause");
-    await expect(legend).toContainText("Failed");
+    await expect(legend).toContainText("Effective");
 
     const [legendBox, exitBox] = await Promise.all([
       legend.boundingBox(),
@@ -74,6 +75,31 @@ for (const width of [375, 768, 1280]) {
     ).toBe(true);
   });
 }
+
+test("expanded presentation legend is contained at mobile 200% zoom", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.body.style.zoom = "2";
+  });
+  await page.getByRole("button", { name: "Present map" }).click();
+  const legend = page.getByRole("complementary", {
+    name: "Presentation legend",
+  });
+  await legend.getByRole("button", { name: /Legend/ }).click();
+  const details = legend.locator(".presentation-legend__details");
+  const box = await details.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+  await page.getByRole("button", { name: "Chronology" }).click();
+  await expect(
+    page.getByRole("button", { name: "Close chronology" }),
+  ).toBeVisible();
+});
 
 test("mobile inspector closes and reopens when a node is tapped", async ({
   page,
