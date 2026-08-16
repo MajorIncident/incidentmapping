@@ -15,7 +15,6 @@ import {
   type ChainNodeData,
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
-import { EditableMapTitle } from "./EditableMapTitle";
 
 export type GraphPresentation = {
   roots: Set<string>;
@@ -93,7 +92,7 @@ export const Canvas = ({
     (state) => state.metadata?.title || "Untitled Map",
   );
   const viewportRequest = useAppStore((state) => state.viewportRequest);
-  const { clearViewportRequest, moveNode, select, setMapTitle } = useAppStore(
+  const { clearViewportRequest, moveNode, select } = useAppStore(
     (state) => state.actions,
   );
   const reactFlow = useReactFlow();
@@ -331,7 +330,6 @@ export const Canvas = ({
       className="relative h-full w-full"
       aria-label={`${mapTitle} incident map`}
     >
-      <EditableMapTitle title={mapTitle} onCommit={setMapTitle} />
       <aside
         className="map-guide absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
         aria-label="Incident map legend"

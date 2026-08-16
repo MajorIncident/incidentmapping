@@ -137,11 +137,14 @@ export const barrierSchema = strictObject({
   failureReason: barrierFailureReasonSchema.optional(),
   failureDetails: z.string().optional(),
 });
+const optionalMetadataText = z.string().trim().min(1).optional();
 export const metadataSchema = strictObject({
-  title: z.string().optional(),
-  incidentDate: z.string().optional(),
-  location: z.string().optional(),
-  description: z.string().optional(),
+  title: optionalMetadataText,
+  incidentId: optionalMetadataText,
+  occurredAt: optionalMetadataText,
+  location: optionalMetadataText,
+  severity: severitySchema.optional(),
+  status: incidentStatusSchema.optional(),
   nodeReferenceHighWaterMark: z.number().int().nonnegative().optional(),
 }).optional();
 export const mapDataSchema = strictObject({
@@ -160,3 +163,4 @@ export type CauseEffectEdge = z.infer<typeof causeEffectEdgeSchema>;
 export type ActionEdge = z.infer<typeof actionEdgeSchema>;
 export type Barrier = z.infer<typeof barrierSchema>;
 export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
+export type MapMetadata = NonNullable<MapData["metadata"]>;

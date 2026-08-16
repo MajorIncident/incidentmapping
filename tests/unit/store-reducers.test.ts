@@ -565,6 +565,35 @@ describe("useAppStore actions", () => {
     expect(state.metadata?.title).toBe("Untitled Map");
   });
 
+  it.each([
+    ["incidentId", "INC-204"],
+    ["occurredAt", "2026-08-16T09:30"],
+    ["location", "Plant 4"],
+    ["severity", "High"],
+    ["status", "InProgress"],
+  ] as const)("persists and restores the %s metadata field", (field, value) => {
+    const { actions } = useAppStore.getState();
+    actions.updateMetadata({ [field]: value });
+    expect(actions.toMap().metadata?.[field]).toBe(value);
+
+    actions.undo();
+    expect(useAppStore.getState().metadata?.[field]).toBeUndefined();
+    actions.redo();
+    expect(useAppStore.getState().metadata?.[field]).toBe(value);
+  });
+
+  it("normalizes a blank field without dropping other metadata", () => {
+    const { actions } = useAppStore.getState();
+    actions.updateMetadata({ incidentId: " INC-204 ", location: "Plant 4" });
+    actions.updateMetadata({ incidentId: "   " });
+
+    expect(actions.toMap().metadata).toMatchObject({
+      title: "Untitled Map",
+      location: "Plant 4",
+    });
+    expect(actions.toMap().metadata).not.toHaveProperty("incidentId");
+  });
+
   it("organizes atomically and restores positions through undo and redo", () => {
     const { actions } = useAppStore.getState();
     const parent = actions.addChild() as string;
