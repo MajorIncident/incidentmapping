@@ -110,7 +110,7 @@ describe("Inspector and keyboard workflows", () => {
       "Incident Manager",
     );
 
-    const timestampInput = screen.getByLabelText(/^Occurred at$/i);
+    const timestampInput = screen.getByLabelText(/^(Occurred at|Started)$/i);
     expect(timestampInput).toHaveAttribute("type", "datetime-local");
     await act(async () => {
       await userEvent.clear(timestampInput);
