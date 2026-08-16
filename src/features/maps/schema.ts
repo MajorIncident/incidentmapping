@@ -435,9 +435,9 @@ export type MapMetadataV2 = NonNullable<MapDataV2["metadata"]>;
 // V3 above is frozen as an import-only contract. All newly persisted maps use V4.
 export const eventDisplaySchema = z.enum(["Map", "ChronologyOnly"]);
 export const assertionStateSchema = z.enum([
-  "Unverified",
-  "Supported",
-  "Disputed",
+  "Confirmed",
+  "Working",
+  "Inferred",
 ]);
 export const contextDisplayModeSchema = z.enum(["Text", "Metric"]);
 export const attachmentMimeTypeSchema = z.enum([

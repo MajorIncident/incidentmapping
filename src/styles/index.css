@@ -506,3 +506,21 @@ select:focus-visible {
     display: none;
   }
 }
+.assertion-marker {
+  @apply inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-1 text-[10px] font-bold text-slate-600 shadow-sm;
+}
+.case-summary {
+  @apply fixed bottom-16 left-4 z-20 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-lg backdrop-blur;
+}
+.case-summary h2 {
+  @apply text-sm font-bold text-slate-900;
+}
+.case-summary ul {
+  @apply mt-2 flex flex-wrap gap-2;
+}
+.case-summary li {
+  @apply flex items-center gap-1;
+}
+.case-summary details {
+  @apply mt-2;
+}

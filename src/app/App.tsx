@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
 import { canAddBelowSelection } from "../state/selectors";
+import { CaseSummary } from "../components/Presentation/CaseSummary";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -183,6 +184,12 @@ export const App = (): JSX.Element => {
                   </aside>
                 ) : null}
                 <Legend />
+                <CaseSummary
+                  factors={useAppStore
+                    .getState()
+                    .nodes.map((node) => node.data)}
+                  controls={useAppStore.getState().barriers}
+                />
                 {chronologyOpen ? (
                   <Chronology
                     nodes={useAppStore.getState().nodes}

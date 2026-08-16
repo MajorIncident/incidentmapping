@@ -11,6 +11,7 @@ import {
 } from "../../state/selectors";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
+import { AssertionMarker } from "../AssertionState/AssertionState";
 
 const causalNodeTypeOptions = ["Event", "Factor", "Impact"].map((value) => ({
   value: value as NonNullable<ChainNodeData["nodeType"]>,
@@ -283,6 +284,9 @@ const ChainNodeComponent = ({
       data-unrelated={graphRole?.isUnrelated || undefined}
       data-node-type={data.nodeType ?? "Event"}
       data-significance={data.nodeType === "Factor" ? significance : undefined}
+      data-assertion-state={
+        data.nodeType === "Factor" ? data.assertionState : undefined
+      }
     >
       <>
         <Handle
@@ -323,6 +327,9 @@ const ChainNodeComponent = ({
         >
           {data.referenceId ?? "Unassigned"}
         </span>
+        {data.nodeType === "Factor" ? (
+          <AssertionMarker state={data.assertionState} />
+        ) : null}
       </header>
       {!isEditing &&
       (data.nodeType === "Event" || data.nodeType === "Action") &&
@@ -698,6 +705,7 @@ const BarrierNodeComponent = ({
       data-testid="control-node"
       data-read-only={data.readOnly || undefined}
       aria-label={`${reference} Control, ${role}, ${data.status}`}
+      data-assertion-state={data.assertionState}
     >
       <>
         <Handle
@@ -729,6 +737,7 @@ const BarrierNodeComponent = ({
         >
           {data.status}
         </span>
+        <AssertionMarker state={data.assertionState} />
       </header>
       <p className="mt-2 text-xs font-semibold text-slate-700">
         {role} <span aria-hidden="true">·</span> {data.status}
