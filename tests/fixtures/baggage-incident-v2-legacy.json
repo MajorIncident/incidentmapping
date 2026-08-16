@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "title": "Delayed baggage delivery at North Terminal",
+    "incidentId": "BAG-2026-0142",
+    "occurredAt": "2026-06-14T18:31",
+    "location": "North Terminal — Belt 4",
+    "severity": "High",
+    "status": "Open",
+    "nodeReferenceHighWaterMark": 5,
+    "evidenceReferenceHighWaterMark": 4
+  },
+  "nodes": [
+    {
+      "id": "impact",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Impact",
+      "title": "Passengers separated from baggage",
+      "description": "Forty-two passengers waited beyond the service target.",
+      "owner": "Station manager",
+      "timestamp": "2026-06-14T18:42:00Z",
+      "severity": "High",
+      "positiveConsequenceBulletPoints": ["All bags were traced"],
+      "negativeConsequenceBulletPoints": ["Connections put at risk"],
+      "evidenceItems": [
+        {
+          "id": "local-1",
+          "text": "Passenger service log records 42 delayed bags"
+        }
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "incidentStatus": "Closed",
+      "evidenceHighWaterMark": 99
+    },
+    {
+      "id": "event",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Event",
+      "title": "Arrival belt stopped during unloading",
+      "description": "Belt 4 stopped at 18:31.",
+      "owner": "Ramp operations",
+      "timestamp": "2026-06-14T18:31:00Z",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": ["Bags accumulated at induction"],
+      "evidenceItems": [
+        {
+          "id": "local-1",
+          "text": "Belt controller log: photo-eye fault at 18:31"
+        }
+      ],
+      "position": {
+        "x": 0,
+        "y": 240
+      }
+    },
+    {
+      "id": "factor-human",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Fault alarm was not escalated",
+      "factorCategory": "Human",
+      "factorSignificance": "KeyFactor",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -240,
+        "y": 480
+      }
+    },
+    {
+      "id": "factor-root",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Factor",
+      "title": "Inspection omitted photo-eye test",
+      "description": "The opening checklist did not require a functional sensor test.",
+      "factorCategory": "Process",
+      "factorSignificance": "RootCause",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [
+        {
+          "id": "EV-003",
+          "text": "Approved checklist revision 7 has no photo-eye step"
+        },
+        {
+          "id": "EV-004",
+          "text": "Technician interview confirms visual-only check"
+        }
+      ],
+      "position": {
+        "x": 240,
+        "y": 480
+      }
+    },
+    {
+      "id": "action",
+      "kind": "ChainNode",
+      "referenceId": "N-005",
+      "nodeType": "Action",
+      "title": "Add functional photo-eye check",
+      "owner": "Maintenance lead",
+      "actionStatus": "Planned",
+      "actionDueDate": "2026-07-01",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": 520,
+        "y": 480
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-impact-event",
+      "kind": "CauseEffectEdge",
+      "fromId": "impact",
+      "toId": "event"
+    },
+    {
+      "id": "cause-event-human",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-human"
+    },
+    {
+      "id": "cause-event-root",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-root"
+    },
+    {
+      "id": "action-root",
+      "kind": "ActionEdge",
+      "fromId": "factor-root",
+      "toId": "action",
+      "status": "Completed",
+      "dueDate": "2099-01-01"
+    }
+  ],
+  "barriers": [
+    {
+      "id": "control-inspection",
+      "kind": "Barrier",
+      "upstreamNodeId": "event",
+      "downstreamNodeId": "factor-root",
+      "description": "Pre-opening belt inspection",
+      "status": "Failed",
+      "failureReason": "InadequateDesign",
+      "failureDetails": "Checklist covered visible damage but not functional sensor response."
+    }
+  ]
+}

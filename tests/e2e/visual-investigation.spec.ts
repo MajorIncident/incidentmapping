@@ -98,7 +98,14 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await page.getByLabel("Type").selectOption("Factor");
   await expect(page.getByLabel("Category")).toHaveValue("");
   await page.getByLabel("Category").selectOption("Process");
-  await page.getByLabel("Significance").selectOption("RootCause");
+
+  // Significance can be changed directly on a selected Factor card rather
+  // than requiring a round trip through the Inspector.
+  await page
+    .getByRole("button", { name: "Factor significance: Set significance" })
+    .click();
+  await page.getByRole("menuitemradio", { name: /Root Cause/ }).click();
+  await expect(page.getByLabel("Significance")).toHaveValue("RootCause");
 
   // Evidence IDs are allocated globally rather than within one node.
   const evidenceSection = page
@@ -114,6 +121,22 @@ test("builds a complete visual investigation and preserves it exactly", async ({
     .last()
     .fill("Technician interview confirms visual-only check");
   await page.getByPlaceholder("Add supporting evidence").last().press("Tab");
+
+  // Removing evidence leaves a deliberate gap; neither save/reopen nor later
+  // allocation may silently compact identifiers.
+  await page.getByRole("button", { name: "Remove EV-001 evidence" }).click();
+  await expect(page.getByLabel("EV-002 evidence")).toHaveValue(
+    "Technician interview confirms visual-only check",
+  );
+
+  // Add a second branch so selecting the Control below proves the precise
+  // controlled branch is highlighted rather than every sibling cause.
+  await page.getByText("Arrival belt stopped during unloading").click();
+  await page.getByRole("button", { name: "Add Below" }).click();
+  await title(page).fill("Fault alarm was not escalated");
+  await title(page).press("Enter");
+  await page.getByLabel("Type").selectOption("Factor");
+  await page.getByText("Inspection omitted photo-eye test").click();
 
   // Put the failed Control on the causal connection and record why it failed.
   await page.getByText("Arrival belt stopped during unloading").click();
@@ -155,6 +178,16 @@ test("builds a complete visual investigation and preserves it exactly", async ({
 
   // Presentation supports deliberate selection of each semantic entity.
   await page.getByRole("button", { name: "Present map" }).click();
+  await expect(
+    page.getByRole("button", { name: "Show Details" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    page.getByText("Technician interview confirms visual-only check"),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Show Details" }).click();
+  await expect(
+    page.getByText("Technician interview confirms visual-only check"),
+  ).toBeVisible();
   for (const entity of [
     rootCauseCard,
     actionCard,
@@ -163,11 +196,23 @@ test("builds a complete visual investigation and preserves it exactly", async ({
     await entity.click();
     await expect(entity).toHaveClass(/selected/);
   }
+  await page.getByTestId("control-node").click();
+  await expect(
+    page
+      .locator('[data-testid="chain-node"]')
+      .filter({ hasText: "Fault alarm was not escalated" }),
+  ).toHaveClass(/unrelated/);
   await page.keyboard.press("Escape");
 
   await expect(page.getByText("Unsaved", { exact: true })).toBeVisible();
   const initiallySaved = await saveMap(page, firstSave);
   assertPersistedIntegrity(initiallySaved);
+  expect(
+    initiallySaved.nodes.flatMap((node) =>
+      node.evidenceItems.map((item) => item.id),
+    ),
+  ).toEqual(["EV-002"]);
+  expect(initiallySaved.metadata?.evidenceReferenceHighWaterMark).toBe(2);
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   // Reset to a clean canvas before proving the downloaded investigation stands
@@ -189,7 +234,24 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   ).toBeVisible();
   await expect(page.getByText("Add functional photo-eye check")).toBeVisible();
   await expect(page.getByText("Pre-opening belt inspection")).toBeVisible();
+  await page.getByText("Inspection omitted photo-eye test").click();
+  await expect(page.getByLabel("EV-002 evidence")).toHaveValue(
+    "Technician interview confirms visual-only check",
+  );
+  await evidenceSection.getByRole("button", { name: "Add" }).click();
+  await page
+    .getByLabel("EV-003 evidence")
+    .fill("Reopen review confirms the allocation high-water mark");
+  await page.getByLabel("EV-003 evidence").press("Tab");
   const savedAgain = await saveMap(page, reloadedSave);
   assertPersistedIntegrity(savedAgain);
-  expect(savedAgain).toEqual(initiallySaved);
+  expect(
+    savedAgain.nodes.flatMap((node) =>
+      node.evidenceItems.map((item) => item.id),
+    ),
+  ).toEqual(["EV-002", "EV-003"]);
+  expect(savedAgain.metadata?.evidenceReferenceHighWaterMark).toBe(3);
+  expect(savedAgain.nodes.map((node) => node.id)).toEqual(
+    initiallySaved.nodes.map((node) => node.id),
+  );
 });

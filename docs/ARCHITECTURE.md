@@ -90,4 +90,19 @@ survives actual save and reopen.
 
 ## Trusted graph boundary
 
-The migration boundary uses separate V1, legacy-V2 compatibility, and canonical V2 schemas. Canonical V2 is validated and returned unchanged. Only input that fails canonical validation but passes legacy V2 compatibility is normalized: evidence is deterministically renumbered in node/evidence array order, retired node `incidentStatus` is discarded in favor of authoritative `metadata.status`, and ActionEdge accountability fields are applied to the target node only when the node has no explicit value. Canonical graph validation then enforces identifier uniqueness, endpoint existence, causal/control pair consistency, Action isolation and single-parent ownership, and relationship-pair uniqueness. The persisted `Barrier` discriminator remains unchanged even though the UI presents barriers as Controls.
+The migration boundary uses separate V1, legacy-V2 compatibility, and canonical
+V2 schemas. V2 parsing is canonical-first: canonical input is validated and
+returned without identity rewriting. Only input that fails canonical validation
+but passes legacy-V2 compatibility is normalized. That legacy-only step
+deterministically renumbers evidence in node/evidence array order and records the
+resulting high-water mark. It also discards retired node `incidentStatus` because
+`metadata.status` is the chosen incident-wide authority. Retired ActionEdge
+accountability is copied to its target Action only where the Action has no
+explicit value, giving node-owned status and due date precedence. At runtime,
+new evidence is allocated above both the stored evidence high-water mark and the
+highest well-formed evidence reference; deletion, save, and reopen never compact
+or reuse gaps. Canonical graph validation then enforces identifier uniqueness,
+endpoint existence, causal/control pair consistency, Action isolation and
+single-parent ownership, and relationship-pair uniqueness. The persisted
+`Barrier` discriminator remains unchanged even though the UI presents barriers
+as Controls.
