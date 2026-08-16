@@ -40,15 +40,6 @@ export const Toolbar = ({
         <button
           type="button"
           className={buttonBase}
-          onClick={onOrganize}
-          disabled={!canOrganize}
-          aria-label="Organize all nodes"
-        >
-          Organize
-        </button>
-        <button
-          type="button"
-          className={buttonBase}
           onClick={onNew}
           aria-label="Create a new map"
         >
@@ -80,49 +71,77 @@ export const Toolbar = ({
         </button>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className={buttonBase}
-          onClick={onUndo}
-          disabled={!canUndo}
-          aria-label="Undo the last action"
+        <div
+          className="flex items-center gap-2"
+          role="group"
+          aria-label="History actions"
         >
-          Undo
-        </button>
-        <button
-          type="button"
-          className={buttonBase}
-          onClick={onRedo}
-          disabled={!canRedo}
-          aria-label="Redo the previously undone action"
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label="Undo the last action"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label="Redo the previously undone action"
+          >
+            Redo
+          </button>
+        </div>
+        <div
+          className="flex items-center gap-2 border-l border-slate-200 pl-2"
+          role="group"
+          aria-label="Graph actions"
         >
-          Redo
-        </button>
-        <button
-          type="button"
-          className={buttonBase}
-          onClick={onAddChainNode}
-          aria-label="Add a new chain node"
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onAddChainNode}
+            aria-label="Add a new chain node"
+          >
+            Add ChainNode
+          </button>
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onOrganize}
+            disabled={!canOrganize}
+            aria-label="Organize all nodes"
+            title="Arrange all nodes into a hierarchy"
+          >
+            Organize
+          </button>
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onToggleDetails}
+            aria-label="Toggle node detail visibility"
+          >
+            {showDetails ? "Hide Details" : "Show Details"}
+          </button>
+        </div>
+        <div
+          className="flex items-center border-l border-slate-200 pl-2"
+          role="group"
+          aria-label="Destructive actions"
         >
-          Add ChainNode
-        </button>
-        <button
-          type="button"
-          className={buttonBase}
-          onClick={onToggleDetails}
-          aria-label="Toggle node detail visibility"
-        >
-          {showDetails ? "Hide Details" : "Show Details"}
-        </button>
-        <button
-          type="button"
-          className={buttonBase}
-          onClick={onDeleteSelection}
-          disabled={!canDelete}
-          aria-label="Delete the selected node"
-        >
-          Delete
-        </button>
+          <button
+            type="button"
+            className={buttonBase}
+            onClick={onDeleteSelection}
+            disabled={!canDelete}
+            aria-label="Delete the selected node"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </header>
   );

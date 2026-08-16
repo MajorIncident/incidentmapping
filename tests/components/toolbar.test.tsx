@@ -41,6 +41,30 @@ describe("Toolbar map title", () => {
   const titleControl = () =>
     screen.getByRole("button", { name: /untitled map.*edit map title/i });
 
+  it("orders file actions first and keeps Organize with graph actions", () => {
+    render(<App />);
+
+    const toolbar = screen.getByRole("banner");
+    const buttons = Array.from(toolbar.querySelectorAll("button"));
+    expect(buttons[0]).toHaveAccessibleName("Create a new map");
+    expect(buttons.slice(0, 4).map((button) => button.textContent)).toEqual([
+      "New",
+      "Open…",
+      "Save",
+      "Export PNG",
+    ]);
+
+    const graphActions = screen.getByRole("group", { name: /graph actions/i });
+    expect(graphActions).toContainElement(
+      screen.getByRole("button", { name: /organize all nodes/i }),
+    );
+    expect(
+      Array.from(graphActions.querySelectorAll("button")).map(
+        (button) => button.textContent,
+      ),
+    ).toEqual(["Add ChainNode", "Organize", "Hide Details"]);
+  });
+
   it("edits the canvas title with a double-click and commits on Enter", async () => {
     const user = userEvent.setup();
     render(<App />);
