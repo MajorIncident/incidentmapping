@@ -131,6 +131,9 @@ export const Inspector = ({
   const setNodeActionDueDate = useAppStore(
     (state) => state.actions.setNodeActionDueDate,
   );
+  const setNodeActionCompletedAt = useAppStore(
+    (state) => state.actions.setNodeActionCompletedAt,
+  );
   const addBarrier = useAppStore((state) => state.actions.addBarrier);
   const addAction = useAppStore((state) => state.actions.addAction);
   const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
@@ -1395,20 +1398,73 @@ export const Inspector = ({
         </div>
 
         {node.data.nodeType === "Action" ? (
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspector-action-due-date" className={labelClasses}>
-              Due date
-            </label>
-            <input
-              id="inspector-action-due-date"
-              type="date"
-              className={inputClasses}
-              value={node.data.actionDueDate ?? ""}
-              onChange={(event) =>
-                setNodeActionDueDate(node.id, event.target.value)
-              }
-            />
-          </div>
+          <fieldset className="flex min-w-0 flex-col gap-2">
+            <legend className="sr-only">Action lifecycle dates</legend>
+            {node.data.actionStatus === "Completed" ? (
+              <>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label
+                    htmlFor="inspector-action-completed-at"
+                    className={labelClasses}
+                  >
+                    Completed at
+                  </label>
+                  <input
+                    id="inspector-action-completed-at"
+                    type="date"
+                    className={inputClasses}
+                    value={node.data.actionCompletedAt ?? ""}
+                    onChange={(event) =>
+                      setNodeActionCompletedAt(node.id, event.target.value)
+                    }
+                  />
+                </div>
+                <details className="min-w-0 text-sm text-slate-600">
+                  <summary className="cursor-pointer font-medium">
+                    Due date
+                    {node.data.actionDueDate
+                      ? `: ${node.data.actionDueDate}`
+                      : ""}
+                  </summary>
+                  <div className="mt-2 flex min-w-0 flex-col gap-1">
+                    <label
+                      htmlFor="inspector-action-due-date"
+                      className={labelClasses}
+                    >
+                      Due date
+                    </label>
+                    <input
+                      id="inspector-action-due-date"
+                      type="date"
+                      className={inputClasses}
+                      value={node.data.actionDueDate ?? ""}
+                      onChange={(event) =>
+                        setNodeActionDueDate(node.id, event.target.value)
+                      }
+                    />
+                  </div>
+                </details>
+              </>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-1">
+                <label
+                  htmlFor="inspector-action-due-date"
+                  className={labelClasses}
+                >
+                  Due date
+                </label>
+                <input
+                  id="inspector-action-due-date"
+                  type="date"
+                  className={inputClasses}
+                  value={node.data.actionDueDate ?? ""}
+                  onChange={(event) =>
+                    setNodeActionDueDate(node.id, event.target.value)
+                  }
+                />
+              </div>
+            )}
+          </fieldset>
         ) : null}
 
         {node.data.nodeType === "Event" ? (
@@ -1628,6 +1684,7 @@ export const Inspector = ({
     setFactorSignificance,
     setNodeActionStatus,
     setNodeActionDueDate,
+    setNodeActionCompletedAt,
     setNodeType,
     setEventPhase,
     setEventDisplay,

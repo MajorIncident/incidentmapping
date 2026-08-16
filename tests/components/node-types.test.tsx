@@ -70,6 +70,49 @@ describe("ChainNode details", () => {
     });
   });
 
+  it("labels independent Action lifecycle dates without exposing a retained due date", () => {
+    const { rerender } = renderChainNode({
+      nodeType: "Action",
+      actionStatus: "Completed",
+      actionDueDate: "2026-08-20",
+      actionCompletedAt: "2026-08-16",
+    });
+
+    expect(screen.getByLabelText(/Completed at/)).toHaveTextContent(
+      /^Completed /,
+    );
+    expect(screen.queryByLabelText(/Due date/)).not.toBeInTheDocument();
+
+    const ChainNode = nodeTypes.ChainNode;
+    rerender(
+      <ReactFlowProvider>
+        <ChainNode
+          {...({
+            id: "node-1",
+            data: {
+              ...defaultData,
+              nodeType: "Action",
+              actionStatus: "Completed",
+            },
+            selected: false,
+          } as NodeProps<ChainNodeData>)}
+        />
+      </ReactFlowProvider>,
+    );
+    expect(screen.getAllByText("Completed")).toHaveLength(2);
+  });
+
+  it("shows the explicitly labelled due date only while an Action is incomplete", () => {
+    renderChainNode({
+      nodeType: "Action",
+      actionStatus: "Planned",
+      actionDueDate: "2026-08-20",
+      actionCompletedAt: "2026-08-16",
+    });
+    expect(screen.getByLabelText(/Due date/)).toHaveTextContent(/^Due /);
+    expect(screen.queryByLabelText(/Completed at/)).not.toBeInTheDocument();
+  });
+
   it("does not render the details wrapper when all details are empty", () => {
     renderChainNode({
       description: "   ",
