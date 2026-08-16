@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
+  ActionEdge,
   Barrier,
   ChainNode,
   MapData,
@@ -28,6 +29,7 @@ export type ChainNodeData = {
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
   evidenceItems?: ChainNode["evidenceItems"];
+  evidenceHighWaterMark?: ChainNode["evidenceHighWaterMark"];
   severity?: ChainNode["severity"];
   incidentStatus?: ChainNode["incidentStatus"];
   factorCategory?: ChainNode["factorCategory"];
@@ -102,6 +104,31 @@ type AppState = {
       downstreamNodeId: string,
     ) => string | null;
     setMapTitle: (title: string) => void;
+    updateIncidentMetadata: (
+      patch: Partial<NonNullable<MapData["metadata"]>>,
+    ) => void;
+    setNodeType: (id: string, value: ChainNode["nodeType"]) => void;
+    setFactorCategory: (
+      id: string,
+      value?: ChainNode["factorCategory"],
+    ) => void;
+    setFactorSignificance: (
+      id: string,
+      value?: ChainNode["factorSignificance"],
+    ) => void;
+    addEvidence: (
+      nodeId: string,
+      description: string,
+      source?: string,
+    ) => string | null;
+    updateEvidence: (
+      nodeId: string,
+      evidenceId: string,
+      patch: { description?: string; source?: string },
+    ) => boolean;
+    removeEvidence: (nodeId: string, evidenceId: string) => void;
+    setActionStatus: (edgeId: string, status?: ActionEdge["status"]) => void;
+    setActionDueDate: (edgeId: string, dueDate?: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
     nudgeNodeBy: (id: string, dx: number, dy: number) => void;
@@ -184,6 +211,7 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
     evidenceItems: node.evidenceItems.map((item) => ({ ...item })),
+    evidenceHighWaterMark: node.evidenceHighWaterMark,
     severity: node.severity,
     incidentStatus: node.incidentStatus,
     factorCategory: node.factorCategory,
@@ -205,8 +233,10 @@ const mapEdgesToReactEdges = (map: MapData): Edge[] =>
     data: {
       kind: edge.kind,
       ...(edge.kind === "ActionEdge" && edge.status
-        ? { status: edge.status }
-        : {}),
+        ? { status: edge.status, dueDate: edge.dueDate }
+        : edge.kind === "ActionEdge" && edge.dueDate
+          ? { dueDate: edge.dueDate }
+          : {}),
     },
   }));
 
@@ -223,6 +253,7 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
+    evidenceHighWaterMark: node.data.evidenceHighWaterMark,
     severity: node.data.severity,
     incidentStatus: node.data.incidentStatus,
     factorCategory: node.data.factorCategory,
@@ -230,20 +261,25 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     position: snapPosition(node.position),
   }));
 
-const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => ({
-  ...node,
-  position: { ...node.position },
-  data: {
-    ...node.data,
-    positiveConsequenceBulletPoints: [
-      ...node.data.positiveConsequenceBulletPoints,
-    ],
-    negativeConsequenceBulletPoints: [
-      ...node.data.negativeConsequenceBulletPoints,
-    ],
-    evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
-  },
-});
+const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => {
+  const { presentation: _presentation, ...persistedData } = node.data;
+  return {
+    ...node,
+    position: { ...node.position },
+    data: {
+      ...persistedData,
+      positiveConsequenceBulletPoints: [
+        ...node.data.positiveConsequenceBulletPoints,
+      ],
+      negativeConsequenceBulletPoints: [
+        ...node.data.negativeConsequenceBulletPoints,
+      ],
+      evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({
+        ...item,
+      })),
+    },
+  };
+};
 
 const cloneEdge = (edge: Edge): Edge => ({
   ...edge,
@@ -363,13 +399,15 @@ export const createRootNode = (): ChainNode => ({
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
   evidenceItems: [],
+  evidenceHighWaterMark: 0,
+  factorSignificance: "Normal",
   position: snapPosition({ x: 0, y: 0 }),
 });
 
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
   schemaVersion: 2,
-  metadata: { title: "Untitled Map" },
+  metadata: { title: "Untitled Map", nodeReferenceHighWaterMark: 1 },
   nodes: [createRootNode()],
   edges: [],
   barriers: [],
@@ -421,7 +459,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           state.showDetails,
         ).nodes,
         edges: mapEdgesToReactEdges(map),
-        metadata: map.metadata ? { ...map.metadata } : undefined,
+        metadata: {
+          ...(map.metadata ?? {}),
+          nodeReferenceHighWaterMark: Math.max(
+            map.metadata?.nodeReferenceHighWaterMark ?? 0,
+            ...map.nodes.map((node) =>
+              Number(node.referenceId.match(/N-(\d+)/)?.[1] ?? 0),
+            ),
+          ),
+        },
         barriers: map.barriers.map((barrier) => ({
           ...barrier,
           breached: barrier.status === "Failed",
@@ -453,6 +499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                   fromId: edge.source,
                   toId: edge.target,
                   status: edge.data.status,
+                  dueDate: edge.data.dueDate,
                 }
               : {
                   id: edge.id,
@@ -516,6 +563,125 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
       });
     },
+    updateIncidentMetadata: (patch) => {
+      const normalized = Object.fromEntries(
+        Object.entries(patch).map(([key, value]) => [
+          key,
+          typeof value === "string"
+            ? value.trim()
+              ? value
+              : undefined
+            : value,
+        ]),
+      ) as Partial<NonNullable<MapData["metadata"]>>;
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        const metadata = { ...(state.metadata ?? {}), ...normalized };
+        for (const key of Object.keys(metadata) as Array<
+          keyof typeof metadata
+        >) {
+          if (metadata[key] === undefined) delete metadata[key];
+        }
+        if (JSON.stringify(metadata) === JSON.stringify(state.metadata ?? {}))
+          return {};
+        const history = updateHistoryState(state, prevSnapshot, true);
+        return { metadata, history, canUndo: true, canRedo: false };
+      });
+    },
+    setNodeType: (id, value) =>
+      get().actions.updateNodeData(id, { nodeType: value }),
+    setFactorCategory: (id, value) =>
+      get().actions.updateNodeData(id, { factorCategory: value }),
+    setFactorSignificance: (id, value) =>
+      get().actions.updateNodeData(id, { factorSignificance: value }),
+    addEvidence: (nodeId, description, source) => {
+      const text = description.trim();
+      if (!text) return null;
+      const node = get().nodes.find((item) => item.id === nodeId);
+      if (!node) return null;
+      const current = node.data.evidenceItems ?? [];
+      const highWater = Math.max(
+        node.data.evidenceHighWaterMark ?? 0,
+        ...current.map((item) => Number(item.id.match(/E-(\d+)/)?.[1] ?? 0)),
+      );
+      const id = `E-${String(highWater + 1).padStart(3, "0")}`;
+      get().actions.updateNodeData(nodeId, {
+        evidenceItems: [
+          ...current,
+          { id, description: text, source: source?.trim() || undefined },
+        ],
+        evidenceHighWaterMark: highWater + 1,
+      });
+      return id;
+    },
+    updateEvidence: (nodeId, evidenceId, patch) => {
+      const node = get().nodes.find((item) => item.id === nodeId);
+      if (!node) return false;
+      const description = patch.description?.trim();
+      if (patch.description !== undefined && !description) return false;
+      const evidenceItems = (node.data.evidenceItems ?? []).map((item) =>
+        item.id === evidenceId
+          ? {
+              ...item,
+              ...(patch.description === undefined ? {} : { description }),
+              ...(patch.source === undefined
+                ? {}
+                : { source: patch.source.trim() || undefined }),
+            }
+          : item,
+      );
+      if (!evidenceItems.some((item) => item.id === evidenceId)) return false;
+      get().actions.updateNodeData(nodeId, { evidenceItems });
+      return true;
+    },
+    removeEvidence: (nodeId, evidenceId) => {
+      const node = get().nodes.find((item) => item.id === nodeId);
+      if (!node) return;
+      get().actions.updateNodeData(nodeId, {
+        evidenceItems: (node.data.evidenceItems ?? []).filter(
+          (item) => item.id !== evidenceId,
+        ),
+      });
+    },
+    setActionStatus: (edgeId, status) => {
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        let changed = false;
+        const edges = state.edges.map((edge) => {
+          if (
+            edge.id !== edgeId ||
+            edge.data?.kind !== "ActionEdge" ||
+            edge.data.status === status
+          )
+            return edge;
+          changed = true;
+          return { ...edge, data: { ...edge.data, status } };
+        });
+        if (!changed) return {};
+        const history = updateHistoryState(state, prevSnapshot, true);
+        return { edges, history, canUndo: true, canRedo: false };
+      });
+    },
+    setActionDueDate: (edgeId, dueDate) => {
+      const value = dueDate?.trim() || undefined;
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        let changed = false;
+        const edges = state.edges.map((edge) => {
+          if (
+            edge.id !== edgeId ||
+            edge.data?.kind !== "ActionEdge" ||
+            edge.data.dueDate === value
+          )
+            return edge;
+          changed = true;
+          return { ...edge, data: { ...edge.data, dueDate: value } };
+        });
+        if (!changed) return {};
+        const history = updateHistoryState(state, prevSnapshot, true);
+        return { edges, history, canUndo: true, canRedo: false };
+      });
+    },
     addChild: (parentId) => {
       const initialParentId = parentId ?? get().selectionId ?? undefined;
       const newNodeId = createId("node");
@@ -531,11 +697,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           position: { x: 0, y: 0 },
           data: {
             title: "New Event",
-            referenceId: `N-${String(state.nodes.length + 1).padStart(3, "0")}`,
+            referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            factorSignificance: "Normal",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
+            evidenceHighWaterMark: 0,
           },
         };
         const outgoingChildCount = parentNode
@@ -579,6 +747,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...state,
           nodes: laidOutNodes,
           edges: nextEdges,
+          metadata: {
+            ...(state.metadata ?? {}),
+            nodeReferenceHighWaterMark:
+              (state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1,
+          },
           selectionId: newNodeId,
           editingId: newNodeId,
           layoutVersion: layoutChanged
@@ -594,6 +767,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           nodes: laidOutNodes,
           edges: nextEdges,
+          metadata: candidate.metadata,
           selectionId: newNodeId,
           editingId: newNodeId,
           layoutVersion: candidate.layoutVersion,
@@ -655,11 +829,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           position,
           data: {
             title: "New Event",
-            referenceId: `N-${String(state.nodes.length + 1).padStart(3, "0")}`,
+            referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            factorSignificance: "Normal",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
+            evidenceHighWaterMark: 0,
           },
         };
         const nextNodes = [...state.nodes, newNode];
@@ -687,6 +863,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...state,
           nodes: laidOutNodes,
           edges: nextEdges,
+          metadata: {
+            ...(state.metadata ?? {}),
+            nodeReferenceHighWaterMark:
+              (state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1,
+          },
           selectionId: newNodeId,
           editingId: newNodeId,
           layoutVersion: layoutChanged
@@ -702,6 +883,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           nodes: laidOutNodes,
           edges: nextEdges,
+          metadata: candidate.metadata,
           selectionId: newNodeId,
           editingId: newNodeId,
           layoutVersion: candidate.layoutVersion,
@@ -1119,7 +1301,27 @@ export const useAppStore = create<AppState>((set, get) => ({
           if (node.id !== id) {
             return node;
           }
-          const nextData = { ...node.data, ...patch };
+          const normalizedPatch = Object.fromEntries(
+            Object.entries(patch).map(([key, value]) => [
+              key,
+              typeof value === "string"
+                ? value.trim()
+                  ? value
+                  : undefined
+                : value,
+            ]),
+          ) as typeof patch;
+          const nextData = {
+            ...node.data,
+            ...normalizedPatch,
+            ...(normalizedPatch.evidenceItems
+              ? {
+                  evidenceItems: normalizedPatch.evidenceItems.map((item) => ({
+                    ...item,
+                  })),
+                }
+              : {}),
+          };
           if (JSON.stringify(nextData) === JSON.stringify(node.data)) {
             return node;
           }
@@ -1168,9 +1370,19 @@ export const useAppStore = create<AppState>((set, get) => ({
             return barrier;
           }
           const hasBreachedItems = patch.breachedItems !== undefined;
+          const normalizedPatch = Object.fromEntries(
+            Object.entries(patch).map(([key, value]) => [
+              key,
+              typeof value === "string"
+                ? value.trim()
+                  ? value
+                  : undefined
+                : value,
+            ]),
+          ) as typeof patch;
           const nextBarrier = {
             ...barrier,
-            ...patch,
+            ...normalizedPatch,
             breachedItems: hasBreachedItems
               ? [...(patch.breachedItems ?? [])]
               : barrier.breachedItems,
@@ -1234,6 +1446,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         resetMoveDebounce();
         const applied = applyHistorySnapshot(previous);
+        applied.metadata = {
+          ...(applied.metadata ?? {}),
+          nodeReferenceHighWaterMark: Math.max(
+            applied.metadata?.nodeReferenceHighWaterMark ?? 0,
+            state.metadata?.nodeReferenceHighWaterMark ?? 0,
+          ),
+        };
         return {
           ...applied,
           editingId: null,
@@ -1256,6 +1475,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         resetMoveDebounce();
         const applied = applyHistorySnapshot(next);
+        applied.metadata = {
+          ...(applied.metadata ?? {}),
+          nodeReferenceHighWaterMark: Math.max(
+            applied.metadata?.nodeReferenceHighWaterMark ?? 0,
+            state.metadata?.nodeReferenceHighWaterMark ?? 0,
+          ),
+        };
         return {
           ...applied,
           editingId: null,

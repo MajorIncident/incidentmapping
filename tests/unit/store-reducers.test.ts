@@ -145,6 +145,49 @@ describe("useAppStore actions", () => {
     expect(state.nodes[0]?.data.title).toBe("Primary Event");
   });
 
+  it("allocates stable node references without reusing deleted references", () => {
+    const { actions } = useAppStore.getState();
+    const first = actions.addChild() as string;
+    const second = actions.addChild(first) as string;
+    const third = actions.addChild(second) as string;
+    expect(
+      useAppStore.getState().nodes.map((node) => node.data.referenceId),
+    ).toEqual(["N-001", "N-002", "N-003"]);
+
+    actions.deleteNode(third);
+    const replacement = actions.addChild(second) as string;
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === replacement)?.data
+        .referenceId,
+    ).toBe("N-004");
+    expect(actions.toMap().metadata?.nodeReferenceHighWaterMark).toBe(4);
+  });
+
+  it("keeps evidence identifiers stable and restores deep-cloned evidence", () => {
+    const { actions } = useAppStore.getState();
+    const nodeId = actions.addChild() as string;
+    const first = actions.addEvidence(nodeId, "Witness statement") as string;
+    const second = actions.addEvidence(
+      nodeId,
+      "Camera footage",
+      " CCTV ",
+    ) as string;
+    expect([first, second]).toEqual(["E-001", "E-002"]);
+
+    actions.removeEvidence(nodeId, first);
+    expect(actions.addEvidence(nodeId, "Operator log")).toBe("E-003");
+    actions.updateEvidence(nodeId, second, { description: "Reviewed footage" });
+    const changed = useAppStore.getState().nodes[0].data.evidenceItems!;
+    actions.undo();
+    const restored = useAppStore.getState().nodes[0].data.evidenceItems!;
+    expect(restored.find((item) => item.id === second)?.description).toBe(
+      "Camera footage",
+    );
+    expect(restored).not.toBe(changed);
+    expect(restored[0]).not.toBe(changed[0]);
+    expect(actions.addEvidence(nodeId, "   ")).toBeNull();
+  });
+
   it("debounces nudge history entries", () => {
     vi.useFakeTimers();
     try {

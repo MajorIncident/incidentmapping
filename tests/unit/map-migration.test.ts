@@ -55,7 +55,10 @@ describe("parseAndMigrateMapData", () => {
   it("preserves V1 content while deterministically adding V2 fields", () => {
     const migrated = parseAndMigrateMapData(legacy);
     expect(migrated.schemaVersion).toBe(2);
-    expect(migrated.metadata).toEqual(legacy.metadata);
+    expect(migrated.metadata).toEqual({
+      ...legacy.metadata,
+      nodeReferenceHighWaterMark: legacy.nodes.length,
+    });
     expect(migrated.nodes.map(({ referenceId }) => referenceId)).toEqual([
       "N-001",
       "N-002",
