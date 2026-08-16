@@ -184,22 +184,90 @@ select:focus-visible {
 }
 
 .presentation-legend {
-  @apply absolute bottom-4 left-4 z-20 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-xs text-slate-700 shadow-sm;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  left: max(0.75rem, env(safe-area-inset-left));
+  max-width: calc(
+    100% - max(1.5rem, env(safe-area-inset-left) + env(safe-area-inset-right))
+  );
+  @apply absolute z-20 rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow-sm backdrop-blur-sm;
 }
-.presentation-legend strong {
-  @apply text-slate-900;
+.presentation-legend > h2 {
+  @apply sr-only;
 }
-.legend-dot {
-  @apply mr-1 inline-block h-2.5 w-2.5 rounded-full;
+.presentation-legend__groups {
+  @apply flex flex-wrap items-start gap-x-4 gap-y-1.5;
+}
+.presentation-legend section {
+  @apply flex min-w-0 items-baseline gap-2;
+}
+.presentation-legend h3 {
+  @apply shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500;
+}
+.presentation-legend ul {
+  @apply flex flex-wrap gap-x-2.5 gap-y-1;
+}
+.presentation-legend li {
+  @apply flex items-center whitespace-nowrap font-medium;
+}
+.legend-swatch {
+  @apply mr-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full border;
+}
+.legend-swatch--impact {
+  @apply border-violet-200 bg-violet-50;
+}
+.legend-swatch--event {
+  @apply border-sky-200 bg-sky-50;
+}
+.legend-swatch--factor {
+  @apply border-amber-200 bg-amber-50;
+}
+.legend-swatch--action {
+  @apply border-emerald-200 bg-emerald-50;
+}
+.legend-swatch--key-factor {
+  @apply border-2 border-amber-400 bg-white;
+}
+.legend-swatch--root-cause {
+  @apply rounded-sm border-2 border-rose-500 bg-white;
+}
+.legend-swatch--effective {
+  @apply rounded-sm border-emerald-300 bg-emerald-100;
+}
+.legend-swatch--degraded {
+  @apply rounded-sm border-amber-300 bg-amber-100;
+}
+.legend-swatch--failed {
+  @apply rounded-sm border-rose-300 bg-rose-100;
+}
+.legend-swatch--missing {
+  @apply rounded-sm border-slate-400 bg-slate-200;
 }
 .presentation-exit {
-  @apply absolute right-4 top-3 z-40 rounded-lg border border-slate-300 bg-white/90 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  @apply absolute z-40 rounded-lg border border-slate-300 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white;
 }
 .presentation-exit span {
   @apply ml-2 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-400;
 }
 .presentation-hint {
-  @apply absolute left-1/2 top-4 z-30 w-[min(90vw,34rem)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-600 shadow-lg;
+  top: max(4rem, calc(env(safe-area-inset-top) + 3.25rem));
+  @apply absolute left-1/2 z-30 w-[min(90vw,34rem)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-600 shadow-lg;
+}
+
+@media (max-width: 639px) {
+  .presentation-legend {
+    @apply text-[11px];
+  }
+  .presentation-legend__groups {
+    @apply gap-x-3;
+  }
+  .presentation-legend section {
+    @apply gap-1.5;
+  }
+  .presentation-legend ul {
+    @apply gap-x-2;
+  }
 }
 .presentation-hint h2 {
   @apply pr-8 text-base font-semibold text-slate-900;

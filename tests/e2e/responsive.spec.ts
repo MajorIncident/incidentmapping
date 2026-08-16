@@ -35,6 +35,44 @@ for (const width of [375, 768, 1280]) {
       expect(box?.height).toBeGreaterThanOrEqual(44);
     }
   });
+
+  test(`presentation legend stays in the viewport at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Present map" }).click();
+
+    const legend = page.getByRole("complementary", {
+      name: "Presentation legend",
+    });
+    await expect(legend).toBeVisible();
+    await expect(legend.getByRole("heading", { name: "Nodes" })).toBeVisible();
+    await expect(
+      legend.getByRole("heading", { name: "Analysis" }),
+    ).toBeVisible();
+    await expect(
+      legend.getByRole("heading", { name: "Controls" }),
+    ).toBeVisible();
+    await expect(legend).toContainText("Root Cause");
+    await expect(legend).toContainText("Failed");
+
+    const [legendBox, exitBox] = await Promise.all([
+      legend.boundingBox(),
+      page.getByRole("button", { name: /Exit Presentation/ }).boundingBox(),
+    ]);
+    expect(legendBox!.x).toBeGreaterThanOrEqual(0);
+    expect(legendBox!.x + legendBox!.width).toBeLessThanOrEqual(width);
+    expect(legendBox!.y + legendBox!.height).toBeLessThanOrEqual(800);
+    expect(exitBox!.x + exitBox!.width).toBeLessThanOrEqual(width);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  });
 }
 
 test("mobile inspector closes and reopens when a node is tapped", async ({
