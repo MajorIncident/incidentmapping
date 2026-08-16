@@ -10,6 +10,7 @@ import {
   VERTICAL_GAP,
 } from "../../src/features/layout/hierarchy";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
+import type { MapData } from "../../src/features/maps/schema";
 
 describe("useAppStore actions", () => {
   beforeEach(() => {
@@ -369,6 +370,82 @@ describe("useAppStore actions", () => {
       id: "barrier-root-child",
       status: "Effective",
     });
+  });
+
+  it("uses Control-aware clearance when laying out an imported map", () => {
+    const node = (
+      id: string,
+      referenceId: string,
+    ): MapData["nodes"][number] => ({
+      id,
+      kind: "ChainNode",
+      referenceId,
+      nodeType: "Event",
+      title: id,
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      evidenceIds: [],
+      contextItems: [],
+      position: { x: 0, y: 0 },
+    });
+    const map: MapData = {
+      schemaVersion: 3,
+      nodes: [
+        node("root", "N-001"),
+        node("left", "N-002"),
+        node("right", "N-003"),
+      ],
+      edges: [
+        {
+          id: "root-left",
+          kind: "CauseEffectEdge",
+          fromId: "root",
+          toId: "left",
+        },
+        {
+          id: "root-right",
+          kind: "CauseEffectEdge",
+          fromId: "root",
+          toId: "right",
+        },
+      ],
+      barriers: [
+        {
+          id: "left-control",
+          kind: "Barrier",
+          upstreamNodeId: "root",
+          downstreamNodeId: "left",
+          status: "Effective",
+          evidenceIds: [],
+        },
+        {
+          id: "right-control",
+          kind: "Barrier",
+          upstreamNodeId: "root",
+          downstreamNodeId: "right",
+          status: "Effective",
+          evidenceIds: [],
+        },
+      ],
+      evidence: [],
+    };
+    const childPositions = () => {
+      const byId = new Map(
+        useAppStore.getState().nodes.map(({ id, position }) => [id, position]),
+      );
+      return { left: byId.get("left")!, right: byId.get("right")! };
+    };
+
+    useAppStore.getState().actions.loadMap({ ...map, barriers: [] });
+    const withoutControls = childPositions();
+    useAppStore.getState().actions.loadMap(map);
+    const withControls = childPositions();
+
+    expect(withControls.right.x - withControls.left.x).toBeGreaterThan(
+      withoutControls.right.x - withoutControls.left.x,
+    );
+    expect(withControls.left.y).toBeGreaterThan(withoutControls.left.y);
+    expect(withControls.right.y).toBeGreaterThan(withoutControls.right.y);
   });
 
   it("batches live barrier description changes into one undo entry", () => {

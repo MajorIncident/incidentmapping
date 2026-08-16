@@ -553,15 +553,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     loadMap: (input) => {
       const map = parseAndMigrateMapData(input);
+      const runtimeNodes = mapNodesToReactNodes(map);
+      const runtimeEdges = mapEdgesToReactEdges(map);
+      const runtimeBarriers = map.barriers.map(cloneBarrier);
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
         nodes: applyLayout(
-          mapNodesToReactNodes(map),
-          mapEdgesToReactEdges(map),
+          runtimeNodes,
+          runtimeEdges,
           state.showDetails,
+          runtimeBarriers,
         ).nodes,
-        edges: mapEdgesToReactEdges(map),
+        edges: runtimeEdges,
         metadata: {
           ...(map.metadata ?? {}),
           nodeReferenceHighWaterMark: Math.max(
@@ -577,7 +581,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             ),
           ),
         },
-        barriers: map.barriers.map(cloneBarrier),
+        barriers: runtimeBarriers,
         evidence: map.evidence.map(cloneEvidence),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
