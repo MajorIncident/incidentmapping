@@ -225,6 +225,70 @@ describe("useAppStore actions", () => {
     });
   });
 
+  it("adds, serializes, deletes, and restores an action atomically", () => {
+    const { actions } = useAppStore.getState();
+    const sourceId = actions.addChild() as string;
+    actions.moveNode(sourceId, { x: 80, y: 40 });
+    const before = useAppStore.getState();
+    const sourcePosition = before.nodes[0].position;
+    const historyLength = before.history.past.length;
+
+    const actionId = actions.addAction(sourceId) as string;
+    let state = useAppStore.getState();
+    const action = state.nodes.find((node) => node.id === actionId)!;
+    expect(state.nodes.find((node) => node.id === sourceId)?.position).toEqual(
+      sourcePosition,
+    );
+    expect(action.data).toMatchObject({
+      nodeType: "Action",
+      actionStatus: "Proposed",
+    });
+    expect(action.position.x).toBeGreaterThan(sourcePosition.x);
+    expect(action.position.x % GRID_SIZE).toBe(0);
+    expect(
+      state.edges.filter((edge) => edge.data?.kind === "ActionEdge"),
+    ).toEqual([
+      expect.objectContaining({
+        source: sourceId,
+        target: actionId,
+        sourceHandle: "right",
+        targetHandle: "left",
+      }),
+    ]);
+    expect(state.history.past).toHaveLength(historyLength + 1);
+    expect(actions.toMap().edges[0].kind).toBe("ActionEdge");
+
+    actions.undo();
+    expect(
+      useAppStore.getState().nodes.some((node) => node.id === actionId),
+    ).toBe(false);
+    actions.redo();
+    expect(
+      useAppStore.getState().nodes.some((node) => node.id === actionId),
+    ).toBe(true);
+
+    actions.deleteNode(actionId);
+    state = useAppStore.getState();
+    expect(state.nodes.some((node) => node.id === sourceId)).toBe(true);
+    expect(state.edges).toHaveLength(0);
+  });
+
+  it("deletes attached actions with their causal source", () => {
+    const { actions } = useAppStore.getState();
+    const sourceId = actions.addChild() as string;
+    const childId = actions.addChild(sourceId) as string;
+    const actionId = actions.addAction(sourceId) as string;
+    actions.deleteNode(sourceId);
+    expect(useAppStore.getState().nodes).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: sourceId }),
+        expect.objectContaining({ id: childId }),
+        expect.objectContaining({ id: actionId }),
+      ]),
+    );
+    expect(useAppStore.getState().edges).toEqual([]);
+  });
+
   it("creates a failed, selected barrier and requests description focus", () => {
     const { actions } = useAppStore.getState();
     const parentId = actions.addChild() as string;

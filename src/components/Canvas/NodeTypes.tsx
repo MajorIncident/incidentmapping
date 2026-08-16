@@ -170,7 +170,11 @@ const ChainNodeComponent = ({
       : presentation?.isOnSelectedPath
         ? "ring-2 ring-slate-300"
         : "ring-0";
-    return `${containerClasses} ${root} ${classification} ${related} ${active}`;
+    const action =
+      data.nodeType === "Action"
+        ? "border-slate-300 bg-slate-50 shadow-sm"
+        : "";
+    return `${containerClasses} ${root} ${classification} ${action} ${related} ${active}`;
   }, [data.factorSignificance, data.nodeType, presentation, selected]);
 
   const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
@@ -207,7 +211,13 @@ const ChainNodeComponent = ({
         id="top"
         type="target"
         position={Position.Top}
-        className="!h-3 !w-3 !border-2 !border-white !bg-slate-600"
+        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
+      />
+      <Handle
+        id="left"
+        type="target"
+        position={Position.Left}
+        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"}`}
       />
       <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
         <NodeTagMenu
@@ -256,7 +266,13 @@ const ChainNodeComponent = ({
         id="bottom"
         type="source"
         position={Position.Bottom}
-        className="!h-3 !w-3 !border-2 !border-white !bg-slate-600"
+        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
+      />
+      <Handle
+        id="right"
+        type="source"
+        position={Position.Right}
+        className="!h-3 !w-3 !border-2 !border-white !bg-slate-400"
       />
       {isEditing ? (
         <input

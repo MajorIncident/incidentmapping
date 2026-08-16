@@ -12,6 +12,8 @@ import { parseAndMigrateMapData } from "../features/maps/migration";
 import { createId } from "../lib/id";
 import {
   applyHierarchyLayout,
+  ACTION_HORIZONTAL_GAP,
+  ACTION_VERTICAL_GAP,
   getNodeSize,
   snapPosition,
   VERTICAL_GAP,
@@ -94,6 +96,7 @@ type AppState = {
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
+    addAction: (sourceId?: string) => string | null;
     addBarrier: (
       upstreamNodeId: string,
       downstreamNodeId: string,
@@ -219,8 +222,8 @@ const mapEdgesToReactEdges = (map: MapData): Edge[] =>
     source: edge.fromId,
     target: edge.toId,
     type: "step",
-    sourceHandle: "bottom",
-    targetHandle: "top",
+    sourceHandle: edge.kind === "ActionEdge" ? "right" : "bottom",
+    targetHandle: edge.kind === "ActionEdge" ? "left" : "top",
     data: {
       kind: edge.kind,
       ...(edge.kind === "ActionEdge" && edge.status
@@ -383,7 +386,9 @@ const updateHistoryState = (
 };
 
 const computeParentId = (edges: Edge[], childId: string): string | null => {
-  const parentEdge = edges.find((edge) => edge.target === childId);
+  const parentEdge = edges.find(
+    (edge) => edge.target === childId && edge.data?.kind !== "ActionEdge",
+  );
   return parentEdge ? parentEdge.source : null;
 };
 
@@ -584,8 +589,44 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { metadata, history, canUndo: true, canRedo: false };
       });
     },
-    setNodeType: (id, value) =>
-      get().actions.updateNodeData(id, { nodeType: value }),
+    setNodeType: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (!node || node.data.nodeType === value) return;
+      const connected = get().edges.filter(
+        (edge) => edge.source === id || edge.target === id,
+      );
+      if (
+        value === "Action" &&
+        connected.some((edge) => edge.data?.kind !== "ActionEdge")
+      )
+        return;
+      if (node.data.nodeType === "Action" && value !== "Action") {
+        const prevSnapshot = snapshotFromState(get());
+        set((state) => {
+          const nodes = state.nodes.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  data: {
+                    ...item.data,
+                    nodeType: value,
+                    actionStatus: undefined,
+                  },
+                }
+              : item,
+          );
+          const edges = state.edges.filter(
+            (edge) =>
+              edge.data?.kind !== "ActionEdge" ||
+              (edge.source !== id && edge.target !== id),
+          );
+          const history = updateHistoryState(state, prevSnapshot, true);
+          return { nodes, edges, history, canUndo: true, canRedo: false };
+        });
+        return;
+      }
+      get().actions.updateNodeData(id, { nodeType: value });
+    },
     setFactorCategory: (id, value) =>
       get().actions.updateNodeData(id, { factorCategory: value }),
     setFactorSignificance: (id, value) =>
@@ -693,6 +734,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const parentNode = initialParentId
           ? (state.nodes.find((node) => node.id === initialParentId) ?? null)
           : null;
+        if (parentNode?.data.nodeType === "Action") return {};
         const newNode: Node<ChainNodeData> = {
           id: newNodeId,
           type: "ChainNode",
@@ -709,7 +751,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
         };
         const outgoingChildCount = parentNode
-          ? state.edges.filter((edge) => edge.source === parentNode.id).length
+          ? state.edges.filter(
+              (edge) =>
+                edge.source === parentNode.id &&
+                edge.data?.kind !== "ActionEdge",
+            ).length
           : 0;
         const position = parentNode
           ? (() => {
@@ -796,6 +842,82 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
+    addAction: (sourceId) => {
+      const targetSourceId = sourceId ?? get().selectionId ?? undefined;
+      if (!targetSourceId) return null;
+      const actionId = createId("node");
+      const prevSnapshot = snapshotFromState(get());
+      let created = false;
+      set((state) => {
+        const source = state.nodes.find((node) => node.id === targetSourceId);
+        if (!source || source.data.nodeType === "Action") return {};
+        const attachedActionIds = state.edges
+          .filter(
+            (edge) =>
+              edge.source === source.id && edge.data?.kind === "ActionEdge",
+          )
+          .map((edge) => edge.target);
+        const action: Node<ChainNodeData> = {
+          id: actionId,
+          type: "ChainNode",
+          position: snapPosition({
+            x:
+              source.position.x +
+              getNodeSize(source, state.showDetails).width +
+              ACTION_HORIZONTAL_GAP,
+            y:
+              source.position.y +
+              attachedActionIds.length *
+                (getNodeSize(source, state.showDetails).height +
+                  ACTION_VERTICAL_GAP),
+          }),
+          data: {
+            title: "New Action",
+            referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
+            nodeType: "Action",
+            actionStatus: "Proposed",
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+            evidenceItems: [],
+            evidenceHighWaterMark: 0,
+          },
+        };
+        const edge: Edge = {
+          id: createId("edge"),
+          source: source.id,
+          target: actionId,
+          type: "step",
+          sourceHandle: "right",
+          targetHandle: "left",
+          data: { kind: "ActionEdge", status: "Proposed" },
+        };
+        const nodes = [...state.nodes, action];
+        const edges = [...state.edges, edge];
+        const metadata = {
+          ...(state.metadata ?? {}),
+          nodeReferenceHighWaterMark:
+            (state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1,
+        };
+        const history = updateHistoryState(state, prevSnapshot, true);
+        created = true;
+        return {
+          nodes,
+          edges,
+          metadata,
+          selectionId: actionId,
+          editingId: actionId,
+          editorFocusRequest: {
+            id: nextEditorFocusRequestId++,
+            entityId: actionId,
+            field: "title" as const,
+          },
+          history,
+          canUndo: true,
+          canRedo: false,
+        };
+      });
+      return created ? actionId : null;
+    },
     addSibling: (siblingId) => {
       const targetSiblingId = siblingId ?? get().selectionId ?? undefined;
       if (!targetSiblingId) {
@@ -812,6 +934,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!siblingNode) {
           return {};
         }
+        if (siblingNode.data.nodeType === "Action") return {};
         const parentNode = parentId
           ? (state.nodes.find((node) => node.id === parentId) ?? null)
           : null;
@@ -1112,7 +1235,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
           toRemove.add(nodeId);
           edges
-            .filter((edge) => edge.source === nodeId)
+            .filter(
+              (edge) =>
+                edge.source === nodeId && edge.data?.kind !== "ActionEdge",
+            )
             .forEach((edge) => visit(edge.target));
         };
 
@@ -1122,6 +1248,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
 
         visit(id);
+        // Actions attached to a removed causal entity would otherwise be
+        // orphaned, so remove them in the same atomic history operation.
+        edges
+          .filter(
+            (edge) =>
+              edge.data?.kind === "ActionEdge" && toRemove.has(edge.source),
+          )
+          .forEach((edge) => toRemove.add(edge.target));
         const remainingNodes = state.nodes.filter(
           (node) => !toRemove.has(node.id),
         );
@@ -1172,7 +1306,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       const descendants = new Set<string>();
       const pending = edges
-        .filter((edge) => edge.source === selectionId)
+        .filter(
+          (edge) =>
+            edge.source === selectionId && edge.data?.kind !== "ActionEdge",
+        )
         .map((edge) => edge.target);
       while (pending.length) {
         const id = pending.pop()!;
@@ -1180,14 +1317,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         descendants.add(id);
         pending.push(
           ...edges
-            .filter((edge) => edge.source === id)
+            .filter(
+              (edge) => edge.source === id && edge.data?.kind !== "ActionEdge",
+            )
             .map((edge) => edge.target),
         );
       }
+      const actionCount = edges.filter(
+        (edge) =>
+          edge.data?.kind === "ActionEdge" &&
+          (edge.source === selectionId || descendants.has(edge.source)),
+      ).length;
       if (
-        descendants.size > 0 &&
+        (descendants.size > 0 || actionCount > 0) &&
         !window.confirm(
-          `Delete this event and its ${descendants.size} descendant${descendants.size === 1 ? "" : "s"}? This will remove the entire branch.`,
+          `Delete this entity${descendants.size ? ` and its ${descendants.size} causal descendant${descendants.size === 1 ? "" : "s"}` : ""}${actionCount ? ` plus ${actionCount} attached action${actionCount === 1 ? "" : "s"}` : ""}? This will remove the entire branch.`,
         )
       ) {
         return;
