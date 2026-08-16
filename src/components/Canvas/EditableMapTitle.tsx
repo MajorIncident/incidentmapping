@@ -46,7 +46,7 @@ export const EditableMapTitle = ({
   };
 
   return (
-    <div className="absolute left-4 top-4 z-10 max-w-[min(75vw,36rem)]">
+    <div className="map-title max-w-[min(75vw,36rem)]">
       <div className="pointer-events-none absolute inset-0 rounded-xl border border-slate-200 bg-white/95 shadow-sm" />
       <div className="relative px-2 py-1">
         <h1 className="text-base font-bold text-slate-900">
@@ -111,7 +111,7 @@ export const EditableMapTitle = ({
             {error}
           </p>
         ) : (
-          <p className="pointer-events-none px-2 pb-1 text-xs text-slate-600">
+          <p className="map-title__subtitle pointer-events-none px-2 pb-1 text-xs text-slate-600">
             Incident event map
           </p>
         )}

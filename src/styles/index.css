@@ -26,8 +26,27 @@ input[type="checkbox"] {
 }
 
 .react-flow__controls {
-  margin-left: max(0.5rem, env(safe-area-inset-left));
-  margin-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  margin-top: max(0.75rem, env(safe-area-inset-top));
+  margin-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+.map-title {
+  @apply absolute left-4 top-4 z-10;
+}
+
+.map-mobile-actions,
+.mobile-map-guide {
+  display: none;
+}
+
+.map-overlay-button,
+.react-flow__controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.map-overlay-button {
+  @apply grid place-items-center rounded-xl border border-slate-300 bg-white text-lg font-bold text-slate-700 shadow-sm;
 }
 
 button:focus-visible {
@@ -59,16 +78,34 @@ button:focus-visible {
   right: max(1rem, env(safe-area-inset-right)) !important;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   .react-flow__minimap,
-  [aria-label="Incident map legend"] {
+  .map-guide,
+  .react-flow__controls {
     display: none;
   }
-  .react-flow__controls {
-    bottom: 55%;
+  .map-mobile-actions,
+  .mobile-map-guide {
+    display: flex;
   }
-  .react-flow__controls button {
-    width: 44px;
-    height: 44px;
+  .map-title {
+    left: 0.5rem;
+    top: 0.5rem;
+    max-width: calc(100% - 4.75rem);
+  }
+  .map-title > div:nth-child(2) {
+    padding-block: 0;
+  }
+  .map-title__subtitle {
+    display: none;
+  }
+  .mobile-map-guide {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .react-flow__minimap {
+    display: none;
   }
 }

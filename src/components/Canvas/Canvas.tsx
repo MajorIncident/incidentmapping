@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -90,6 +90,12 @@ export const Canvas = ({
     (state) => state.actions,
   );
   const reactFlow = useReactFlow();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  const fitMap = useCallback(() => {
+    void reactFlow.fitView({ padding: 0.2, duration: 400 });
+  }, [reactFlow]);
 
   const { nodes, renderedEdges } = useMemo(() => {
     const presentation = deriveGraphPresentation(
@@ -249,16 +255,49 @@ export const Canvas = ({
     return () => cancelAnimationFrame(frame);
   }, [clearViewportRequest, reactFlow, viewportRequest]);
 
+  // A mobile inspector changes the usable canvas without changing graph data.
+  // Keep the selected node visible when that sheet opens or is resized.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (
+      !canvas ||
+      !selectionId ||
+      typeof window.matchMedia !== "function" ||
+      typeof ResizeObserver === "undefined" ||
+      !window.matchMedia("(max-width: 767px)").matches
+    )
+      return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const selectedNode = reactFlow.getNode(selectionId);
+        if (selectedNode) {
+          void reactFlow.fitBounds(getNodesBounds([selectedNode]), {
+            padding: 0.6,
+            duration: 250,
+          });
+        }
+      });
+    });
+    observer.observe(canvas);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [reactFlow, selectionId]);
+
   const memorizedNodeTypes = useMemo(() => nodeTypes, []);
 
   return (
     <div
+      ref={canvasRef}
       className="relative h-full w-full"
       aria-label={`${mapTitle} incident map`}
     >
       <EditableMapTitle title={mapTitle} onCommit={setMapTitle} />
       <aside
-        className="absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
+        className="map-guide absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
         aria-label="Incident map legend"
       >
         <div className="mb-1 font-semibold text-slate-900">
@@ -285,6 +324,56 @@ export const Canvas = ({
           </span>
         </div>
       </aside>
+      <div className="map-mobile-actions absolute right-3 top-3 z-20 flex flex-col gap-2">
+        <button
+          type="button"
+          className="map-overlay-button"
+          aria-label="How to read this map"
+          aria-expanded={guideOpen}
+          aria-controls="mobile-map-guide"
+          onClick={() => setGuideOpen((open) => !open)}
+        >
+          <span aria-hidden="true">i</span>
+        </button>
+        <button
+          type="button"
+          className="map-overlay-button"
+          onClick={fitMap}
+          aria-label="Fit map"
+        >
+          <span aria-hidden="true">⌗</span>
+        </button>
+      </div>
+      {guideOpen ? (
+        <aside
+          id="mobile-map-guide"
+          className="mobile-map-guide absolute inset-x-3 bottom-3 z-20 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-lg"
+          aria-label="How to read this map"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900">
+                How to read this map
+              </h2>
+              <p className="mt-1">
+                Events flow top to bottom. Dashed purple edges are upstream;
+                heavy blue edges are downstream.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="min-h-11 min-w-11 rounded-lg text-xl"
+              aria-label="Dismiss map guide"
+              onClick={() => {
+                sessionStorage.setItem("incident-map-guide-dismissed", "true");
+                setGuideOpen(false);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </aside>
+      ) : null}
       <ReactFlow
         style={{ width: "100%", height: "100%" }}
         nodes={nodes}
@@ -304,7 +393,11 @@ export const Canvas = ({
         selectionOnDrag
       >
         <Background color="#E2E8F0" gap={8} />
-        <Controls showInteractive={false} />
+        <Controls
+          position="top-right"
+          showInteractive={false}
+          onFitView={fitMap}
+        />
         <MiniMap
           ariaLabel="Incident map overview"
           pannable

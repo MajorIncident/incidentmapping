@@ -54,3 +54,45 @@ test("mobile inspector closes and reopens when a node is tapped", async ({
   await page.locator(".react-flow__node").first().click();
   await expect(inspector).toBeVisible();
 });
+
+test("mobile canvas overlays remain usable with a long title at 200% zoom", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.body.style.zoom = "2";
+  });
+
+  const titleButton = page.getByTitle("Edit map title");
+  await titleButton.click();
+  await page
+    .getByLabel("Map title")
+    .fill("A very long incident map title that must not cover canvas actions");
+  await page.getByLabel("Map title").press("Enter");
+
+  const info = page.getByRole("button", { name: "How to read this map" });
+  const fit = page.getByRole("button", { name: "Fit map" });
+  await expect(info).toBeVisible();
+  await expect(fit).toBeVisible();
+  await expect(page.locator(".react-flow__minimap")).toBeHidden();
+  const [titleBox, infoBox] = await Promise.all([
+    titleButton.boundingBox(),
+    info.boundingBox(),
+  ]);
+  expect(titleBox!.x + titleBox!.width).toBeLessThanOrEqual(infoBox!.x);
+
+  await page.getByLabel("File menu").click();
+  await expect(
+    page.getByRole("button", { name: "Open an existing map" }),
+  ).toBeVisible();
+  await info.click();
+  await expect(
+    page.getByRole("complementary", { name: "How to read this map" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss map guide" }).click();
+  await page.reload();
+  await expect(
+    page.getByRole("complementary", { name: "How to read this map" }),
+  ).toHaveCount(0);
+});
