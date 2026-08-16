@@ -1,108 +1,106 @@
 # Incident Mapping Architecture
 
-## Layers and data flow
+## Data flow and four state categories
 
-- **UI:** React components render the Incident Header, semantic canvas nodes,
-  Inspector, toolbar, legend, and presentation overlay on React Flow.
-- **State:** Zustand in `src/state/useAppStore.ts` owns the authoritative runtime
-  graph and all mutations.
-- **Domain:** Zod schemas and migration in `src/features/maps` define the
-  persisted contract and compatibility boundary.
-- **Layout:** `src/features/layout/hierarchy.ts` computes deterministic positions.
-- **Persistence:** the File menu validates `toMap()` output and uses the File
-  System Access API where available, with upload/download fallbacks.
+The application intentionally separates the saved investigation from rendering
+and view state.
 
-UI actions update the store synchronously. The canvas receives derived React
-Flow nodes and edges; selections and drags dispatch store actions. Open calls
-`parseAndMigrateMapData` before `loadMap`; save validates the Version 2 document
-before writing it.
+### 1. Persisted V3 state
 
-## Persisted, derived, and ephemeral state
+The canonical save document is strict Version 3 `MapData`: incident metadata,
+semantic nodes and coordinates, discriminated relationships, Controls (under
+the historical wire key `barriers`), the global Evidence registry, Context,
+and allocation high-water marks. Action accountability lives on Action nodes.
+The [map schema](MAP_SCHEMA.md) is the complete wire contract.
 
-Persisted state consists of investigation metadata (including incident status), chain nodes and their domain fields and
-positions, discriminated relationship edges, Controls, and global allocation high-water marks. Evidence numbering is map-wide rather than node-local; Action status and due date belong to Action nodes rather than relationship edges. `toMap()` derives this state from the runtime graph and strips
-React Flow rendering data.
+Open sends all untrusted JSON through `parseAndMigrateMapData` before loading the
+store. Save converts the runtime model with `toMap()`, validates V3, and only
+then writes JSON using the browser's available local-file/download mechanism.
+This is JSON persistence, not hosted storage, an upload service, or attachment
+storage.
 
-Ephemeral UI state is never serialized: selection and inline editing IDs,
-detail visibility, computed graph roles/selected-path styling, read-only flags,
-layout and viewport requests, editor focus requests, presentation mode, the
-open state of menus/popovers, history stacks, and `canUndo`/`canRedo`.
+### 2. Runtime React Flow state
 
-Saved/unsaved status is also derived rather than persisted. The persistence
-shell compares the current validated `toMap()` serialization with the last
-new/open/save baseline. Selection, presentation, viewport, and other UI-only
-changes therefore do not dirty a map.
+Zustand owns the editable runtime graph. Persisted domain nodes are adapted to
+React Flow nodes with `data`, position, selection, and component/rendering
+properties; persisted relationships become React Flow edges. Runtime Controls
+and the Evidence registry remain domain collections rather than independent
+causal nodes. Store mutations, history snapshots, selection, dragging, and
+layout operate here. `toMap()` removes React Flow-specific rendering data and
+reconstructs canonical V3.
 
-## Relationships, layout, and visual derivation
+### 3. Derived Presentation state
 
-All graph semantics first filter relationships by discriminator. Only
-`CauseEffectEdge` participates in roots, causal depth, sibling groups, selected
-upstream paths, and Control eligibility/placement. `ActionEdge` does **not**
-affect roots, depths, sibling positions, selected causal paths, or Controls.
+Presentation is a read-only projection of current runtime state. It derives
+card labels, graph roles, classification tags, selected-path styling, Evidence
+summaries, Control placement, legend content, and chronology groups. It does not
+copy or become an alternative source of investigation truth. Saved/unsaved
+status is likewise derived by comparing validated canonical serialization with
+the last new/open/save baseline.
 
-Layout is explicitly two phase:
+### 4. Ephemeral Chronology visibility
 
-1. Lay out non-Action nodes from the causal hierarchy, deterministically
-   centering parents above sibling groups and spacing roots/components.
-2. Place Action nodes in deterministic stacks to the right of their source,
-   using stable edge/node order and grid-snapped gaps.
+Whether Chronology is open, including its responsive overlay/drawer behavior,
+is local ephemeral UI state. It is not persisted and does not enter undo/redo.
+Chronology itself derives Events from runtime state, orders valid timestamps by
+instant and phase, and puts missing or invalid timestamps in a final **Untimed
+Events** group at the bottom. Closing it changes no investigation data.
 
-Consequently, adding or removing an action cannot move causal nodes. Unit tests
-assert causal-coordinate invariance, deterministic action stacking, and
-idempotence; these guarantees intentionally do not depend on pixel-sensitive
-browser screenshots.
+Other ephemeral state includes selection/editing IDs, menus and popovers,
+viewport and focus requests, presentation mode, read-only flags, detail
+visibility, and undo/redo availability. History stacks are runtime-only.
 
-## History
+## Evidence ownership and references
 
-History snapshots contain nodes, relationships, metadata, Controls, and
-selection. A domain mutation pushes the prior snapshot and clears the redo
-stack. Undo/redo restores snapshots by value and recomputes its availability.
-Repeated keyboard movement within 200 ms is one history operation, while text
-and Control edits use their own short debounce to avoid an entry per keystroke.
-Organizing, metadata edits, classifications, evidence, Controls, and
-graph edits participate in history. Focus requests, viewport requests, detail
-visibility, saved status, and presentation state do not.
+The V3 map globally owns each Evidence record once in its Evidence Registry.
+Nodes and Controls contain `evidenceIds` references; they never persist embedded
+copies. One Evidence item can support assertions associated with several nodes
+or Controls. Evidence is not a graph node and does not create a causal edge.
+Future attachment or link fields may extend the Evidence record through a new
+schema decision, but no unused attachment objects are persisted today and the
+application does not imply file storage exists.
 
-## UI semantics
+## Relationships, Controls, and layout
 
-- Canvas cards carry a node-type tag (`Event`, `Factor`, `Impact`, `Action`) and
-  stable node reference. Factor cards additionally show category and significance
-  tags; Action cards show action status. Root Cause receives distinct emphasis.
-- The adaptive Inspector exposes general description/owner/time/consequences
-  and evidence, then type-relevant classification or action fields. Evidence is
-  summarized on expanded canvas cards with stable evidence labels.
-- The compact Incident Header keeps title, ID, occurrence, location, severity,
-  and status discoverable without consuming canvas space.
-- Control cards and Inspector fields expose status, description, and—when
-  relevant—failure reason and details.
-- Presentation mode is a read-only projection of the same current store state.
-  It hides editing chrome and handles, retains the header, legend, semantic tags,
-  evidence summaries, and Controls, and exits without changing persisted data or
-  history. It is presentation assistance, not a compliance report.
+Relationship discriminators determine semantics:
 
-## Quality boundaries
+- `CauseEffectEdge` builds the causal hierarchy between non-Action nodes and
+  participates in roots, causal depth, sibling groups, upstream paths, and
+  Control eligibility.
+- `ActionEdge` associates exactly one non-Action source with an Action. It does
+  not affect causal roots, depth, paths, or Control placement.
+- A Control refers to an ordered upstream/downstream causal pair rather than an
+  edge ID. Its Role describes intended function; its Status describes observed
+  performance.
 
-Schema and migration unit tests protect data compatibility. Store tests protect
-history and serialization. Layout unit tests protect semantic filtering and
-coordinate invariance. Component tests protect adaptive/read-only rendering,
-and focused Playwright journeys verify that an understandable investigation
-survives actual save and reopen.
+Layout has two phases. First it lays out non-Action nodes from the causal
+hierarchy, centering parents over siblings and spacing components. Then it puts
+Actions in stable, grid-snapped stacks to the right of their source. Adding or
+removing an Action therefore cannot move causal nodes.
 
-## Trusted graph boundary
+## Investigation semantics in the UI
 
-The migration boundary uses separate V1, legacy-V2 compatibility, and canonical
-V2 schemas. V2 parsing is canonical-first: canonical input is validated and
-returned without identity rewriting. Only input that fails canonical validation
-but passes legacy-V2 compatibility is normalized. That legacy-only step
-deterministically renumbers evidence in node/evidence array order and records the
-resulting high-water mark. It also discards retired node `incidentStatus` because
-`metadata.status` is the chosen incident-wide authority. Retired ActionEdge
-accountability is copied to its target Action only where the Action has no
-explicit value, giving node-owned status and due date precedence. At runtime,
-new evidence is allocated above both the stored evidence high-water mark and the
-highest well-formed evidence reference; deletion, save, and reopen never compact
-or reuse gaps. Canonical graph validation then enforces identifier uniqueness,
-endpoint existence, causal/control pair consistency, Action isolation and
-single-parent ownership, and relationship-pair uniqueness. The persisted
-`Barrier` discriminator remains unchanged even though the UI presents barriers
-as Controls.
+Canvas cards expose stable node references and semantic types. Events may show
+Event Phase; Factors may show category and significance, including Key Factor
+or Root Cause; Actions may show purpose (Action Type) and lifecycle (Action
+Status). The Inspector exposes narrative fields, Context where valid, linked
+Evidence, and type-specific classification. Incident Context is edited at the
+incident level. See the [investigation model](INVESTIGATION_MODEL.md) for the
+meaning and boundaries of each concept.
+
+Presentation mode remains read-only assistance over the same runtime model. It
+is not a generated report or a certification artifact.
+
+## History and quality boundaries
+
+Domain mutations snapshot runtime nodes, relationships, metadata, Controls,
+Evidence, and relevant selection. Undo/redo restores values and recomputes
+availability; text and Control edits are debounced, and repeated keyboard moves
+within the coalescing window form one operation. Presentation, Chronology
+visibility, viewport/focus requests, and saved status do not create history.
+
+Schema and migration tests protect compatibility and semantic integrity. Store
+tests protect history, Evidence ownership, and serialization. Layout tests
+protect discriminator filtering and deterministic coordinates. Component and
+browser journeys protect adaptive/read-only rendering and save/reopen behavior.
+Schema validation establishes data compatibility, not regulatory compliance.
