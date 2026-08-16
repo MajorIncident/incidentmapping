@@ -16,6 +16,49 @@ export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
 };
 
+const padDatePart = (value: number): string => String(value).padStart(2, "0");
+
+export const persistedTimestampToLocalControl = (value?: string): string => {
+  if (!value?.trim()) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`;
+};
+
+export const localControlToPersistedTimestamp = (
+  value: string,
+): string | undefined => {
+  if (!value.trim()) return undefined;
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(
+      value,
+    );
+  if (!match) return undefined;
+  const [, year, month, day, hour, minute, second = "0", fraction = "0"] =
+    match;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    Number(fraction.padEnd(3, "0")),
+  );
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day) ||
+    date.getHours() !== Number(hour) ||
+    date.getMinutes() !== Number(minute) ||
+    date.getSeconds() !== Number(second)
+  ) {
+    return undefined;
+  }
+  return date.toISOString();
+};
+
 const labelClasses =
   "text-xs font-semibold uppercase tracking-wide text-slate-500";
 const inputClasses =
@@ -153,8 +196,18 @@ export const Inspector = ({
       setTitle(node.data.title);
       setDescription(node.data.description ?? "");
       setTitleError(null);
-      setPositiveConsequences(node.data.positiveConsequenceBulletPoints ?? []);
-      setNegativeConsequences(node.data.negativeConsequenceBulletPoints ?? []);
+      const supportsConsequences =
+        node.data.nodeType === "Impact" || node.data.nodeType === "Event";
+      setPositiveConsequences(
+        supportsConsequences
+          ? (node.data.positiveConsequenceBulletPoints ?? [])
+          : [],
+      );
+      setNegativeConsequences(
+        supportsConsequences
+          ? (node.data.negativeConsequenceBulletPoints ?? [])
+          : [],
+      );
       const selectionChanged = evidenceSelectionRef.current !== node.id;
       evidenceSelectionRef.current = node.id;
       setEvidenceDrafts((drafts) => [
@@ -168,19 +221,29 @@ export const Inspector = ({
       setNegativeErrors([]);
       if (
         positiveItemIds.current.length !==
-        (node.data.positiveConsequenceBulletPoints ?? []).length
+        (supportsConsequences
+          ? (node.data.positiveConsequenceBulletPoints ?? [])
+          : []
+        ).length
       ) {
-        positiveItemIds.current = (
-          node.data.positiveConsequenceBulletPoints ?? []
-        ).map(() => createListItemId("positive"));
+        positiveItemIds.current = supportsConsequences
+          ? (node.data.positiveConsequenceBulletPoints ?? []).map(() =>
+              createListItemId("positive"),
+            )
+          : [];
       }
       if (
         negativeItemIds.current.length !==
-        (node.data.negativeConsequenceBulletPoints ?? []).length
+        (supportsConsequences
+          ? (node.data.negativeConsequenceBulletPoints ?? [])
+          : []
+        ).length
       ) {
-        negativeItemIds.current = (
-          node.data.negativeConsequenceBulletPoints ?? []
-        ).map(() => createListItemId("negative"));
+        negativeItemIds.current = supportsConsequences
+          ? (node.data.negativeConsequenceBulletPoints ?? []).map(() =>
+              createListItemId("negative"),
+            )
+          : [];
       }
     } else {
       setTitle("");
@@ -301,11 +364,10 @@ export const Inspector = ({
       if (!node) {
         return;
       }
-      updateNodeData(node.id, {
-        timestamp: event.target.value.trim().length
-          ? event.target.value
-          : undefined,
-      });
+      const localValue = event.target.value;
+      const timestamp = localControlToPersistedTimestamp(localValue);
+      if (localValue.trim() && !timestamp) return;
+      updateNodeData(node.id, { timestamp });
     },
     [node, updateNodeData],
   );
@@ -623,7 +685,7 @@ export const Inspector = ({
   }, [fitView, selectionId]);
 
   const ownerValue = node?.data.owner ?? "";
-  const timestampValue = node?.data.timestamp ?? "";
+  const timestampValue = persistedTimestampToLocalControl(node?.data.timestamp);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1149,7 +1211,7 @@ export const Inspector = ({
           ))}
         </div>
 
-        {node.data.nodeType !== "Action" ? (
+        {node.data.nodeType === "Impact" || node.data.nodeType === "Event" ? (
           <div className="flex flex-col gap-3">
             <h3 className="text-sm font-semibold text-slate-900">
               Consequences
@@ -1366,19 +1428,16 @@ export const Inspector = ({
         {node.data.nodeType !== "Action" ? (
           <div className="flex flex-col gap-1">
             <label htmlFor="inspector-timestamp" className={labelClasses}>
-              Timestamp
+              Occurred at
             </label>
             <input
               id="inspector-timestamp"
+              type="datetime-local"
+              step="1"
               className={inputClasses}
               value={timestampValue}
               onChange={handleTimestampChange}
-              placeholder="YYYY-MM-DDTHH:mm:ssZ"
-              aria-describedby="timestamp-help"
             />
-            <p id="timestamp-help" className="text-xs text-slate-500">
-              Use an ISO 8601 timestamp (UTC).
-            </p>
           </div>
         ) : null}
 

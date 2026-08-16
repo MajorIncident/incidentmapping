@@ -9,7 +9,11 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider } from "reactflow";
-import { Inspector } from "../../src/components/Sidebar/Inspector";
+import {
+  Inspector,
+  localControlToPersistedTimestamp,
+  persistedTimestampToLocalControl,
+} from "../../src/components/Sidebar/Inspector";
 import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
@@ -92,16 +96,72 @@ describe("Inspector and keyboard workflows", () => {
       "Incident Manager",
     );
 
-    const timestampInput = screen.getByRole("textbox", {
-      name: /^Timestamp$/i,
-    });
+    const timestampInput = screen.getByLabelText(/^Occurred at$/i);
+    expect(timestampInput).toHaveAttribute("type", "datetime-local");
     await act(async () => {
       await userEvent.clear(timestampInput);
-      await userEvent.type(timestampInput, "2024-06-01T12:00:00Z");
+      await userEvent.type(timestampInput, "2024-06-01T12:00");
     });
     expect(useAppStore.getState().nodes[0]?.data.timestamp).toBe(
-      "2024-06-01T12:00:00Z",
+      new Date(2024, 5, 1, 12, 0).toISOString(),
     );
+  });
+
+  it("converts timestamps without slicing timezone-dependent strings", () => {
+    const persisted = new Date(2024, 5, 1, 12, 30, 45).toISOString();
+    expect(persistedTimestampToLocalControl(persisted)).toBe(
+      "2024-06-01T12:30:45",
+    );
+    expect(localControlToPersistedTimestamp("2024-06-01T12:30:45")).toBe(
+      persisted,
+    );
+    expect(localControlToPersistedTimestamp("")).toBeUndefined();
+    expect(
+      localControlToPersistedTimestamp("2024-02-31T12:30"),
+    ).toBeUndefined();
+    expect(persistedTimestampToLocalControl("not-a-date")).toBe("");
+  });
+
+  it("shows consequence editing only for Impact and Event nodes", async () => {
+    const nodeId = await renderSelectedNode();
+    const consequences = () =>
+      screen.queryByRole("heading", { name: "Consequences" });
+
+    expect(consequences()).toBeVisible();
+    act(() => {
+      useAppStore.getState().actions.updateNodeData(nodeId, {
+        positiveConsequenceBulletPoints: ["Persisted outcome"],
+      });
+      useAppStore.getState().actions.setNodeType(nodeId, "Impact");
+    });
+    expect(consequences()).toBeVisible();
+
+    act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
+    expect(consequences()).not.toBeInTheDocument();
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === nodeId)?.data
+        .positiveConsequenceBulletPoints,
+    ).toEqual(["Persisted outcome"]);
+
+    let actionId = "";
+    act(() => {
+      actionId = useAppStore.getState().actions.addAction(nodeId) ?? "";
+      useAppStore.getState().actions.select(actionId);
+    });
+    expect(consequences()).not.toBeInTheDocument();
+
+    act(() => {
+      useAppStore.getState().actions.loadMap(sampleMap);
+      useAppStore.getState().actions.select("barrier-root-child");
+    });
+    expect(consequences()).not.toBeInTheDocument();
+
+    act(() => {
+      useAppStore.getState().actions.loadMap(emptyMap);
+      const eventId = useAppStore.getState().actions.addChild() ?? "";
+      useAppStore.getState().actions.select(eventId);
+    });
+    expect(consequences()).toBeVisible();
   });
 
   it("adds a child via Enter and starts inline editing", async () => {
