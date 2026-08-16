@@ -1,9 +1,70 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  calculateControlPosition,
   deriveGraphPresentation,
   deriveRelationshipPresentation,
+  splitEdgeAtControl,
   viewportAnimationDuration,
 } from "../../src/components/Canvas/Canvas";
+
+describe("Control edge geometry", () => {
+  it("centers a Control between unequal endpoint handle coordinates", () => {
+    const source = {
+      position: { x: 40, y: 20 },
+      width: 180,
+      height: 100,
+    };
+    const target = {
+      position: { x: 260, y: 420 },
+      width: 300,
+      height: 220,
+    };
+    const control = { width: 120, height: 80 };
+
+    const position = calculateControlPosition(source, target, control);
+    const center = {
+      x: position.x + control.width / 2,
+      y: position.y + control.height / 2,
+    };
+    const sourceBottom = {
+      x: source.position.x + source.width / 2,
+      y: source.position.y + source.height,
+    };
+    const targetTop = {
+      x: target.position.x + target.width / 2,
+      y: target.position.y,
+    };
+
+    expect(center).toEqual({
+      x: (sourceBottom.x + targetTop.x) / 2,
+      y: (sourceBottom.y + targetTop.y) / 2,
+    });
+    expect(center.x).toBeGreaterThan(sourceBottom.x);
+    expect(center.x).toBeLessThan(targetTop.x);
+    expect(center.y).toBeGreaterThan(sourceBottom.y);
+    expect(center.y).toBeLessThan(targetTop.y);
+  });
+
+  it("connects source bottom to Control top and Control bottom to target top", () => {
+    const [upstream, downstream] = splitEdgeAtControl(
+      { id: "causal", source: "source", target: "target" },
+      "control",
+    );
+
+    expect(upstream).toMatchObject({
+      source: "source",
+      sourceHandle: "bottom",
+      target: "control",
+      targetHandle: "top",
+    });
+    expect(downstream).toMatchObject({
+      source: "control",
+      sourceHandle: "bottom",
+      target: "target",
+      targetHandle: "top",
+    });
+  });
+});
 
 describe("deriveGraphPresentation", () => {
   const ids = ["root", "left", "left-leaf", "right"];
