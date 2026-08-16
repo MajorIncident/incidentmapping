@@ -9,7 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { App } from "../../src/app/App";
 import { sampleMap } from "../../src/features/maps/fixtures";
-import type { MapData } from "../../src/features/maps/schema";
+import type { MapDataV2 as MapData } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
 
 const actionMap: MapData = {
