@@ -127,3 +127,12 @@ node-level `incidentStatus` is accepted but discarded. Retired ActionEdge
 `status` and `dueDate` move to the target Action only when its node-owned field
 is absent, so explicit Action values win. Canonical serialization never includes
 node status, node evidence counters, or ActionEdge accountability fields.
+
+## Presentation chronology
+
+Presentation Mode derives a read-only chronology from Event nodes; it does not
+create a second editable timeline. Events with valid timestamps are ordered by
+their parsed instant and grouped by event phase. Missing or invalid timestamps
+are intentionally retained in a final **Untimed Events** group so important
+story events are not silently omitted. Opening the chronology is transient UI
+state: it is neither serialized into `MapData` nor recorded in undo history.
