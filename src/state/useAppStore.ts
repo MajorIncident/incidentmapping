@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
-import { sampleMap } from "../features/maps/fixtures";
 import type { Barrier, ChainNode, MapData } from "../features/maps/schema";
 import { createId } from "../lib/id";
 import {
@@ -283,7 +282,7 @@ export const createNewMap = (): MapData => ({
   barriers: [],
 });
 
-const createNewMapState = () => {
+export const createNewMapState = () => {
   const map = createNewMap();
   const rootId = map.nodes[0].id;
   return {
@@ -308,19 +307,7 @@ const createNewMapState = () => {
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
-  nodes: mapNodesToReactNodes(sampleMap.nodes),
-  edges: mapEdgesToReactEdges(sampleMap),
-  metadata: sampleMap.metadata ? { ...sampleMap.metadata } : undefined,
-  barriers: sampleMap.barriers ? [...sampleMap.barriers] : [],
-  selectionId: sampleMap.nodes[0]?.id ?? null,
-  editingId: null,
-  showDetails: true,
-  layoutVersion: 0,
-  viewportRequest: null,
-  editorFocusRequest: null,
-  history: createEmptyHistory(),
-  canUndo: false,
-  canRedo: false,
+  ...createNewMapState(),
   actions: {
     newMap: () => {
       resetMoveDebounce();
