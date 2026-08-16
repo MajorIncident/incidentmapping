@@ -157,6 +157,25 @@ describe("presentation mode", () => {
     expect(actionEdge).toHaveClass("incident-edge--action");
   });
 
+  it("dismisses its ephemeral hint and selects review elements without opening the Inspector", async () => {
+    act(() => useAppStore.getState().actions.loadMap(actionMap));
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+    expect(screen.getByText("Review the investigation")).toBeVisible();
+
+    fireEvent.click(screen.getByText("Prevent recurrence"));
+    expect(
+      screen.queryByText("Review the investigation"),
+    ).not.toBeInTheDocument();
+    expect(useAppStore.getState().selectionId).toBe("action");
+    expect(
+      screen.queryByRole("complementary", { name: "Inspector" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(document.querySelector(".react-flow__pane")!);
+    expect(useAppStore.getState().selectionId).toBeNull();
+  });
+
   it("exits by button and Escape without changing map data or history", async () => {
     render(<App />);
     const beforeMap = useAppStore.getState().actions.toMap();
@@ -166,6 +185,7 @@ describe("presentation mode", () => {
     expect(screen.getByRole("button", { name: "Present map" })).toBeVisible();
     expect(useAppStore.getState().actions.toMap()).toEqual(beforeMap);
     expect(useAppStore.getState().history).toEqual(beforeHistory);
+    expect(useAppStore.getState().selectionId).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
     await userEvent.click(

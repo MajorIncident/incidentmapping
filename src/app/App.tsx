@@ -7,12 +7,13 @@ import { Footer } from "../components/Footer/Footer";
 import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [presenting, setPresenting] = useState(false);
+  const [presentationHintOpen, setPresentationHintOpen] = useState(false);
   const addChild = useAppStore((state) => state.actions.addChild);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
@@ -25,6 +26,12 @@ export const App = (): JSX.Element => {
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
   const showDetails = useAppStore((state) => state.showDetails);
+  const select = useAppStore((state) => state.actions.select);
+  const exitPresentation = useCallback(() => {
+    select(null);
+    setPresentationHintOpen(false);
+    setPresenting(false);
+  }, [select]);
   const canOrganize = useAppStore(
     (state) =>
       state.nodes.length >= 2 &&
@@ -68,11 +75,11 @@ export const App = (): JSX.Element => {
       )
         return;
       event.preventDefault();
-      setPresenting(false);
+      exitPresentation();
     };
     window.addEventListener("keydown", exitOnEscape, true);
     return () => window.removeEventListener("keydown", exitOnEscape, true);
-  }, [presenting]);
+  }, [exitPresentation, presenting]);
 
   return (
     <ReactFlowProvider>
@@ -100,6 +107,7 @@ export const App = (): JSX.Element => {
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
                   useAppStore.getState().actions.select(null);
+                  setPresentationHintOpen(true);
                   setPresenting(true);
                 }}
               />
@@ -109,6 +117,7 @@ export const App = (): JSX.Element => {
               <div className="min-w-0 flex-1 bg-slate-100">
                 <Canvas
                   presenting={presenting}
+                  onPresentationInteract={() => setPresentationHintOpen(false)}
                   onInspect={() => setInspectorOpen(true)}
                 />
               </div>
@@ -118,11 +127,31 @@ export const App = (): JSX.Element => {
             </div>
             {presenting ? (
               <>
+                {presentationHintOpen ? (
+                  <aside
+                    className="presentation-hint"
+                    aria-label="Presentation help"
+                  >
+                    <h2>Review the investigation</h2>
+                    <p>
+                      Select a node, control or action to highlight its
+                      relationship to the incident.
+                    </p>
+                    <p>Click empty space to show the full map.</p>
+                    <button
+                      type="button"
+                      aria-label="Dismiss presentation help"
+                      onClick={() => setPresentationHintOpen(false)}
+                    >
+                      ×
+                    </button>
+                  </aside>
+                ) : null}
                 <Legend />
                 <button
                   className="presentation-exit"
                   type="button"
-                  onClick={() => setPresenting(false)}
+                  onClick={exitPresentation}
                 >
                   Exit Presentation <span aria-hidden="true">Esc</span>
                 </button>

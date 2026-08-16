@@ -76,6 +76,7 @@ test("complete baggage investigation remains understandable after save and reope
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Present map" }).click();
+  await expect(page.getByText("Review the investigation")).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Exit Presentation/ }),
   ).toBeVisible();
@@ -86,7 +87,16 @@ test("complete baggage investigation remains understandable after save and reope
   await expect(edgePath).toHaveAttribute("d", /\S+/);
   await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
   await expectInvestigationOnCanvas(page);
-  await page.getByRole("button", { name: /Exit Presentation/ }).click();
+  await page.getByText("Inspection omitted photo-eye test").click();
+  await expect(page.getByText("Review the investigation")).toHaveCount(0);
+  await expect(
+    page
+      .locator(".react-flow__node")
+      .filter({ hasText: "Inspection omitted photo-eye test" }),
+  ).toHaveClass(/selected/);
+  await page.locator(".react-flow__pane").click({ position: { x: 20, y: 20 } });
+  await expect(page.locator(".react-flow__node.selected")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Add Below" })).toBeVisible();
   await expect(
     page.locator(".react-flow__handle:visible").first(),

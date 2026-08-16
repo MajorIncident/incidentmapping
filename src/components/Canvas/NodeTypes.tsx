@@ -189,7 +189,7 @@ const ChainNodeComponent = ({
           ? "border-amber-400"
           : "";
     const related = graphRole?.isUnrelated
-      ? "opacity-45 saturate-50"
+      ? "opacity-60 saturate-[.7]"
       : "opacity-100";
     const active = selected
       ? "ring-4 ring-sky-500 ring-offset-2 border-sky-700 shadow-lg"
@@ -536,8 +536,12 @@ const BarrierNodeComponent = ({
   return (
     <div
       className={`${barrierClasses} ${
-        selected ? "ring-2 ring-canvas-accent" : "ring-0"
-      } ${treatments[data.status]}`}
+        selected
+          ? "ring-4 ring-sky-500 ring-offset-2 border-sky-700 shadow-lg"
+          : data.graphRole?.isOnSelectedPath
+            ? "ring-2 ring-slate-300"
+            : "ring-0"
+      } ${data.graphRole?.isUnrelated ? "opacity-60 saturate-[.7]" : "opacity-100"} ${treatments[data.status]}`}
       data-testid="barrier-node"
       data-read-only={data.readOnly || undefined}
     >
