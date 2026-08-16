@@ -191,13 +191,13 @@ export const mapDataV2Schema = strictObject({
   barriers: z.array(barrierSchema),
 });
 
-export const contextItemSchema = strictObject({
+export const contextItemV3Schema = strictObject({
   id: z.string().min(1),
   label: z.string().trim().min(1),
   value: z.string().trim().min(1),
   showOnCard: z.boolean().optional(),
 });
-export const evidenceItemSchema = strictObject({
+export const evidenceItemV3Schema = strictObject({
   id: z.string().min(1),
   type: evidenceTypeSchema,
   title: z.string().min(1),
@@ -205,7 +205,7 @@ export const evidenceItemSchema = strictObject({
   source: z.string().optional(),
   reference: z.string().optional(),
 });
-export const chainNodeSchema = strictObject({
+export const chainNodeV3Schema = strictObject({
   id: z.string().min(1),
   kind: z.literal("ChainNode"),
   referenceId: z.string().min(1),
@@ -224,14 +224,14 @@ export const chainNodeSchema = strictObject({
   positiveConsequenceBulletPoints: z.array(z.string()),
   negativeConsequenceBulletPoints: z.array(z.string()),
   evidenceIds: z.array(z.string().min(1)),
-  contextItems: z.array(contextItemSchema),
+  contextItems: z.array(contextItemV3Schema),
   position: positionSchema,
 });
-export const controlSchema = barrierSchema.extend({
+export const controlV3Schema = barrierSchema.extend({
   controlRole: controlRoleSchema.optional(),
   evidenceIds: z.array(z.string().min(1)),
 });
-export const metadataSchema = strictObject({
+export const metadataV3Schema = strictObject({
   title: optionalMetadataText,
   incidentId: optionalMetadataText,
   occurredAt: optionalMetadataText,
@@ -240,7 +240,7 @@ export const metadataSchema = strictObject({
   status: incidentStatusSchema.optional(),
   nodeReferenceHighWaterMark: z.number().int().nonnegative().optional(),
   evidenceReferenceHighWaterMark: z.number().int().nonnegative().optional(),
-  contextItems: z.array(contextItemSchema).default([]),
+  contextItems: z.array(contextItemV3Schema).default([]),
 }).optional();
 
 const issue = (
@@ -249,13 +249,13 @@ const issue = (
   path: (string | number)[] = [],
 ) => ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
 
-export const mapDataSchema = strictObject({
+export const mapDataV3Schema = strictObject({
   schemaVersion: z.literal(3),
-  metadata: metadataSchema,
-  nodes: z.array(chainNodeSchema),
+  metadata: metadataV3Schema,
+  nodes: z.array(chainNodeV3Schema),
   edges: z.array(relationshipEdgeSchema),
-  barriers: z.array(controlSchema),
-  evidence: z.array(evidenceItemSchema),
+  barriers: z.array(controlV3Schema),
+  evidence: z.array(evidenceItemV3Schema),
 }).superRefine((map, ctx) => {
   const seen = (values: string[], label: string) => {
     const ids = new Set<string>();
@@ -421,13 +421,280 @@ export const mapDataSchema = strictObject({
 export type MapDataV1 = z.infer<typeof mapDataV1Schema>;
 export type MapDataV2 = z.infer<typeof mapDataV2Schema>;
 export type ChainNodeV2 = z.infer<typeof chainNodeV2Schema>;
-export type MapData = z.infer<typeof mapDataSchema>;
-export type ChainNode = z.infer<typeof chainNodeSchema>;
-export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
-export type ContextItem = z.infer<typeof contextItemSchema>;
+export type MapDataV3 = z.infer<typeof mapDataV3Schema>;
+export type ChainNodeV3 = z.infer<typeof chainNodeV3Schema>;
+export type EvidenceItemV3 = z.infer<typeof evidenceItemV3Schema>;
+export type ContextItemV3 = z.infer<typeof contextItemV3Schema>;
 export type RelationshipEdge = z.infer<typeof relationshipEdgeSchema>;
 export type CauseEffectEdge = z.infer<typeof causeEffectEdgeSchema>;
 export type ActionEdge = z.infer<typeof actionEdgeSchema>;
 export type Barrier = z.infer<typeof barrierSchema>;
-export type MapMetadata = NonNullable<MapData["metadata"]>;
+export type MapMetadataV3 = NonNullable<MapDataV3["metadata"]>;
 export type MapMetadataV2 = NonNullable<MapDataV2["metadata"]>;
+
+// V3 above is frozen as an import-only contract. All newly persisted maps use V4.
+export const eventDisplaySchema = z.enum(["Map", "Timeline"]);
+export const assertionStateSchema = z.enum([
+  "Unverified",
+  "Supported",
+  "Disputed",
+]);
+export const contextDisplayModeSchema = z.enum(["Text", "Metric"]);
+export const attachmentMimeTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/json",
+]);
+
+export const contextItemSchema = strictObject({
+  id: z.string().min(1),
+  label: z.string().trim().min(1),
+  value: z.string().trim().min(1),
+  showOnCard: z.boolean().optional(),
+  displayMode: contextDisplayModeSchema,
+  unit: z.string().trim().min(1).optional(),
+});
+export const evidenceItemSchema = strictObject({
+  id: z.string().min(1),
+  type: evidenceTypeSchema,
+  title: z.string().min(1),
+  description: z.string().optional(),
+  source: z.string().optional(),
+  reference: z.string().optional(),
+  attachmentIds: z.array(z.string().min(1)),
+  externalUrl: z.string().url().optional(),
+});
+export const attachmentSchema = strictObject({
+  id: z.string().min(1),
+  filename: z.string().trim().min(1),
+  mimeType: attachmentMimeTypeSchema,
+  size: z.number().int().nonnegative(),
+  bundlePath: z.string().trim().min(1),
+  sha256: z
+    .string()
+    .regex(
+      /^[a-fA-F0-9]{64}$/,
+      "SHA-256 must contain 64 hexadecimal characters",
+    )
+    .optional(),
+});
+export const chainNodeSchema = strictObject({
+  id: z.string().min(1),
+  kind: z.literal("ChainNode"),
+  referenceId: z.string().min(1),
+  nodeType: nodeTypeSchema,
+  title: z.string().min(1, "ChainNode title is required"),
+  description: z.string().optional(),
+  owner: z.string().optional(),
+  timestamp: z.string().optional(),
+  endTimestamp: z.string().optional(),
+  eventDisplay: eventDisplaySchema.optional(),
+  severity: severitySchema.optional(),
+  factorCategory: factorCategorySchema.optional(),
+  factorSignificance: factorSignificanceSchema.optional(),
+  assertionState: assertionStateSchema.optional(),
+  actionStatus: actionStatusSchema.optional(),
+  actionDueDate: z.string().optional(),
+  actionCompletedAt: z.string().optional(),
+  eventPhase: eventPhaseSchema.optional(),
+  actionType: actionTypeSchema.optional(),
+  positiveConsequenceBulletPoints: z.array(z.string()),
+  negativeConsequenceBulletPoints: z.array(z.string()),
+  evidenceIds: z.array(z.string().min(1)),
+  contextItems: z.array(contextItemSchema),
+  position: positionSchema,
+});
+export const controlSchema = barrierSchema
+  .extend({
+    referenceId: z.string().min(1),
+    controlRole: controlRoleSchema.optional(),
+    assertionState: assertionStateSchema.optional(),
+    evidenceIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export const metadataSchema = strictObject({
+  title: optionalMetadataText,
+  incidentId: optionalMetadataText,
+  occurredAt: optionalMetadataText,
+  location: optionalMetadataText,
+  severity: severitySchema.optional(),
+  status: incidentStatusSchema.optional(),
+  nodeReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  evidenceReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  controlReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  attachmentReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  contextItems: z.array(contextItemSchema).default([]),
+}).optional();
+
+export const mapDataSchema = strictObject({
+  schemaVersion: z.literal(4),
+  metadata: metadataSchema,
+  nodes: z.array(chainNodeSchema),
+  edges: z.array(relationshipEdgeSchema),
+  barriers: z.array(controlSchema),
+  evidence: z.array(evidenceItemSchema),
+  attachments: z.array(attachmentSchema),
+}).superRefine((map, ctx) => {
+  // Reuse every frozen V3 graph/reference invariant after removing V4-only data.
+  const legacy = mapDataV3Schema.safeParse({
+    schemaVersion: 3,
+    metadata:
+      map.metadata &&
+      (() => {
+        const {
+          controlReferenceHighWaterMark: _control,
+          attachmentReferenceHighWaterMark: _attachment,
+          contextItems,
+          ...metadata
+        } = map.metadata;
+        return {
+          ...metadata,
+          contextItems: contextItems.map(
+            ({ displayMode: _d, unit: _u, ...item }) => item,
+          ),
+        };
+      })(),
+    nodes: map.nodes.map(
+      ({
+        endTimestamp: _end,
+        eventDisplay: _display,
+        assertionState: _assertion,
+        actionCompletedAt: _completed,
+        contextItems,
+        ...node
+      }) => ({
+        ...node,
+        contextItems: contextItems.map(
+          ({ displayMode: _d, unit: _u, ...item }) => item,
+        ),
+      }),
+    ),
+    edges: map.edges,
+    barriers: map.barriers.map(
+      ({ referenceId: _ref, assertionState: _assertion, ...control }) =>
+        control,
+    ),
+    evidence: map.evidence.map(
+      ({ attachmentIds: _ids, externalUrl: _url, ...item }) => item,
+    ),
+  });
+  if (!legacy.success)
+    legacy.error.issues.forEach((item) => ctx.addIssue(item));
+  const duplicate = (values: string[], label: string, path: string) => {
+    const seen = new Set<string>();
+    values.forEach((value, index) => {
+      if (seen.has(value))
+        issue(ctx, `Duplicate ${label}: ${value}`, [path, index]);
+      seen.add(value);
+    });
+  };
+  duplicate(
+    map.barriers.map((item) => item.referenceId),
+    "control reference ID",
+    "barriers",
+  );
+  duplicate(
+    map.attachments.map((item) => item.id),
+    "attachment ID",
+    "attachments",
+  );
+  duplicate(
+    map.attachments.map((item) => item.bundlePath),
+    "attachment bundle path",
+    "attachments",
+  );
+  const attachmentIds = new Set(map.attachments.map((item) => item.id));
+  map.evidence.forEach((evidence, evidenceIndex) => {
+    const local = new Set<string>();
+    evidence.attachmentIds.forEach((id, index) => {
+      if (local.has(id))
+        issue(ctx, `Duplicate attachment reference: ${id}`, [
+          "evidence",
+          evidenceIndex,
+          "attachmentIds",
+          index,
+        ]);
+      local.add(id);
+      if (!attachmentIds.has(id))
+        issue(ctx, `Missing attachment reference: ${id}`, [
+          "evidence",
+          evidenceIndex,
+          "attachmentIds",
+          index,
+        ]);
+    });
+  });
+  const checkContext = (items: ContextItem[], path: (string | number)[]) =>
+    items.forEach((item, index) => {
+      if (item.displayMode !== "Metric" && item.unit !== undefined)
+        issue(ctx, "Context unit is only valid for Metric display", [
+          ...path,
+          index,
+          "unit",
+        ]);
+    });
+  checkContext(map.metadata?.contextItems ?? [], ["metadata", "contextItems"]);
+  map.nodes.forEach((node, index) => {
+    checkContext(node.contextItems, ["nodes", index, "contextItems"]);
+    const eventFields = [
+      ["eventDisplay", node.eventDisplay],
+      ["endTimestamp", node.endTimestamp],
+    ] as const;
+    if (node.nodeType === "Event" && node.eventDisplay === undefined)
+      issue(ctx, "eventDisplay is required on Events", [
+        "nodes",
+        index,
+        "eventDisplay",
+      ]);
+    if (node.nodeType !== "Event")
+      eventFields.forEach(
+        ([field, value]) =>
+          value !== undefined &&
+          issue(ctx, `${field} is only valid on Events`, [
+            "nodes",
+            index,
+            field,
+          ]),
+      );
+    if (node.nodeType !== "Action" && node.actionCompletedAt !== undefined)
+      issue(ctx, "actionCompletedAt is only valid on Actions", [
+        "nodes",
+        index,
+        "actionCompletedAt",
+      ]);
+    if (node.nodeType !== "Factor" && node.assertionState !== undefined)
+      issue(ctx, "assertionState is only valid on Factors", [
+        "nodes",
+        index,
+        "assertionState",
+      ]);
+    if (
+      node.nodeType === "Event" &&
+      node.timestamp !== undefined &&
+      node.endTimestamp !== undefined
+    ) {
+      const start = Date.parse(node.timestamp),
+        end = Date.parse(node.endTimestamp);
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end < start)
+        issue(ctx, "Event end time cannot be earlier than its start time", [
+          "nodes",
+          index,
+          "endTimestamp",
+        ]);
+    }
+  });
+});
+
+export type EventDisplay = z.infer<typeof eventDisplaySchema>;
+export type AssertionState = z.infer<typeof assertionStateSchema>;
+export type ContextDisplayMode = z.infer<typeof contextDisplayModeSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
+export type MapData = z.infer<typeof mapDataSchema>;
+export type ChainNode = z.infer<typeof chainNodeSchema>;
+export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
+export type ContextItem = z.infer<typeof contextItemSchema>;
+export type MapMetadata = NonNullable<MapData["metadata"]>;

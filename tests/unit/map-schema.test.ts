@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   mapDataSchema,
+  mapDataV3Schema,
   mapDataV1Schema,
   mapDataV2Schema,
 } from "../../src/features/maps/schema";
@@ -97,7 +98,7 @@ const validMap = {
 };
 
 const issues = (value: unknown) => {
-  const result = mapDataSchema.safeParse(value);
+  const result = mapDataV3Schema.safeParse(value);
   expect(result.success).toBe(false);
   return result.success ? [] : result.error.issues;
 };
@@ -108,16 +109,16 @@ const mutateNode = (index: number, patch: object) => ({
   ),
 });
 
-describe("mapDataSchema V3", () => {
+describe("mapDataV3Schema V3", () => {
   it("accepts a comprehensive V3 document and normalizes metadata context", () => {
-    const parsed = mapDataSchema.parse(validMap);
+    const parsed = mapDataV3Schema.parse(validMap);
     expect(parsed.schemaVersion).toBe(3);
     expect(parsed.metadata?.contextItems[0]).toMatchObject({
       label: "Weather",
       value: "Rain",
     });
     expect(
-      mapDataSchema.parse({ ...validMap, metadata: { title: "Minimal" } })
+      mapDataV3Schema.parse({ ...validMap, metadata: { title: "Minimal" } })
         .metadata?.contextItems,
     ).toEqual([]);
   });
@@ -262,10 +263,10 @@ describe("mapDataSchema V3", () => {
   });
 
   it("validates node and Control evidence references independently while allowing sharing", () => {
-    expect(mapDataSchema.parse(validMap).nodes[1].evidenceIds).toEqual([
+    expect(mapDataV3Schema.parse(validMap).nodes[1].evidenceIds).toEqual([
       "EV-2",
     ]);
-    expect(mapDataSchema.parse(validMap).barriers[0].evidenceIds).toEqual([
+    expect(mapDataV3Schema.parse(validMap).barriers[0].evidenceIds).toEqual([
       "EV-2",
     ]);
     expect(
@@ -343,5 +344,41 @@ describe("mapDataSchema V3", () => {
         i.message.includes("does not match a causal relationship"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("mapDataSchema V4", () => {
+  it("accepts canonical attachments and compares only parseable Event times", () => {
+    const canonical = structuredClone(sampleMap);
+    canonical.attachments.push({
+      id: "AT-001",
+      filename: "log.txt",
+      mimeType: "text/plain",
+      size: 0,
+      bundlePath: "attachments/log.txt",
+    });
+    canonical.evidence.push({
+      id: "EV-001",
+      type: "Document",
+      title: "Log",
+      attachmentIds: ["AT-001"],
+    });
+    expect(mapDataSchema.safeParse(canonical).success).toBe(true);
+    canonical.nodes[0].timestamp = "2026-01-02T00:00:00Z";
+    canonical.nodes[0].endTimestamp = "2026-01-01T00:00:00Z";
+    expect(mapDataSchema.safeParse(canonical).success).toBe(false);
+    canonical.nodes[0].endTimestamp = "stored-but-malformed";
+    expect(mapDataSchema.safeParse(canonical).success).toBe(true);
+  });
+
+  it("rejects missing and duplicate attachment identities and paths", () => {
+    const canonical = structuredClone(sampleMap);
+    canonical.evidence.push({
+      id: "EV-001",
+      type: "Document",
+      title: "Missing",
+      attachmentIds: ["AT-404"],
+    });
+    expect(mapDataSchema.safeParse(canonical).success).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
+  Attachment,
   ChainNode,
   ContextItem,
   EvidenceItem,
@@ -27,6 +28,8 @@ export type ChainNodeData = {
   description?: string;
   owner?: string;
   timestamp?: string;
+  endTimestamp?: ChainNode["endTimestamp"];
+  eventDisplay?: ChainNode["eventDisplay"];
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
   evidenceItems?: Array<{ id: string; text: string }>;
@@ -35,8 +38,10 @@ export type ChainNodeData = {
   severity?: ChainNode["severity"];
   factorCategory?: ChainNode["factorCategory"];
   factorSignificance?: ChainNode["factorSignificance"];
+  assertionState?: ChainNode["assertionState"];
   actionStatus?: ChainNode["actionStatus"];
   actionDueDate?: ChainNode["actionDueDate"];
+  actionCompletedAt?: ChainNode["actionCompletedAt"];
   eventPhase?: ChainNode["eventPhase"];
   actionType?: ChainNode["actionType"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
@@ -60,7 +65,9 @@ export type BarrierNodeData = {
   status: RuntimeBarrier["status"];
   failureReason?: RuntimeBarrier["failureReason"];
   failureDetails?: string;
+  referenceId?: string;
   controlRole?: RuntimeBarrier["controlRole"];
+  assertionState?: RuntimeBarrier["assertionState"];
   evidenceIds?: string[];
   readOnly?: boolean;
   /** Ephemeral detail visibility resolved by the canvas for this view. */
@@ -85,6 +92,7 @@ type HistoryEntry = {
   metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
   evidence: EvidenceItem[];
+  attachments: Attachment[];
   selectionId: string | null;
 };
 
@@ -93,12 +101,17 @@ type HistoryState = {
   future: HistoryEntry[];
 };
 
+type EvidenceDraft = Omit<EvidenceItem, "id" | "attachmentIds"> & {
+  attachmentIds?: string[];
+};
+
 type AppState = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
   evidence: EvidenceItem[];
+  attachments: Attachment[];
   selectionId: string | null;
   editingId: string | null;
   showDetails: boolean;
@@ -160,10 +173,10 @@ type AppState = {
       target: "incident" | string,
       contextId: string,
     ) => void;
-    createEvidence: (item: Omit<EvidenceItem, "id">) => string | null;
+    createEvidence: (item: EvidenceDraft) => string | null;
     createAndLinkEvidence: (
       target: { kind: "node" | "control"; id: string },
-      item: Omit<EvidenceItem, "id">,
+      item: EvidenceDraft,
     ) => string | null;
     editEvidence: (
       id: string,
@@ -266,6 +279,8 @@ const chainNodeToReactNode = (
     description: node.description,
     owner: node.owner,
     timestamp: node.timestamp,
+    endTimestamp: node.endTimestamp,
+    eventDisplay: node.eventDisplay,
     positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
     evidenceItems: node.evidenceIds.map((id) => {
@@ -277,8 +292,10 @@ const chainNodeToReactNode = (
     severity: node.severity,
     factorCategory: node.factorCategory,
     factorSignificance: node.factorSignificance,
+    assertionState: node.assertionState,
     actionStatus: node.actionStatus,
     actionDueDate: node.actionDueDate,
+    actionCompletedAt: node.actionCompletedAt,
     eventPhase: node.eventPhase,
     actionType: node.actionType,
   },
@@ -308,6 +325,11 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     description: node.data.description,
     owner: node.data.owner,
     timestamp: node.data.timestamp,
+    endTimestamp: node.data.endTimestamp,
+    eventDisplay:
+      (node.data.nodeType ?? "Event") === "Event"
+        ? (node.data.eventDisplay ?? "Map")
+        : undefined,
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     evidenceIds: [
@@ -318,8 +340,10 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     severity: node.data.severity,
     factorCategory: node.data.factorCategory,
     factorSignificance: node.data.factorSignificance,
+    assertionState: node.data.assertionState,
     actionStatus: node.data.actionStatus,
     actionDueDate: node.data.actionDueDate,
+    actionCompletedAt: node.data.actionCompletedAt,
     eventPhase: node.data.eventPhase,
     actionType: node.data.actionType,
     position: snapPosition(node.position),
@@ -361,7 +385,11 @@ const cloneBarrier = (barrier: RuntimeBarrier): RuntimeBarrier => ({
   evidenceIds: [...barrier.evidenceIds],
 });
 
-const cloneEvidence = (item: EvidenceItem): EvidenceItem => ({ ...item });
+const cloneEvidence = (item: EvidenceItem): EvidenceItem => ({
+  ...item,
+  attachmentIds: [...(item.attachmentIds ?? [])],
+});
+const cloneAttachment = (item: Attachment): Attachment => ({ ...item });
 const cloneMetadata = (metadata: RuntimeMetadata | undefined) =>
   metadata
     ? {
@@ -378,6 +406,7 @@ const snapshotFromState = (state: AppState): HistoryEntry => ({
   metadata: cloneMetadata(state.metadata),
   barriers: state.barriers.map(cloneBarrier),
   evidence: state.evidence.map(cloneEvidence),
+  attachments: state.attachments.map(cloneAttachment),
   selectionId: state.selectionId,
 });
 
@@ -417,6 +446,7 @@ const applyHistorySnapshot = (snapshot: HistoryEntry) => ({
   metadata: cloneMetadata(snapshot.metadata),
   barriers: snapshot.barriers.map(cloneBarrier),
   evidence: snapshot.evidence.map(cloneEvidence),
+  attachments: snapshot.attachments.map(cloneAttachment),
   selectionId: snapshot.selectionId,
 });
 
@@ -510,17 +540,20 @@ export const createRootNode = (): ChainNode => ({
 
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   metadata: {
     title: "Untitled Map",
     nodeReferenceHighWaterMark: 1,
     evidenceReferenceHighWaterMark: 0,
+    controlReferenceHighWaterMark: 0,
+    attachmentReferenceHighWaterMark: 0,
     contextItems: [],
   },
   nodes: [createRootNode()],
   edges: [],
   barriers: [],
   evidence: [],
+  attachments: [],
 });
 
 export const createNewMapState = () => {
@@ -532,6 +565,7 @@ export const createNewMapState = () => {
     metadata: map.metadata ? { ...map.metadata } : undefined,
     barriers: map.barriers ? [...map.barriers] : [],
     evidence: map.evidence.map(cloneEvidence),
+    attachments: map.attachments.map(cloneAttachment),
     selectionId: rootId,
     editingId: rootId,
     showDetails: true,
@@ -589,9 +623,22 @@ export const useAppStore = create<AppState>((set, get) => ({
               Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
             ),
           ),
+          controlReferenceHighWaterMark: Math.max(
+            map.metadata?.controlReferenceHighWaterMark ?? 0,
+            ...map.barriers.map((item) =>
+              Number(item.referenceId.match(/^C-(\d+)$/)?.[1] ?? 0),
+            ),
+          ),
+          attachmentReferenceHighWaterMark: Math.max(
+            map.metadata?.attachmentReferenceHighWaterMark ?? 0,
+            ...map.attachments.map((item) =>
+              Number(item.id.match(/^AT-(\d+)$/)?.[1] ?? 0),
+            ),
+          ),
         },
         barriers: runtimeBarriers,
         evidence: map.evidence.map(cloneEvidence),
+        attachments: map.attachments.map(cloneAttachment),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
@@ -605,9 +652,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     },
     toMap: () => {
-      const { nodes, edges, metadata, barriers, evidence } = get();
+      const { nodes, edges, metadata, barriers, evidence, attachments } = get();
       return {
-        schemaVersion: 3,
+        schemaVersion: 4,
         metadata: metadata
           ? {
               ...metadata,
@@ -644,11 +691,14 @@ export const useAppStore = create<AppState>((set, get) => ({
             failureReason: barrier.failureReason,
             failureDetails: barrier.failureDetails,
             description: description?.length ? description : undefined,
+            referenceId: barrier.referenceId ?? "C-001",
             controlRole: barrier.controlRole,
+            assertionState: barrier.assertionState,
             evidenceIds: [...barrier.evidenceIds],
           };
         }),
         evidence: evidence.map(cloneEvidence),
+        attachments: attachments.map(cloneAttachment),
       };
     },
     addChainNode: (options) => {
@@ -771,6 +821,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id,
         label,
         value,
+        displayMode: "Text",
         ...(showOnCard === undefined ? {} : { showOnCard }),
       };
       if (target === "incident")
@@ -844,7 +895,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((current) => {
         const history = updateHistoryState(current, prev, true);
         return {
-          evidence: [...current.evidence, { ...input, title, id }],
+          evidence: [
+            ...current.evidence,
+            { ...input, attachmentIds: input.attachmentIds ?? [], title, id },
+          ],
           metadata: {
             ...(current.metadata ?? {}),
             evidenceReferenceHighWaterMark: highWater + 1,
@@ -892,7 +946,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           nodes,
           barriers,
-          evidence: [...current.evidence, { ...input, title, id }],
+          evidence: [
+            ...current.evidence,
+            { ...input, attachmentIds: input.attachmentIds ?? [], title, id },
+          ],
           metadata: {
             ...(current.metadata ?? {}),
             evidenceReferenceHighWaterMark: highWater + 1,
@@ -1052,7 +1109,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const history = updateHistoryState(current, prev, true);
         return {
           nodes,
-          evidence: [...current.evidence, { id, type: "Note", title }],
+          evidence: [
+            ...current.evidence,
+            { id, type: "Note", title, attachmentIds: [] },
+          ],
           metadata: {
             ...(current.metadata ?? {}),
             evidenceReferenceHighWaterMark: highWater + 1,
@@ -1098,6 +1158,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            eventDisplay: "Map",
             eventPhase: "Incident",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
@@ -1313,6 +1374,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
+            eventDisplay: "Map",
             eventPhase: "Incident",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
@@ -1421,6 +1483,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             kind: "Barrier" as const,
             upstreamNodeId,
             downstreamNodeId,
+            referenceId: `C-${String((state.metadata?.controlReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             status: "Failed" as const,
             evidenceIds: [],
           },
@@ -1444,6 +1507,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         );
         return {
           barriers: nextBarriers,
+          metadata: {
+            ...(state.metadata ?? {}),
+            controlReferenceHighWaterMark:
+              (state.metadata?.controlReferenceHighWaterMark ?? 0) + 1,
+          },
           selectionId: barrierId,
           editingId: null,
           editorFocusRequest: candidate.editorFocusRequest,

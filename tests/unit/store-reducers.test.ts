@@ -381,6 +381,7 @@ describe("useAppStore actions", () => {
       kind: "ChainNode",
       referenceId,
       nodeType: "Event",
+      eventDisplay: "Map",
       title: id,
       positiveConsequenceBulletPoints: [],
       negativeConsequenceBulletPoints: [],
@@ -388,8 +389,8 @@ describe("useAppStore actions", () => {
       contextItems: [],
       position: { x: 0, y: 0 },
     });
-    const map: MapData = {
-      schemaVersion: 3,
+    const map = {
+      schemaVersion: 4 as const,
       nodes: [
         node("root", "N-001"),
         node("left", "N-002"),
@@ -416,6 +417,7 @@ describe("useAppStore actions", () => {
           upstreamNodeId: "root",
           downstreamNodeId: "left",
           status: "Effective",
+          referenceId: "C-001",
           evidenceIds: [],
         },
         {
@@ -424,10 +426,12 @@ describe("useAppStore actions", () => {
           upstreamNodeId: "root",
           downstreamNodeId: "right",
           status: "Effective",
+          referenceId: "C-002",
           evidenceIds: [],
         },
       ],
       evidence: [],
+      attachments: [],
     };
     const childPositions = () => {
       const byId = new Map(
@@ -748,8 +752,18 @@ describe("useAppStore actions", () => {
         evidenceIds: [index === 0 ? "EV-001" : "EV-003"],
       })),
       evidence: [
-        { id: "EV-001", type: "Note" as const, title: "Imported" },
-        { id: "EV-003", type: "Note" as const, title: "Imported" },
+        {
+          id: "EV-001",
+          type: "Note" as const,
+          title: "Imported",
+          attachmentIds: [],
+        },
+        {
+          id: "EV-003",
+          type: "Note" as const,
+          title: "Imported",
+          attachmentIds: [],
+        },
       ],
     };
     const { actions } = useAppStore.getState();

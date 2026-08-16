@@ -4,10 +4,12 @@ import {
   barrierStatusSchema,
   incidentStatusSchema,
   mapDataSchema,
+  mapDataV3Schema,
   mapDataV2Schema,
   mapDataV1Schema,
   severitySchema,
   type MapData,
+  type MapDataV3,
   type MapDataV2,
 } from "./schema";
 
@@ -214,7 +216,7 @@ const evidenceNumber = (id: string): number => {
   return match ? Number(match[1]) : 0;
 };
 
-const migrateV2 = (legacy: MapDataV2): MapData => {
+const migrateV2 = (legacy: MapDataV2): MapDataV3 => {
   const evidence = legacy.nodes.flatMap((node) =>
     node.evidenceItems.map((item) => ({
       id: item.id,
@@ -227,7 +229,7 @@ const migrateV2 = (legacy: MapDataV2): MapData => {
     0,
   );
 
-  return validate({
+  return mapDataV3Schema.parse({
     schemaVersion: 3,
     metadata: {
       ...(legacy.metadata ?? {}),
@@ -251,7 +253,7 @@ const migrateV2 = (legacy: MapDataV2): MapData => {
   });
 };
 
-export const migrateMapDataV1 = (input: unknown): MapData => {
+const migrateMapDataV1ToV3 = (input: unknown): MapDataV3 => {
   const legacy = mapDataV1Schema.parse(input);
   return migrateV2({
     schemaVersion: 2,
@@ -278,14 +280,60 @@ export const migrateMapDataV1 = (input: unknown): MapData => {
   });
 };
 
+const referenceNumber = (id: string, prefix: string): number => {
+  const match = new RegExp(`^${prefix}-(\\d+)$`).exec(id);
+  return match ? Number(match[1]) : 0;
+};
+
+export const migrateMapDataV3 = (input: unknown): MapData => {
+  const legacy = mapDataV3Schema.parse(input);
+  const barriers = legacy.barriers.map((control, index) => ({
+    ...control,
+    referenceId: `C-${String(index + 1).padStart(3, "0")}`,
+  }));
+  return validate({
+    schemaVersion: 4,
+    metadata: {
+      ...(legacy.metadata ?? {}),
+      controlReferenceHighWaterMark: Math.max(
+        legacy.barriers.length,
+        ...barriers.map((control) => referenceNumber(control.referenceId, "C")),
+      ),
+      attachmentReferenceHighWaterMark: 0,
+      contextItems: (legacy.metadata?.contextItems ?? []).map((item) => ({
+        ...item,
+        displayMode: "Text",
+      })),
+    },
+    nodes: legacy.nodes.map((node) => ({
+      ...node,
+      ...(node.nodeType === "Event" ? { eventDisplay: "Map" as const } : {}),
+      contextItems: node.contextItems.map((item) => ({
+        ...item,
+        displayMode: "Text" as const,
+      })),
+    })),
+    edges: legacy.edges,
+    barriers,
+    evidence: legacy.evidence.map((item) => ({ ...item, attachmentIds: [] })),
+    attachments: [],
+  });
+};
+
+export const migrateMapDataV1 = (input: unknown): MapData =>
+  migrateMapDataV3(migrateMapDataV1ToV3(input));
+
 /** The sole boundary for untrusted persisted map JSON. */
 export const parseAndMigrateMapData = (input: unknown): MapData => {
   const { schemaVersion } = versionEnvelope.parse(input);
   if (schemaVersion === 1) return migrateMapDataV1(input);
   if (schemaVersion === 2) {
     const canonical = mapDataV2Schema.safeParse(input);
-    return migrateV2(canonical.success ? canonical.data : parseLegacyV2(input));
+    return migrateMapDataV3(
+      migrateV2(canonical.success ? canonical.data : parseLegacyV2(input)),
+    );
   }
-  if (schemaVersion === 3) return validate(input);
+  if (schemaVersion === 3) return migrateMapDataV3(input);
+  if (schemaVersion === 4) return validate(input);
   throw new Error(`Unsupported map schema version: ${schemaVersion}`);
 };
