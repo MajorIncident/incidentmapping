@@ -5,12 +5,11 @@ import { useAppStore } from "../../state/useAppStore";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 
-const nodeTypeOptions = ["Event", "Factor", "Impact", "Action"].map(
-  (value) => ({
-    value: value as NonNullable<ChainNodeData["nodeType"]>,
-    label: value,
-  }),
-);
+const causalNodeTypeOptions = ["Event", "Factor", "Impact"].map((value) => ({
+  value: value as NonNullable<ChainNodeData["nodeType"]>,
+  label: value,
+}));
+const actionNodeTypeOptions = [{ value: "Action" as const, label: "Action" }];
 const factorCategoryOptions = [
   "Human",
   "Process",
@@ -232,7 +231,11 @@ const ChainNodeComponent = ({
           readOnly={data.readOnly}
           label="Node type"
           value={data.nodeType ?? "Event"}
-          options={nodeTypeOptions}
+          options={
+            data.nodeType === "Action"
+              ? actionNodeTypeOptions
+              : causalNodeTypeOptions
+          }
           onChange={(value) => setNodeType(id, value)}
           className={`node-tag--type node-tag--${(data.nodeType ?? "Event").toLowerCase()}`}
         />

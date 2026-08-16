@@ -118,6 +118,7 @@ type AppState = {
       id: string,
       value?: ChainNode["actionStatus"],
     ) => void;
+    setNodeActionDueDate: (id: string, dueDate?: string) => void;
     addEvidence: (nodeId: string, text: string) => string | null;
     updateEvidence: (
       nodeId: string,
@@ -125,11 +126,6 @@ type AppState = {
       text: string,
     ) => boolean;
     removeEvidence: (nodeId: string, evidenceId: string) => void;
-    setActionStatus: (
-      edgeId: string,
-      status?: ChainNode["actionStatus"],
-    ) => void;
-    setActionDueDate: (edgeId: string, dueDate?: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
     nudgeNodeBy: (id: string, dx: number, dy: number) => void;
@@ -400,18 +396,17 @@ export const findDownstreamEdges = (
     (edge) => edge.source === upstreamId && edge.data?.kind !== "ActionEdge",
   );
 
-/** Creates the initial event for an interactive map without mutating a fixture. */
+/** Creates the initial impact for an interactive map without mutating a fixture. */
 export const createRootNode = (): ChainNode => ({
   id: createId("node"),
   kind: "ChainNode",
-  title: "New incident",
+  title: "Undesirable outcome",
   referenceId: "N-001",
-  nodeType: "Event",
+  nodeType: "Impact",
   description: "",
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
   evidenceItems: [],
-  factorSignificance: "Normal",
   position: snapPosition({ x: 0, y: 0 }),
 });
 
@@ -480,6 +475,14 @@ export const useAppStore = create<AppState>((set, get) => ({
             map.metadata?.nodeReferenceHighWaterMark ?? 0,
             ...map.nodes.map((node) =>
               Number(node.referenceId.match(/N-(\d+)/)?.[1] ?? 0),
+            ),
+          ),
+          evidenceReferenceHighWaterMark: Math.max(
+            map.metadata?.evidenceReferenceHighWaterMark ?? 0,
+            ...map.nodes.flatMap((node) =>
+              node.evidenceItems.map((item) =>
+                Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
+              ),
             ),
           ),
         },
@@ -569,41 +572,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     setNodeType: (id, value) => {
       const node = get().nodes.find((item) => item.id === id);
-      if (!node || node.data.nodeType === value) return;
-      const connected = get().edges.filter(
-        (edge) => edge.source === id || edge.target === id,
-      );
       if (
-        value === "Action" &&
-        connected.some((edge) => edge.data?.kind !== "ActionEdge")
+        !node ||
+        node.data.nodeType === value ||
+        node.data.nodeType === "Action" ||
+        value === "Action"
       )
         return;
-      if (node.data.nodeType === "Action" && value !== "Action") {
-        const prevSnapshot = snapshotFromState(get());
-        set((state) => {
-          const nodes = state.nodes.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  data: {
-                    ...item.data,
-                    nodeType: value,
-                    actionStatus: undefined,
-                  },
-                }
-              : item,
-          );
-          const edges = state.edges.filter(
-            (edge) =>
-              edge.data?.kind !== "ActionEdge" ||
-              (edge.source !== id && edge.target !== id),
-          );
-          const history = updateHistoryState(state, prevSnapshot, true);
-          return { nodes, edges, history, canUndo: true, canRedo: false };
-        });
-        return;
-      }
-      get().actions.updateNodeData(id, { nodeType: value });
+      get().actions.updateNodeData(id, {
+        nodeType: value,
+        factorCategory: undefined,
+        factorSignificance: value === "Factor" ? "Normal" : undefined,
+      });
     },
     setFactorCategory: (id, value) =>
       get().actions.updateNodeData(id, { factorCategory: value }),
@@ -611,13 +591,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().actions.updateNodeData(id, { factorSignificance: value }),
     setNodeActionStatus: (id, value) =>
       get().actions.updateNodeData(id, { actionStatus: value }),
+    setNodeActionDueDate: (id, dueDate) =>
+      get().actions.updateNodeData(id, {
+        actionDueDate: dueDate?.trim() || undefined,
+      }),
     addEvidence: (nodeId, value) => {
       const text = value.trim();
       if (!text) return null;
       const node = get().nodes.find((item) => item.id === nodeId);
       if (!node) return null;
-      const current = node.data.evidenceItems ?? [];
-      const highWater = get().metadata?.evidenceReferenceHighWaterMark ?? 0;
+      const highWater = Math.max(
+        get().metadata?.evidenceReferenceHighWaterMark ?? 0,
+        ...get().nodes.flatMap((candidate) =>
+          (candidate.data.evidenceItems ?? []).map((item) =>
+            Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
+          ),
+        ),
+      );
       const id = `EV-${String(highWater + 1).padStart(3, "0")}`;
       const prevSnapshot = snapshotFromState(get());
       set((state) => {
@@ -627,7 +617,10 @@ export const useAppStore = create<AppState>((set, get) => ({
                 ...candidate,
                 data: {
                   ...candidate.data,
-                  evidenceItems: [...current, { id, text }],
+                  evidenceItems: [
+                    ...(candidate.data.evidenceItems ?? []),
+                    { id, text },
+                  ],
                 },
               }
             : candidate,
@@ -677,32 +670,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       });
     },
-    setActionStatus: (edgeId, status) => {
-      const target = get().edges.find(
-        (edge) => edge.id === edgeId && edge.data?.kind === "ActionEdge",
-      )?.target;
-      if (target)
-        get().actions.updateNodeData(target, { actionStatus: status });
-    },
-    setActionDueDate: (edgeId, dueDate) => {
-      const value = dueDate?.trim() || undefined;
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        let changed = false;
-        const target = state.edges.find(
-          (edge) => edge.id === edgeId && edge.data?.kind === "ActionEdge",
-        )?.target;
-        const nodes = state.nodes.map((node) => {
-          if (node.id !== target || node.data.actionDueDate === value)
-            return node;
-          changed = true;
-          return { ...node, data: { ...node.data, actionDueDate: value } };
-        });
-        if (!changed) return {};
-        const history = updateHistoryState(state, prevSnapshot, true);
-        return { nodes, history, canUndo: true, canRedo: false };
-      });
-    },
     addChild: (parentId) => {
       const initialParentId = parentId ?? get().selectionId ?? undefined;
       const newNodeId = createId("node");
@@ -721,7 +688,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
-            factorSignificance: "Normal",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
@@ -932,7 +898,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             title: "New Event",
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Event",
-            factorSignificance: "Normal",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
