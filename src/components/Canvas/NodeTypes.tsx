@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
-import { resolveEvidence } from "../../state/selectors";
+import { resolveEvidence, selectPinnedContext } from "../../state/selectors";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 
@@ -232,11 +232,14 @@ const ChainNodeComponent = ({
   const visibleEvidence = evidenceItems.slice(0, 3);
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
+  const contextItems = data.contextItems ?? [];
+  const compactContext = selectPinnedContext(contextItems).slice(0, 2);
   const hasVisibleDetails =
     hasDescription ||
     hasPositivePoints ||
     hasNegativePoints ||
-    evidenceItems.length > 0;
+    evidenceItems.length > 0 ||
+    contextItems.length > 0;
   const timestamp = formatLocalDateTime(data.timestamp);
   const dueDate = formatLocalDate(data.actionDueDate);
   const significance = data.factorSignificance ?? "Normal";
@@ -410,6 +413,19 @@ const ChainNodeComponent = ({
           ) : null}
         </div>
       ) : null}
+      {!isEditing && !showDetails && compactContext.length ? (
+        <dl
+          className="mt-2 space-y-1 text-[11px] text-slate-600"
+          aria-label="Pinned context"
+        >
+          {compactContext.map((item) => (
+            <div key={item.id} className="flex min-w-0 justify-between gap-2">
+              <dt className="shrink-0 font-semibold">{item.label}</dt>
+              <dd className="truncate text-right">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {!isEditing && showDetails && hasVisibleDetails ? (
         <div
           className="mt-2 space-y-2 text-xs text-slate-600"
@@ -419,6 +435,21 @@ const ChainNodeComponent = ({
             <p className="whitespace-pre-wrap break-words text-[13px] text-slate-700">
               {data.description}
             </p>
+          ) : null}
+          {contextItems.length ? (
+            <div className="space-y-1" data-testid="context-details">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                Context
+              </div>
+              <dl className="space-y-1 text-[13px] text-slate-700">
+                {contextItems.map((item) => (
+                  <div key={item.id} className="flex min-w-0 gap-1.5">
+                    <dt className="shrink-0 font-semibold">{item.label}:</dt>
+                    <dd className="min-w-0 break-words">{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           ) : null}
           {hasPositivePoints || hasNegativePoints ? (
             <div
