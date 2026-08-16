@@ -147,6 +147,54 @@ describe("Inspector and keyboard workflows", () => {
     });
   });
 
+  it("keeps Enter and Shift+Enter in parity with causal Add Below availability", () => {
+    render(<App />);
+    let nodeId = "";
+    act(() => {
+      nodeId = useAppStore.getState().actions.addChild() ?? "";
+      useAppStore.getState().actions.finishEditing();
+    });
+
+    for (const nodeType of ["Impact", "Event", "Factor"] as const) {
+      act(() => {
+        const actions = useAppStore.getState().actions;
+        actions.select(nodeId);
+        actions.setNodeType(nodeId, nodeType);
+      });
+      const before = useAppStore.getState().nodes.length;
+      expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(false);
+      expect(useAppStore.getState().nodes).toHaveLength(before + 1);
+    }
+
+    act(() => {
+      const actions = useAppStore.getState().actions;
+      actions.select(nodeId);
+      nodeId = actions.addAction(nodeId) ?? "";
+      actions.finishEditing();
+    });
+    let before = useAppStore.getState().nodes.length;
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
+      true,
+    );
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+
+    act(() => {
+      useAppStore.getState().actions.loadMap(sampleMap);
+      useAppStore.getState().actions.select("barrier-root-child");
+    });
+    before = useAppStore.getState().nodes.length;
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
+      true,
+    );
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+
+    act(() => useAppStore.getState().actions.select(null));
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+  });
+
   it("focuses a new Control purpose, updates its card live, and undoes it as one edit", async () => {
     const mapWithoutBarrier = { ...sampleMap, barriers: [] };
     act(() => {

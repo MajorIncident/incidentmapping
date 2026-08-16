@@ -4,13 +4,14 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider, type NodeProps } from "reactflow";
 import { App } from "../../src/app/App";
 import { useAppStore, type ChainNodeData } from "../../src/state/useAppStore";
-import { emptyMap } from "../../src/features/maps/fixtures";
+import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 import { nodeTypes } from "../../src/components/Canvas/NodeTypes";
 import { viewportAnimationDuration } from "../../src/components/Canvas/Canvas";
 
@@ -64,6 +65,47 @@ describe("Toolbar map title", () => {
     expect(
       screen.getByRole("menuitem", { name: /arrange map/i }),
     ).toBeDisabled();
+  });
+
+  it("enables Add Below only for selected causal nodes and orders editing commands", () => {
+    render(<App />);
+
+    const editingCommands = screen.getByRole("navigation", {
+      name: "Editing commands",
+    });
+    const addBelow = screen.getByRole("button", { name: "Add Below" });
+    const present = screen.getByRole("button", { name: "Present map" });
+    expect(addBelow).toBeDisabled();
+    expect(addBelow).toHaveClass("command-button--primary");
+    expect(present).not.toHaveClass("command-button--primary");
+    expect(within(editingCommands).getAllByRole("button")).toEqual([
+      addBelow,
+      present,
+      screen.getByRole("button", { name: "More menu" }),
+    ]);
+
+    let nodeId = "";
+    act(() => {
+      nodeId = useAppStore.getState().actions.addChild() ?? "";
+    });
+    for (const nodeType of ["Impact", "Event", "Factor"] as const) {
+      act(() => useAppStore.getState().actions.setNodeType(nodeId, nodeType));
+      expect(addBelow).toBeEnabled();
+    }
+
+    act(() => {
+      nodeId = useAppStore.getState().actions.addAction(nodeId) ?? "";
+    });
+    expect(addBelow).toBeDisabled();
+
+    act(() => {
+      useAppStore.getState().actions.loadMap(sampleMap);
+      useAppStore.getState().actions.select("barrier-root-child");
+    });
+    expect(addBelow).toBeDisabled();
+
+    act(() => useAppStore.getState().actions.select(null));
+    expect(addBelow).toBeDisabled();
   });
 
   it("edits the canvas title with a double-click and commits on Enter", async () => {

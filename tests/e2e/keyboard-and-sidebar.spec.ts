@@ -87,4 +87,53 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByLabel("Timestamp")).toHaveValue(
     "2024-07-01T08:30:00Z",
   );
+
+  // Add Below exposes the same causal-node rules to mouse and keyboard users.
+  for (const nodeType of ["Impact", "Event", "Factor"]) {
+    await page.getByLabel("Type").selectOption(nodeType);
+    const addBelow = page.getByRole("button", { name: "Add Below" });
+    await expect(addBelow).toBeEnabled();
+    const countBeforeMouse = await page.getByTestId("chain-node").count();
+    await addBelow.click();
+    await expect(page.getByTestId("chain-node")).toHaveCount(
+      countBeforeMouse + 1,
+    );
+    await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+    await effectNode.click();
+
+    const countBeforeEnter = await page.getByTestId("chain-node").count();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("chain-node")).toHaveCount(
+      countBeforeEnter + 1,
+    );
+    await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+    await effectNode.click();
+  }
+
+  await page.getByRole("button", { name: "+ Action" }).click();
+  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  let unavailableCount = await page.getByTestId("chain-node").count();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Shift+Enter");
+  await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
+
+  await page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Primary Event" })
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: /^Add Control:/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  unavailableCount = await page.getByTestId("chain-node").count();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Shift+Enter");
+  await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
+
+  await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
 });

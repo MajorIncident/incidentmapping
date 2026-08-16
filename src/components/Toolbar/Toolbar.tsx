@@ -4,6 +4,7 @@ import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
   onAddChainNode: () => void;
+  canAddBelow: boolean;
   onDeleteSelection: () => void;
   canDelete: boolean;
   onUndo: () => void;
@@ -159,21 +160,22 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
       <button
         type="button"
         className={`${buttonBase} command-button--primary`}
-        onClick={props.onPresent}
-        aria-label="Present map"
-      >
-        <span aria-hidden="true">▶</span>
-        <span>Present</span>
-      </button>
-      <button
-        type="button"
-        className={buttonBase}
         onClick={props.onAddChainNode}
+        disabled={!props.canAddBelow}
         aria-label="Add Below"
         title="Add Below (Enter)"
       >
         <Icon name="add" />
         <span>Add Below</span>
+      </button>
+      <button
+        type="button"
+        className={buttonBase}
+        onClick={props.onPresent}
+        aria-label="Present map"
+      >
+        <span aria-hidden="true">▶</span>
+        <span>Present</span>
       </button>
       <Menu label="More" icon="more" align="right">
         <Item
