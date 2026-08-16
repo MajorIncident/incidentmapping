@@ -13,6 +13,7 @@ import { useReactFlow } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
 import { EvidenceSection } from "../Evidence/EvidenceSection";
 import { ContextEditor } from "../Context/ContextEditor";
+import { AssertionStateField } from "../AssertionState/AssertionState";
 
 export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
@@ -115,6 +116,9 @@ export const Inspector = ({
   const setFactorSignificance = useAppStore(
     (state) => state.actions.setFactorSignificance,
   );
+  const setFactorAssertionState = useAppStore(
+    (state) => state.actions.setFactorAssertionState,
+  );
   const setNodeActionStatus = useAppStore(
     (state) => state.actions.setNodeActionStatus,
   );
@@ -128,6 +132,9 @@ export const Inspector = ({
   );
   const setActionType = useAppStore((state) => state.actions.setActionType);
   const setControlRole = useAppStore((state) => state.actions.setControlRole);
+  const setControlAssertionState = useAppStore(
+    (state) => state.actions.setControlAssertionState,
+  );
   const setNodeActionDueDate = useAppStore(
     (state) => state.actions.setNodeActionDueDate,
   );
@@ -687,6 +694,12 @@ export const Inspector = ({
             </details>
           </div>
 
+          <AssertionStateField
+            id="barrier-assertion-state"
+            value={barrier.assertionState}
+            onChange={(value) => setControlAssertionState(barrier.id, value)}
+          />
+
           <div className="flex flex-col gap-1">
             <label htmlFor="barrier-control-role" className={labelClasses}>
               Control Role
@@ -1008,6 +1021,13 @@ export const Inspector = ({
               </>
             ) : null}
           </div>
+        ) : null}
+        {node.data.nodeType === "Factor" ? (
+          <AssertionStateField
+            id="factor-assertion-state"
+            value={node.data.assertionState}
+            onChange={(value) => setFactorAssertionState(node.id, value)}
+          />
         ) : null}
         {node.data.nodeType === "Action" ? (
           <div className="flex flex-col gap-1">
@@ -1681,6 +1701,7 @@ export const Inspector = ({
     positiveErrors,
     removeBarrier,
     setFactorCategory,
+    setFactorAssertionState,
     setFactorSignificance,
     setNodeActionStatus,
     setNodeActionDueDate,
@@ -1691,6 +1712,7 @@ export const Inspector = ({
     setEventEndTimestamp,
     setActionType,
     setControlRole,
+    setControlAssertionState,
     select,
     showEndTime,
     timingError,

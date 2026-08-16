@@ -149,6 +149,10 @@ type AppState = {
       id: string,
       value?: ChainNode["factorSignificance"],
     ) => void;
+    setFactorAssertionState: (
+      id: string,
+      value?: ChainNode["assertionState"],
+    ) => void;
     setNodeActionStatus: (
       id: string,
       value?: ChainNode["actionStatus"],
@@ -161,6 +165,10 @@ type AppState = {
     setEventEndTimestamp: (id: string, value?: string) => void;
     setActionType: (id: string, value?: ChainNode["actionType"]) => void;
     setControlRole: (id: string, value?: RuntimeBarrier["controlRole"]) => void;
+    setControlAssertionState: (
+      id: string,
+      value?: RuntimeBarrier["assertionState"],
+    ) => void;
     addContext: (
       target: "incident" | string,
       label: string,
@@ -227,6 +235,7 @@ type AppState = {
           | "failureDetails"
           | "description"
           | "controlRole"
+          | "assertionState"
           | "evidenceIds"
         >
       >,
@@ -769,6 +778,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         nodeType: value,
         factorCategory: undefined,
         factorSignificance: value === "Factor" ? "Normal" : undefined,
+        assertionState:
+          value === "Factor" ? node.data.assertionState : undefined,
         eventPhase: value === "Event" ? node.data.eventPhase : undefined,
         eventDisplay:
           value === "Event" ? (node.data.eventDisplay ?? "Map") : undefined,
@@ -790,6 +801,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().nodes.find((node) => node.id === id)?.data.nodeType === "Factor"
       )
         get().actions.updateNodeData(id, { factorSignificance: value });
+    },
+    setFactorAssertionState: (id, value) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Factor"
+      )
+        get().actions.updateNodeData(id, { assertionState: value });
     },
     setNodeActionStatus: (id, value) => {
       if (
@@ -841,6 +858,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     setControlRole: (id, value) => {
       if (!get().barriers.some((item) => item.id === id)) return;
       get().actions.updateBarrierData(id, { controlRole: value });
+    },
+    setControlAssertionState: (id, value) => {
+      if (!get().barriers.some((item) => item.id === id)) return;
+      get().actions.updateBarrierData(id, { assertionState: value });
     },
     addContext: (target, rawLabel, rawValue, showOnCard) => {
       const label = rawLabel.trim();

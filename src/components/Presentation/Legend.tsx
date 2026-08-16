@@ -68,6 +68,13 @@ export const Legend = (): JSX.Element => {
         barriers.map((control) => control.status),
       ).map(item),
     ];
+    const assertions = orderedValues(
+      ["Confirmed", "Working", "Inferred"] as const,
+      [
+        ...nodes.map((node) => node.data.assertionState),
+        ...barriers.map((control) => control.assertionState),
+      ],
+    ).map((value) => [value, `assertion-${value.toLowerCase()}`] as LegendItem);
     const actions = orderedValues(
       ["Immediate", "Corrective", "Preventive"] as const,
       nodes.map((node) => node.data.actionType),
@@ -79,6 +86,7 @@ export const Legend = (): JSX.Element => {
       ["Event Phase", "event-phase", phases],
       ["Analysis significance", "analysis", significance],
       ["Control Role and Status", "controls", controls],
+      ["Assertion State", "assertions", assertions],
       ["Action Type", "action-type", actions],
     ];
     return groups.filter(([, , items]) => items.length);
