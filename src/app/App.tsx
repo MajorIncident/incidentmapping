@@ -14,6 +14,7 @@ import { canAddBelowSelection } from "../state/selectors";
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [presenting, setPresenting] = useState(false);
+  const [presentationShowDetails, setPresentationShowDetails] = useState(false);
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
@@ -114,6 +115,7 @@ export const App = (): JSX.Element => {
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
                   useAppStore.getState().actions.select(null);
+                  setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
                   setPresenting(true);
                 }}
@@ -124,6 +126,7 @@ export const App = (): JSX.Element => {
               <div className="min-w-0 flex-1 bg-slate-100">
                 <Canvas
                   presenting={presenting}
+                  presentationShowDetails={presentationShowDetails}
                   onPresentationInteract={() => setPresentationHintOpen(false)}
                   onInspect={() => setInspectorOpen(true)}
                 />
@@ -155,13 +158,20 @@ export const App = (): JSX.Element => {
                   </aside>
                 ) : null}
                 <Legend />
-                <button
-                  className="presentation-exit"
-                  type="button"
-                  onClick={exitPresentation}
-                >
-                  Exit Presentation <span aria-hidden="true">Esc</span>
-                </button>
+                <div className="presentation-actions">
+                  <button
+                    type="button"
+                    aria-pressed={presentationShowDetails}
+                    onClick={() =>
+                      setPresentationShowDetails((visible) => !visible)
+                    }
+                  >
+                    {presentationShowDetails ? "Hide Details" : "Show Details"}
+                  </button>
+                  <button type="button" onClick={exitPresentation}>
+                    Exit Presentation <span aria-hidden="true">Esc</span>
+                  </button>
+                </div>
               </>
             ) : (
               <Footer />
