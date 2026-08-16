@@ -144,6 +144,7 @@ export const Canvas = ({
       };
       const matchingBarrier = barriers.find(
         (barrier) =>
+          edge.data?.kind !== "ActionEdge" &&
           barrier.upstreamNodeId === edge.source &&
           barrier.downstreamNodeId === edge.target,
       );
@@ -169,8 +170,6 @@ export const Canvas = ({
           status: matchingBarrier.status,
           failureReason: matchingBarrier.failureReason,
           failureDetails: matchingBarrier.failureDetails,
-          breached: matchingBarrier.breached,
-          breachedItems: matchingBarrier.breachedItems,
         },
         position: {
           x:
@@ -326,11 +325,11 @@ export const Canvas = ({
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           <span>
             <i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500" />
-            Barrier holding
+            Barrier effective
           </span>
           <span>
             <i className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />
-            Barrier breached
+            Barrier failed
           </span>
           <span>
             <b className="text-emerald-700">+</b> positive
@@ -421,7 +420,7 @@ export const Canvas = ({
           zoomable
           nodeColor={(node) => {
             if (node.type === "Barrier")
-              return node.data.breached ? "#e11d48" : "#0ea5e9";
+              return node.data.status === "Effective" ? "#059669" : "#e11d48";
             if (node.data.presentation?.isRoot) return "#7c3aed";
             if ((node.data.positiveConsequenceBulletPoints?.length ?? 0) > 0)
               return "#059669";

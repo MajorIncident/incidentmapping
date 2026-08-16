@@ -225,7 +225,7 @@ describe("useAppStore actions", () => {
     });
   });
 
-  it("creates a breached, selected barrier and requests description focus", () => {
+  it("creates a failed, selected barrier and requests description focus", () => {
     const { actions } = useAppStore.getState();
     const parentId = actions.addChild() as string;
     const childId = actions.addChild(parentId) as string;
@@ -237,8 +237,7 @@ describe("useAppStore actions", () => {
     expect(state.barriers).toContainEqual(
       expect.objectContaining({
         id: barrierId,
-        breached: true,
-        breachedItems: [],
+        status: "Failed",
       }),
     );
     expect(state.selectionId).toBe(barrierId);
@@ -273,6 +272,22 @@ describe("useAppStore actions", () => {
     );
   });
 
+  it("does not create barriers on action relationships", () => {
+    const { actions } = useAppStore.getState();
+    const upstreamId = actions.addChild() as string;
+    const downstreamId = actions.addChild(upstreamId) as string;
+    useAppStore.setState((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.source === upstreamId && edge.target === downstreamId
+          ? { ...edge, data: { kind: "ActionEdge" } }
+          : edge,
+      ),
+    }));
+
+    expect(actions.addBarrier(upstreamId, downstreamId)).toBeNull();
+    expect(useAppStore.getState().barriers).toEqual([]);
+  });
+
   it("does not create a barrier for a node without downstream edges", () => {
     const { actions } = useAppStore.getState();
     const leafId = actions.addChild() as string;
@@ -281,12 +296,12 @@ describe("useAppStore actions", () => {
     expect(useAppStore.getState().barriers).toEqual([]);
   });
 
-  it("retains the breached state of loaded legacy barriers", () => {
+  it("retains the status of loaded barriers", () => {
     useAppStore.getState().actions.loadMap(sampleMap);
 
     expect(useAppStore.getState().barriers[0]).toMatchObject({
       id: "barrier-root-child",
-      breached: false,
+      status: "Effective",
     });
   });
 

@@ -27,7 +27,14 @@ export const App = (): JSX.Element => {
       state.nodes.length >= 2 &&
       applyHierarchyLayout(state.nodes, state.edges, {
         showDetails: state.showDetails,
-        barrierEdges: state.barriers,
+        barrierEdges: state.barriers.filter((barrier) =>
+          state.edges.some(
+            (edge) =>
+              edge.data?.kind !== "ActionEdge" &&
+              edge.source === barrier.upstreamNodeId &&
+              edge.target === barrier.downstreamNodeId,
+          ),
+        ),
       }).changed,
   );
 

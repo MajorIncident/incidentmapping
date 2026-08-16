@@ -87,30 +87,24 @@ export const Inspector = ({
   const [barrierDescription, setBarrierDescription] = useState("");
   const [positiveErrors, setPositiveErrors] = useState<string[]>([]);
   const [negativeErrors, setNegativeErrors] = useState<string[]>([]);
-  const [breachedItems, setBreachedItems] = useState<string[]>([]);
-  const [breachedErrors, setBreachedErrors] = useState<string[]>([]);
-  const [isBreached, setIsBreached] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const barrierDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const nextListItemId = useRef(0);
   const positiveItemIds = useRef<string[]>([]);
   const negativeItemIds = useRef<string[]>([]);
-  const breachedItemIds = useRef<string[]>([]);
   const positiveInputRefs = useRef(new Map<string, HTMLInputElement>());
   const negativeInputRefs = useRef(new Map<string, HTMLInputElement>());
-  const breachedInputRefs = useRef(new Map<string, HTMLInputElement>());
   const evidenceInputRefs = useRef(new Map<string, HTMLInputElement>());
   const positiveAddRef = useRef<HTMLButtonElement | null>(null);
   const negativeAddRef = useRef<HTMLButtonElement | null>(null);
-  const breachedAddRef = useRef<HTMLButtonElement | null>(null);
   const evidenceAddRef = useRef<HTMLButtonElement | null>(null);
   const [pendingFocus, setPendingFocus] = useState<{
-    listType: "positive" | "negative" | "breached" | "evidence";
+    listType: "positive" | "negative" | "evidence";
     itemId: string | null;
   } | null>(null);
 
   const createListItemId = useCallback(
-    (listType: "positive" | "negative" | "breached") =>
+    (listType: "positive" | "negative") =>
       `${listType}-${nextListItemId.current++}`,
     [],
   );
@@ -120,11 +114,9 @@ export const Inspector = ({
     setEvidenceDrafts([]);
     positiveInputRefs.current.clear();
     negativeInputRefs.current.clear();
-    breachedInputRefs.current.clear();
     evidenceInputRefs.current.clear();
     positiveItemIds.current = [];
     negativeItemIds.current = [];
-    breachedItemIds.current = [];
   }, [selectionId]);
 
   useEffect(() => {
@@ -186,26 +178,8 @@ export const Inspector = ({
   }, [clearEditorFocusRequest, editorFocusRequest, node]);
 
   useEffect(() => {
-    if (barrier) {
-      setIsBreached(barrier.breached ?? barrier.status === "Failed");
-      setBreachedItems(barrier.breachedItems ?? []);
-      setBarrierDescription(barrier.description ?? "");
-      setBreachedErrors([]);
-      if (
-        breachedItemIds.current.length !== (barrier.breachedItems ?? []).length
-      ) {
-        breachedItemIds.current = (barrier.breachedItems ?? []).map(() =>
-          createListItemId("breached"),
-        );
-      }
-    } else {
-      setIsBreached(false);
-      setBreachedItems([]);
-      setBarrierDescription("");
-      setBreachedErrors([]);
-      breachedItemIds.current = [];
-    }
-  }, [barrier, createListItemId]);
+    setBarrierDescription(barrier?.description ?? "");
+  }, [barrier]);
 
   useEffect(() => {
     if (
@@ -225,17 +199,13 @@ export const Inspector = ({
         ? positiveInputRefs.current
         : pendingFocus.listType === "negative"
           ? negativeInputRefs.current
-          : pendingFocus.listType === "evidence"
-            ? evidenceInputRefs.current
-            : breachedInputRefs.current;
+          : evidenceInputRefs.current;
     const addButton =
       pendingFocus.listType === "positive"
         ? positiveAddRef.current
         : pendingFocus.listType === "negative"
           ? negativeAddRef.current
-          : pendingFocus.listType === "evidence"
-            ? evidenceAddRef.current
-            : breachedAddRef.current;
+          : evidenceAddRef.current;
     (pendingFocus.itemId
       ? inputRefs.get(pendingFocus.itemId)
       : addButton
@@ -245,7 +215,6 @@ export const Inspector = ({
     pendingFocus,
     positiveConsequences,
     negativeConsequences,
-    breachedItems,
     evidenceDrafts,
   ]);
 
@@ -310,17 +279,6 @@ export const Inspector = ({
     [node, updateNodeData],
   );
 
-  const handleToggleBreached = useCallback(
-    (checked: boolean) => {
-      if (!barrier) {
-        return;
-      }
-      setIsBreached(checked);
-      updateBarrierData(barrier.id, { breached: checked });
-    },
-    [barrier, updateBarrierData],
-  );
-
   const handleBarrierDescriptionBlur = useCallback(() => {
     if (!barrier) {
       return;
@@ -343,97 +301,6 @@ export const Inspector = ({
       );
     },
     [barrier, updateBarrierData],
-  );
-
-  const validateBreachedList = useCallback((values: string[]): string[] => {
-    return values.map((value) =>
-      value.trim().length === 0 ? "This field is required." : "",
-    );
-  }, []);
-
-  const commitBreachedItems = useCallback(
-    (values: string[]) => {
-      if (!barrier) {
-        return;
-      }
-      const errors = validateBreachedList(values);
-      setBreachedErrors(errors);
-      setBreachedItems(values);
-      if (errors.some((error) => error.length > 0)) {
-        return;
-      }
-      const trimmed = values.map((value) => value.trim());
-      updateBarrierData(barrier.id, { breachedItems: trimmed });
-    },
-    [barrier, updateBarrierData, validateBreachedList],
-  );
-
-  const handleBreachedListChange = useCallback(
-    (index: number, event: ChangeEvent<HTMLInputElement>) => {
-      const next = [...breachedItems];
-      next[index] = event.target.value;
-      commitBreachedItems(next);
-    },
-    [breachedItems, commitBreachedItems],
-  );
-
-  const handleAddBreachedItem = useCallback(() => {
-    const itemId = createListItemId("breached");
-    breachedItemIds.current = [...breachedItemIds.current, itemId];
-    setPendingFocus({ listType: "breached", itemId });
-    const next = [...breachedItems, ""];
-    commitBreachedItems(next);
-  }, [breachedItems, commitBreachedItems, createListItemId]);
-
-  const handleRemoveBreachedItem = useCallback(
-    (index: number) => {
-      const remainingIds = breachedItemIds.current.filter(
-        (_, i) => i !== index,
-      );
-      breachedItemIds.current = remainingIds;
-      setPendingFocus({
-        listType: "breached",
-        itemId: remainingIds[index - 1] ?? null,
-      });
-      const next = breachedItems.filter((_, i) => i !== index);
-      const nextErrors = breachedErrors.filter((_, i) => i !== index);
-      setBreachedErrors(nextErrors);
-      commitBreachedItems(next);
-    },
-    [breachedErrors, breachedItems, commitBreachedItems],
-  );
-
-  const handleBreachedListBlur = useCallback(() => {
-    commitBreachedItems(breachedItems);
-  }, [breachedItems, commitBreachedItems]);
-
-  const handleBreachedListKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>, index: number) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        const errors = validateBreachedList(breachedItems);
-        if (!errors.some((error) => error.length > 0)) {
-          handleAddBreachedItem();
-        } else {
-          setBreachedErrors(errors);
-          const invalidIndex = errors.findIndex(Boolean);
-          breachedInputRefs.current
-            .get(breachedItemIds.current[invalidIndex])
-            ?.focus();
-        }
-      }
-      if (event.key === "Backspace" && event.currentTarget.value === "") {
-        if (breachedItems.length > 0) {
-          handleRemoveBreachedItem(index);
-        }
-      }
-    },
-    [
-      breachedItems,
-      handleAddBreachedItem,
-      handleRemoveBreachedItem,
-      validateBreachedList,
-    ],
   );
 
   const handleFocusTitle = useCallback(() => {
@@ -767,7 +634,7 @@ export const Inspector = ({
 
           <div className="flex flex-col gap-1">
             <label htmlFor="barrier-description" className={labelClasses}>
-              Description
+              Control Purpose
             </label>
             <textarea
               ref={barrierDescriptionRef}
@@ -776,109 +643,91 @@ export const Inspector = ({
               value={barrierDescription}
               onChange={handleBarrierDescriptionChange}
               onBlur={handleBarrierDescriptionBlur}
-              placeholder="Explain what this barrier does"
+              placeholder="Describe what this control is intended to do"
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex flex-col">
-              <span className={labelClasses}>Breached</span>
-              <span className="text-xs text-slate-500">
-                Toggle to reveal breached items inside the barrier card.
-              </span>
-            </div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <input
-                type="checkbox"
-                checked={isBreached}
-                onChange={(event) => handleToggleBreached(event.target.checked)}
-              />
-              {isBreached ? "Breached" : "Intact"}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="barrier-status" className={labelClasses}>
+              Status
             </label>
+            <select
+              id="barrier-status"
+              className={inputClasses}
+              value={barrier.status}
+              onChange={(event) =>
+                updateBarrierData(barrier.id, {
+                  status: event.target.value as typeof barrier.status,
+                })
+              }
+            >
+              {(["Effective", "Degraded", "Failed", "Missing"] as const).map(
+                (status) => (
+                  <option key={status}>{status}</option>
+                ),
+              )}
+            </select>
           </div>
 
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <span className={labelClasses}>Breached Items</span>
-              <button
-                ref={breachedAddRef}
-                type="button"
-                className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={handleAddBreachedItem}
-                disabled={!isBreached}
-              >
-                Add
-              </button>
-            </div>
-            {!isBreached ? (
-              <p className="text-xs text-slate-500">
-                Mark the barrier as breached to track how it failed.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {breachedItems.length === 0 ? (
-                  <p className="text-xs text-slate-500">No breach items yet.</p>
-                ) : null}
-                {breachedItems.map((item, index) => (
-                  <div
-                    key={breachedItemIds.current[index]}
-                    className="flex gap-2"
-                  >
-                    <input
-                      ref={(element) => {
-                        const id = breachedItemIds.current[index];
-                        if (element) breachedInputRefs.current.set(id, element);
-                        else breachedInputRefs.current.delete(id);
-                      }}
-                      className={`${inputClasses} ${
-                        breachedErrors[index]?.length
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                          : ""
-                      }`}
-                      value={item}
-                      onChange={(event) =>
-                        handleBreachedListChange(index, event)
-                      }
-                      onBlur={handleBreachedListBlur}
-                      onKeyDown={(event) =>
-                        handleBreachedListKeyDown(event, index)
-                      }
-                      placeholder="Describe how the barrier was breached"
-                      aria-invalid={Boolean(breachedErrors[index])}
-                      aria-describedby={
-                        breachedErrors[index]?.length
-                          ? `breach-error-${index}`
-                          : undefined
-                      }
-                    />
-                    <button
-                      type="button"
-                      className={`${buttonClasses} px-2 py-1 text-xs`}
-                      onClick={() => handleRemoveBreachedItem(index)}
-                      aria-label={`Remove breach item ${index + 1}`}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                {breachedErrors.some((error) => error.length > 0) ? (
-                  <div className="flex flex-col gap-1">
-                    {breachedErrors.map((error, index) =>
-                      error.length ? (
-                        <p
-                          key={`breach-error-${index}`}
-                          id={`breach-error-${index}`}
-                          className="text-xs font-medium text-red-600"
-                        >
-                          {error}
-                        </p>
-                      ) : null,
-                    )}
-                  </div>
-                ) : null}
+          {barrier.status !== "Effective" ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="barrier-failure-reason"
+                  className={labelClasses}
+                >
+                  Why Did It Fail?
+                </label>
+                <select
+                  id="barrier-failure-reason"
+                  className={inputClasses}
+                  value={barrier.failureReason ?? ""}
+                  onChange={(event) =>
+                    updateBarrierData(barrier.id, {
+                      failureReason: (event.target.value ||
+                        undefined) as typeof barrier.failureReason,
+                    })
+                  }
+                >
+                  <option value="">Select a reason</option>
+                  {(
+                    [
+                      "Absent",
+                      "Inadequate",
+                      "NotUsed",
+                      "Failed",
+                      "Unknown",
+                    ] as const
+                  ).map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason === "NotUsed" ? "Not Used" : reason}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
-          </div>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="barrier-failure-details"
+                  className={labelClasses}
+                >
+                  Failure Details
+                </label>
+                <textarea
+                  id="barrier-failure-details"
+                  className={textAreaClasses}
+                  value={barrier.failureDetails ?? ""}
+                  onChange={(event) =>
+                    updateBarrierData(
+                      barrier.id,
+                      { failureDetails: event.target.value },
+                      { debounceHistory: true },
+                    )
+                  }
+                  placeholder="Briefly explain what happened"
+                />
+              </div>
+            </>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -1444,16 +1293,10 @@ export const Inspector = ({
     barrier,
     barrierDescription,
     barriers,
-    breachedErrors,
-    breachedItems,
     chainNodes,
     description,
     edges,
-    handleAddBreachedItem,
     handleAddListItem,
-    handleBreachedListBlur,
-    handleBreachedListChange,
-    handleBreachedListKeyDown,
     handleBarrierDescriptionChange,
     handleBarrierDescriptionBlur,
     handleCenter,
@@ -1466,14 +1309,11 @@ export const Inspector = ({
     handleListChange,
     handleListKeyDown,
     handleOwnerChange,
-    handleRemoveBreachedItem,
     handleRemoveListItem,
     handleRemoveEvidence,
     handleSubmit,
     handleTimestampChange,
     handleTitleCommit,
-    handleToggleBreached,
-    isBreached,
     negativeConsequences,
     negativeErrors,
     node,
@@ -1489,6 +1329,7 @@ export const Inspector = ({
     timestampValue,
     title,
     titleError,
+    updateBarrierData,
   ]);
 
   return (

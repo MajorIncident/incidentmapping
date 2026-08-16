@@ -52,15 +52,9 @@ export type BarrierNodeData = {
   status: Barrier["status"];
   failureReason?: Barrier["failureReason"];
   failureDetails?: string;
-  /** Compatibility view used by the current barrier editor; never persisted. */
-  breached?: boolean;
-  breachedItems?: string[];
 };
 
-type RuntimeBarrier = Barrier & {
-  breached?: boolean;
-  breachedItems?: string[];
-};
+type RuntimeBarrier = Barrier;
 
 type HistoryEntry = {
   nodes: Node<ChainNodeData>[];
@@ -151,12 +145,7 @@ type AppState = {
       patch: Partial<
         Pick<
           RuntimeBarrier,
-          | "status"
-          | "failureReason"
-          | "failureDetails"
-          | "description"
-          | "breached"
-          | "breachedItems"
+          "status" | "failureReason" | "failureDetails" | "description"
         >
       >,
       options?: { debounceHistory?: boolean },
@@ -291,7 +280,6 @@ const cloneEdge = (edge: Edge): Edge => ({
 
 const cloneBarrier = (barrier: RuntimeBarrier): RuntimeBarrier => ({
   ...barrier,
-  breachedItems: barrier.breachedItems ? [...barrier.breachedItems] : undefined,
 });
 
 const snapshotFromState = (state: AppState): HistoryEntry => ({
@@ -310,8 +298,21 @@ const applyLayout = (
   edges: Edge[],
   showDetails: boolean,
   barriers: Barrier[] = [],
-) =>
-  applyHierarchyLayout(nodes, edges, { showDetails, barrierEdges: barriers });
+) => {
+  const causalRelationships = new Set(
+    edges
+      .filter((edge) => edge.data?.kind !== "ActionEdge")
+      .map((edge) => `${edge.source}\u0000${edge.target}`),
+  );
+  return applyHierarchyLayout(nodes, edges, {
+    showDetails,
+    barrierEdges: barriers.filter((barrier) =>
+      causalRelationships.has(
+        `${barrier.upstreamNodeId}\u0000${barrier.downstreamNodeId}`,
+      ),
+    ),
+  });
+};
 
 const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
 
@@ -389,7 +390,10 @@ const computeParentId = (edges: Edge[], childId: string): string | null => {
 export const findDownstreamEdges = (
   edges: Edge[],
   upstreamId: string,
-): Edge[] => edges.filter((edge) => edge.source === upstreamId);
+): Edge[] =>
+  edges.filter(
+    (edge) => edge.source === upstreamId && edge.data?.kind !== "ActionEdge",
+  );
 
 /** Creates the initial event for an interactive map without mutating a fixture. */
 export const createRootNode = (): ChainNode => ({
@@ -471,11 +475,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             ),
           ),
         },
-        barriers: map.barriers.map((barrier) => ({
-          ...barrier,
-          breached: barrier.status === "Failed",
-          breachedItems: barrier.failureDetails?.split("\n") ?? [],
-        })),
+        barriers: map.barriers.map(cloneBarrier),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
         showDetails: state.showDetails,
@@ -518,16 +518,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             kind: barrier.kind,
             upstreamNodeId: barrier.upstreamNodeId,
             downstreamNodeId: barrier.downstreamNodeId,
-            status:
-              barrier.breached === undefined
-                ? barrier.status
-                : barrier.breached
-                  ? ("Failed" as const)
-                  : ("Effective" as const),
+            status: barrier.status,
             failureReason: barrier.failureReason,
-            failureDetails: barrier.breachedItems
-              ? barrier.breachedItems.filter(Boolean).join("\n") || undefined
-              : barrier.failureDetails,
+            failureDetails: barrier.failureDetails,
             description: description?.length ? description : undefined,
           };
         }),
@@ -948,8 +941,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             upstreamNodeId,
             downstreamNodeId,
             status: "Failed" as const,
-            breached: true,
-            breachedItems: [],
           },
         ];
         const candidate = {
@@ -1378,7 +1369,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           if (barrier.id !== id) {
             return barrier;
           }
-          const hasBreachedItems = patch.breachedItems !== undefined;
           const normalizedPatch = Object.fromEntries(
             Object.entries(patch).map(([key, value]) => [
               key,
@@ -1392,9 +1382,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           const nextBarrier = {
             ...barrier,
             ...normalizedPatch,
-            breachedItems: hasBreachedItems
-              ? [...(patch.breachedItems ?? [])]
-              : barrier.breachedItems,
           } satisfies RuntimeBarrier;
           if (JSON.stringify(nextBarrier) === JSON.stringify(barrier)) {
             return barrier;
@@ -1415,7 +1402,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           prevSnapshot,
           !snapshotsEqual(prevSnapshot, nextSnapshot),
           options?.debounceHistory
-            ? { debounce: "text", debounceKey: `barrier:${id}:description` }
+            ? {
+                debounce: "text",
+                debounceKey: `barrier:${id}:${patch.failureDetails !== undefined ? "failureDetails" : "description"}`,
+              }
             : undefined,
         );
         return {

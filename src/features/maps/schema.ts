@@ -30,7 +30,12 @@ export const actionStatusSchema = z.enum([
   "Completed",
   "Cancelled",
 ]);
-export const barrierStatusSchema = z.enum(["Effective", "Failed"]);
+export const barrierStatusSchema = z.enum([
+  "Effective",
+  "Degraded",
+  "Failed",
+  "Missing",
+]);
 export const barrierFailureReasonSchema = z.enum([
   "Absent",
   "Inadequate",
