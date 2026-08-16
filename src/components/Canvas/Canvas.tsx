@@ -64,6 +64,56 @@ export type GraphRole = {
   unrelated: Set<string>;
 };
 
+type PositionedSize = {
+  position: { x: number; y: number };
+  width: number;
+  height: number;
+};
+
+/** Centers a Control between the source bottom and target top handles. */
+export const calculateControlPosition = (
+  source: PositionedSize,
+  target: PositionedSize,
+  control: { width: number; height: number },
+): { x: number; y: number } => {
+  const sourceBottom = {
+    x: source.position.x + source.width / 2,
+    y: source.position.y + source.height,
+  };
+  const targetTop = {
+    x: target.position.x + target.width / 2,
+    y: target.position.y,
+  };
+
+  return {
+    x: (sourceBottom.x + targetTop.x) / 2 - control.width / 2,
+    y: (sourceBottom.y + targetTop.y) / 2 - control.height / 2,
+  };
+};
+
+/** Replaces a causal edge with explicitly connected segments around a Control. */
+export const splitEdgeAtControl = <
+  T extends { id: string; source: string; target: string },
+>(
+  edge: T,
+  controlId: string,
+) => [
+  {
+    ...edge,
+    id: `${edge.id}-${controlId}-upstream`,
+    target: controlId,
+    sourceHandle: "bottom",
+    targetHandle: "top",
+  },
+  {
+    ...edge,
+    id: `${edge.id}-${controlId}-downstream`,
+    source: controlId,
+    sourceHandle: "bottom",
+    targetHandle: "top",
+  },
+];
+
 export const viewportAnimationDuration = (duration: number): number =>
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
@@ -337,6 +387,10 @@ export const Canvas = ({
       const controlSize = measuredControlDimensions[matchingBarrier.id];
       const controlWidth = controlSize?.width ?? CONTROL_NODE_WIDTH;
       const controlHeight = controlSize?.height ?? CONTROL_NODE_HEIGHT;
+      const upstreamWidth = upstream.width ?? CHAIN_NODE_WIDTH;
+      const upstreamHeight = upstream.height ?? CHAIN_NODE_HEIGHT;
+      const downstreamWidth = downstream.width ?? CHAIN_NODE_WIDTH;
+      const downstreamHeight = downstream.height ?? CHAIN_NODE_HEIGHT;
 
       const barrierNode: Node<BarrierNodeData> = {
         id: matchingBarrier.id,
@@ -356,44 +410,26 @@ export const Canvas = ({
             isUnrelated: presentation.unrelated.has(matchingBarrier.id),
           },
         },
-        position: {
-          x:
-            upstream.position.x +
-            (upstream.width ?? CHAIN_NODE_WIDTH) / 2 +
-            (downstream.position.x +
-              (downstream.width ?? CHAIN_NODE_WIDTH) / 2 -
-              (upstream.position.x +
-                (upstream.width ?? CHAIN_NODE_WIDTH) / 2)) /
-              2 -
-            controlWidth / 2,
-          y:
-            upstream.position.y +
-            (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
-            (downstream.position.y +
-              (downstream.height ?? CHAIN_NODE_HEIGHT) / 2 -
-              (upstream.position.y +
-                (upstream.height ?? CHAIN_NODE_HEIGHT) / 2)) /
-              2 -
-            controlHeight / 2,
-        },
+        position: calculateControlPosition(
+          {
+            position: upstream.position,
+            width: upstreamWidth,
+            height: upstreamHeight,
+          },
+          {
+            position: downstream.position,
+            width: downstreamWidth,
+            height: downstreamHeight,
+          },
+          { width: controlWidth, height: controlHeight },
+        ),
         draggable: false,
         selectable: true,
       };
 
       barrierNodes.push(barrierNode);
 
-      return [
-        {
-          ...presentedEdge,
-          id: `${edge.id}-${matchingBarrier.id}-upstream`,
-          target: matchingBarrier.id,
-        },
-        {
-          ...presentedEdge,
-          id: `${edge.id}-${matchingBarrier.id}-downstream`,
-          source: matchingBarrier.id,
-        },
-      ];
+      return splitEdgeAtControl(presentedEdge, matchingBarrier.id);
     });
 
     const styledEdges = flowEdges.map((edge) => {
