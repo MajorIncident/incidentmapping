@@ -119,7 +119,7 @@ describe("Inspector and keyboard workflows", () => {
       render(<App />);
     });
 
-    await screen.findByRole("button", { name: "Add Event" });
+    await screen.findByRole("button", { name: "Add Below" });
     await waitFor(() => {
       expect(useAppStore.getState().nodes).toHaveLength(1);
     });

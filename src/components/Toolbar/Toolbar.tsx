@@ -169,11 +169,11 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
         type="button"
         className={buttonBase}
         onClick={props.onAddChainNode}
-        aria-label="Add Event"
-        title="Add Event (Enter)"
+        aria-label="Add Below"
+        title="Add Below (Enter)"
       >
         <Icon name="add" />
-        <span>Add Event</span>
+        <span>Add Below</span>
       </button>
       <Menu label="More" icon="more" align="right">
         <Item
@@ -206,20 +206,20 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
         <Item
           icon="details"
           onClick={props.onToggleDetails}
-          aria-label="Toggle event detail visibility"
+          aria-label={props.showDetails ? "Hide details" : "Show details"}
           aria-pressed={props.showDetails}
         >
-          {props.showDetails ? "Hide event details" : "Show event details"}
+          {props.showDetails ? "Hide details" : "Show details"}
         </Item>
         <Item
           icon="delete"
           className={`${menuItem} command-button--danger`}
           onClick={props.onDeleteSelection}
           disabled={!props.canDelete}
-          aria-label="Delete selected event"
-          title="Delete selected event (Delete)"
+          aria-label="Delete selected item"
+          title="Delete selected item (Delete)"
         >
-          Delete
+          Delete selected item
         </Item>
       </Menu>
     </nav>

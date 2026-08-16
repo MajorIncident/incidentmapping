@@ -18,7 +18,7 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await input.press("Enter");
   await expect(page.getByText("Primary Event")).toBeVisible();
 
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   const downloadPromise = page.waitForEvent("download");
@@ -124,7 +124,7 @@ test("creating another child focuses the parent and complete sibling group", asy
   await parent.click();
   const parentBeforeFirstChild = await parent.boundingBox();
   expect(parentBeforeFirstChild).not.toBeNull();
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page.waitForTimeout(500);
   const parentAfterFirstChild = await parent.boundingBox();
@@ -144,7 +144,7 @@ test("creating another child focuses the parent and complete sibling group", asy
     0,
   );
   await parent.click();
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
@@ -181,9 +181,9 @@ test("organizes moved nodes and frames the complete graph", async ({
   await page.getByRole("button", { name: "Create a new map" }).click();
   const organize = page.getByRole("button", { name: "Organize all nodes" });
   await expect(organize).toBeDisabled();
-  await page.getByRole("button", { name: "Add Event" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
-  await page.getByRole("button", { name: "Add Event" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page
     .locator(".react-flow__node")
@@ -211,16 +211,20 @@ test("shows map semantics and highlights only a selected branch", async ({
 }) => {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
-  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("button", { name: "Add Below" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await expect(
     page.getByRole("heading", { name: "Untitled Map" }),
   ).toBeVisible();
   await expect(page.getByLabel("Incident map legend")).toContainText(
-    "top to bottom",
+    "Impact at the top",
   );
+  await expect(page.getByLabel("Incident map legend")).toContainText(
+    "work downward by asking why",
+  );
+  await expect(page.getByLabel("Map key")).toContainText("Root Cause");
   await expect(page.getByLabel("Incident map overview")).toBeVisible();
 
   const eventNodes = page.locator('[data-testid="chain-node"]');
@@ -233,7 +237,10 @@ test("shows map semantics and highlights only a selected branch", async ({
   await expect(page.locator(".incident-edge--upstream")).toHaveCount(2);
   await expect(
     page.locator(".incident-edge--upstream .react-flow__edge-path").first(),
-  ).toHaveCSS("stroke-dasharray", "7px, 4px");
+  ).toHaveCSS("stroke-dasharray", "none");
+  await expect(page.locator("marker")).toHaveCount(0);
+  await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
+  await expect(page.getByText("Top Event", { exact: true })).toHaveCount(0);
 });
 
 test("renames the map title in place instead of in the toolbar", async ({
