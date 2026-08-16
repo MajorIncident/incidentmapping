@@ -2,7 +2,7 @@ export const Legend = (): JSX.Element => (
   <aside className="presentation-legend" aria-label="Presentation legend">
     <strong>Map legend</strong>
     <span>
-      <i className="legend-dot bg-violet-500" /> Top Event
+      <i className="legend-dot bg-violet-500" /> Impact
     </span>
     <span>
       <i className="legend-dot bg-amber-400" /> Key Factor

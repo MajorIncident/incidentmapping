@@ -215,7 +215,8 @@ const ChainNodeComponent = ({
           position={Position.Top}
           className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""} ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
         <Handle
           id="left"
@@ -223,7 +224,8 @@ const ChainNodeComponent = ({
           position={Position.Left}
           className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"} ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
       </>
       <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
@@ -245,9 +247,6 @@ const ChainNodeComponent = ({
         >
           {data.referenceId ?? "Unassigned"}
         </span>
-        {graphRole?.isRoot ? (
-          <span className="node-structural-tag">Top Event</span>
-        ) : null}
         {data.nodeType === "Factor" ? (
           <>
             <NodeTagMenu
@@ -284,7 +283,8 @@ const ChainNodeComponent = ({
           position={Position.Bottom}
           className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""} ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
         <Handle
           id="right"
@@ -292,7 +292,8 @@ const ChainNodeComponent = ({
           position={Position.Right}
           className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
       </>
       {isEditing ? (
@@ -464,7 +465,8 @@ const BarrierNodeComponent = ({
           position={Position.Top}
           className={`!bg-sky-500 ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
         <Handle
           id="bottom"
@@ -472,7 +474,8 @@ const BarrierNodeComponent = ({
           position={Position.Bottom}
           className={`!bg-sky-500 ${data.readOnly ? "presentation-handle" : ""}`}
           data-presentation-handle={data.readOnly || undefined}
-          aria-hidden={data.readOnly || undefined}
+          aria-hidden="true"
+          tabIndex={-1}
         />
       </>
       <div className="flex items-center justify-between gap-2">

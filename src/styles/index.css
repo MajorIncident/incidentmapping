@@ -30,9 +30,6 @@
   .node-reference {
     @apply text-[10px] font-semibold tabular-nums tracking-wide text-slate-400;
   }
-  .node-structural-tag {
-    @apply ml-auto text-[9px] font-semibold uppercase tracking-wide text-violet-600;
-  }
   .node-tag-menu {
     @apply absolute left-0 top-full z-50 mt-1 min-w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-xl;
   }
@@ -154,8 +151,9 @@ select:focus-visible {
   cursor: default;
   pointer-events: none;
 }
-.react-flow__handle.presentation-handle {
+.react-flow__handle {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -187,10 +185,18 @@ select:focus-visible {
 }
 
 .incident-edge path.react-flow__edge-path {
+  marker-end: none;
+  stroke-dasharray: none;
   transition:
     stroke 160ms ease,
     stroke-width 160ms ease,
     opacity 160ms ease;
+}
+
+.incident-edge--action path.react-flow__edge-path {
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
 }
 
 .incident-edge--unrelated path.react-flow__edge-path {
@@ -199,6 +205,41 @@ select:focus-visible {
 
 .incident-edge--upstream path.react-flow__edge-path {
   stroke-linecap: round;
+}
+
+.map-guide__intro {
+  @apply leading-relaxed;
+}
+
+.map-guide__key {
+  @apply mt-2 flex flex-wrap gap-1.5;
+}
+
+.map-guide__key-item {
+  @apply inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium transition-colors hover:border-slate-400 hover:bg-white;
+}
+
+.map-guide__key-item i {
+  @apply h-2 w-2 rounded-full bg-slate-400;
+}
+.map-guide__key-item--impact i {
+  @apply bg-violet-500;
+}
+.map-guide__key-item--event i {
+  @apply bg-sky-500;
+}
+.map-guide__key-item--factor i,
+.map-guide__key-item--key-factor i {
+  @apply bg-amber-400;
+}
+.map-guide__key-item--action i {
+  @apply bg-emerald-500;
+}
+.map-guide__key-item--control i {
+  @apply bg-slate-500;
+}
+.map-guide__key-item--root-cause i {
+  @apply bg-rose-500;
 }
 
 .react-flow__minimap {
@@ -228,6 +269,11 @@ select:focus-visible {
   }
   .mobile-map-guide {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    max-height: min(75vh, 32rem);
+    overflow-y: auto;
+  }
+  .mobile-map-guide .map-guide__key {
+    @apply gap-2;
   }
 }
 

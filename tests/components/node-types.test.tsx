@@ -160,7 +160,7 @@ describe("ChainNode details", () => {
     expect(node).toHaveAttribute("data-leaf", "true");
     expect(node).toHaveAttribute("data-selected-path", "true");
     expect(node).toHaveClass("ring-4", "border-sky-700");
-    expect(screen.getByText("Top Event")).toBeInTheDocument();
+    expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
     expect(screen.queryByText(/Root event/i)).not.toBeInTheDocument();
   });
 

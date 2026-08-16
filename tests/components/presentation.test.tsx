@@ -115,15 +115,14 @@ describe("presentation mode", () => {
       expect(handle).toHaveClass("presentation-handle");
       expect(handle).toHaveAttribute("data-presentation-handle", "true");
       expect(handle).toHaveAttribute("aria-hidden", "true");
+      expect(handle).toHaveAttribute("tabindex", "-1");
     });
 
     await waitFor(() =>
       expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
     );
     expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
-    document.querySelectorAll(".react-flow__edge-path").forEach((path) => {
-      expect(path).toHaveAttribute("marker-end");
-    });
+    expect(document.querySelectorAll("marker")).toHaveLength(0);
   });
 
   it("keeps both causal edge segments rendered around a barrier", async () => {
@@ -154,6 +153,8 @@ describe("presentation mode", () => {
     expect(
       actionEdge?.querySelector(".react-flow__edge-path"),
     ).toBeInTheDocument();
+    expect(document.querySelectorAll("marker")).toHaveLength(0);
+    expect(actionEdge).toHaveClass("incident-edge--action");
   });
 
   it("exits by button and Escape without changing map data or history", async () => {

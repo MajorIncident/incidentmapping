@@ -50,7 +50,7 @@ describe("Toolbar map title", () => {
       screen.getByRole("button", { name: "Create a new map" }),
     );
     expect(toolbar).toContainElement(
-      screen.getByRole("button", { name: "Add Event" }),
+      screen.getByRole("button", { name: "Add Below" }),
     );
     expect(screen.getByLabelText("File menu")).toHaveAttribute(
       "title",
@@ -269,9 +269,9 @@ describe("Toolbar map title", () => {
     const user = userEvent.setup();
     act(() => useAppStore.getState().actions.addChild());
     render(<App />);
-    expect(screen.getByRole("button", { name: "Add Event" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Add Below" })).toHaveAttribute(
       "title",
-      "Add Event (Enter)",
+      "Add Below (Enter)",
     );
     const more = screen.getByRole("button", { name: "More menu" });
     await user.click(more);

@@ -60,9 +60,7 @@ test("complete baggage investigation remains understandable after save and reope
   await expectInvestigationOnCanvas(page);
 
   await page.getByRole("button", { name: "More menu" }).click();
-  await page
-    .getByRole("menuitem", { name: "Toggle event detail visibility" })
-    .click();
+  await page.getByRole("menuitem", { name: "Hide details" }).click();
   await expect(
     page.getByText("Approved checklist revision 7 has no photo-eye step"),
   ).toBeVisible();
@@ -71,7 +69,7 @@ test("complete baggage investigation remains understandable after save and reope
   await expect(
     page.getByRole("button", { name: /Exit Presentation/ }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add Event" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add Below" })).toHaveCount(0);
   await expect(page.locator(".react-flow__controls")).toHaveCount(0);
   const edgePath = page.locator(".react-flow__edge-path").first();
   await expect(edgePath).toBeVisible();
@@ -79,7 +77,7 @@ test("complete baggage investigation remains understandable after save and reope
   await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
   await expectInvestigationOnCanvas(page);
   await page.getByRole("button", { name: /Exit Presentation/ }).click();
-  await expect(page.getByRole("button", { name: "Add Event" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add Below" })).toBeVisible();
   await expect(
     page.locator(".react-flow__handle:visible").first(),
   ).toBeVisible();

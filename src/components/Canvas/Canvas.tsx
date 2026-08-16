@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
-  MarkerType,
   MiniMap,
   getNodesBounds,
   type Node,
@@ -15,6 +14,34 @@ import {
   type ChainNodeData,
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
+
+const GuideContent = (): JSX.Element => (
+  <>
+    <p className="map-guide__intro">
+      Start with the <strong>Impact</strong> at the top. Investigators work
+      downward by asking <strong>why</strong>; lower nodes identify the
+      contributing events and factors.
+    </p>
+    <div className="map-guide__key" aria-label="Map key">
+      {[
+        ["Impact", "impact"],
+        ["Event", "event"],
+        ["Factor", "factor"],
+        ["Action", "action"],
+        ["Control", "control"],
+        ["Key Factor", "key-factor"],
+        ["Root Cause", "root-cause"],
+      ].map(([label, kind]) => (
+        <span
+          key={kind}
+          className={`map-guide__key-item map-guide__key-item--${kind}`}
+        >
+          <i aria-hidden="true" /> {label}
+        </span>
+      ))}
+    </div>
+  </>
+);
 
 export type GraphRole = {
   roots: Set<string>;
@@ -212,16 +239,12 @@ export const Canvas = ({
       const unrelated = Boolean(selectionId) && !highlighted;
       return {
         ...edge,
+        type: "step",
         className: isAction
           ? "incident-edge incident-edge--action"
           : highlighted
             ? `incident-edge incident-edge--${upstream ? "upstream" : "downstream"}`
             : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: isAction ? 14 : 18,
-          height: isAction ? 14 : 18,
-        },
         style: {
           stroke: isAction
             ? "#94a3b8"
@@ -237,7 +260,7 @@ export const Canvas = ({
               : unrelated
                 ? 1.5
                 : 2.25,
-          strokeDasharray: upstream ? "7 4" : undefined,
+          strokeDasharray: isAction ? "5 5" : undefined,
         },
       };
     });
@@ -358,26 +381,7 @@ export const Canvas = ({
           <div className="mb-1 font-semibold text-slate-900">
             How to read this map
           </div>
-          <p>
-            Events flow top to bottom. Dashed purple edges are upstream; heavy
-            blue edges are downstream.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-            <span>
-              <i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500" />
-              Barrier effective
-            </span>
-            <span>
-              <i className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />
-              Barrier failed
-            </span>
-            <span>
-              <b className="text-emerald-700">+</b> positive
-            </span>
-            <span>
-              <b className="text-rose-700">−</b> negative
-            </span>
-          </div>
+          <GuideContent />
         </aside>
       ) : null}
       {!presenting ? (
@@ -414,10 +418,7 @@ export const Canvas = ({
               <h2 className="font-semibold text-slate-900">
                 How to read this map
               </h2>
-              <p className="mt-1">
-                Events flow top to bottom. Dashed purple edges are upstream;
-                heavy blue edges are downstream.
-              </p>
+              <GuideContent />
             </div>
             <button
               type="button"
@@ -448,7 +449,7 @@ export const Canvas = ({
         snapGrid={[8, 8]}
         nodesFocusable={!presenting}
         nodesDraggable={!presenting}
-        nodesConnectable={!presenting}
+        nodesConnectable={false}
         elementsSelectable={!presenting}
         selectionOnDrag={!presenting}
       >
