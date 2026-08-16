@@ -102,9 +102,7 @@ type AppState = {
       downstreamNodeId: string,
     ) => string | null;
     setMapTitle: (title: string) => void;
-    updateIncidentMetadata: (
-      patch: Partial<NonNullable<MapData["metadata"]>>,
-    ) => void;
+    updateMetadata: (patch: Partial<NonNullable<MapData["metadata"]>>) => void;
     setNodeType: (id: string, value: ChainNode["nodeType"]) => void;
     setFactorCategory: (
       id: string,
@@ -535,42 +533,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const parentId = options?.parentId;
       get().actions.addChild(parentId);
     },
-    setMapTitle: (title) => {
-      const nextTitle = title.trim();
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        const currentTitle = state.metadata?.title ?? "";
-        if (currentTitle === nextTitle) {
-          return {};
-        }
-        const nextMetadata = nextTitle.length
-          ? { ...(state.metadata ?? {}), title: nextTitle }
-          : undefined;
-        const candidate = {
-          ...state,
-          metadata: nextMetadata,
-        } satisfies AppState;
-        const nextSnapshot = snapshotFromState(candidate);
-        const history = updateHistoryState(
-          state,
-          prevSnapshot,
-          !snapshotsEqual(prevSnapshot, nextSnapshot),
-        );
-        return {
-          metadata: nextMetadata,
-          history,
-          canUndo: history.past.length > 0,
-          canRedo: history.future.length > 0,
-        };
-      });
-    },
-    updateIncidentMetadata: (patch) => {
+    setMapTitle: (title) => get().actions.updateMetadata({ title }),
+    updateMetadata: (patch) => {
       const normalized = Object.fromEntries(
         Object.entries(patch).map(([key, value]) => [
           key,
           typeof value === "string"
             ? value.trim()
-              ? value
+              ? value.trim()
               : undefined
             : value,
         ]),
@@ -586,7 +556,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (JSON.stringify(metadata) === JSON.stringify(state.metadata ?? {}))
           return {};
         const history = updateHistoryState(state, prevSnapshot, true);
-        return { metadata, history, canUndo: true, canRedo: false };
+        return {
+          metadata: Object.keys(metadata).length ? metadata : undefined,
+          history,
+          canUndo: history.past.length > 0,
+          canRedo: false,
+        };
       });
     },
     setNodeType: (id, value) => {

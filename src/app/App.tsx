@@ -4,6 +4,7 @@ import { Toolbar } from "../components/Toolbar/Toolbar";
 import { Canvas } from "../components/Canvas/Canvas";
 import { Inspector } from "../components/Sidebar/Inspector";
 import { Footer } from "../components/Footer/Footer";
+import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
 import { useEffect, useState } from "react";
@@ -65,6 +66,7 @@ export const App = (): JSX.Element => {
               onToggleDetails={toggleShowDetails}
               showDetails={showDetails}
             />
+            <IncidentHeader />
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
               <div className="min-w-0 flex-1 bg-slate-100">
                 <Canvas onInspect={() => setInspectorOpen(true)} />

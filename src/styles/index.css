@@ -69,8 +69,28 @@ input[type="checkbox"] {
   margin-right: max(0.75rem, env(safe-area-inset-right));
 }
 
-.map-title {
-  @apply absolute left-4 top-4 z-10;
+.incident-header {
+  @apply relative z-20 flex min-h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-1 shadow-sm;
+}
+.incident-header__summary {
+  @apply flex min-w-0 flex-1 flex-wrap items-center text-xs text-slate-600;
+}
+.incident-header__summary span + span::before {
+  content: "•";
+  @apply mx-2 text-slate-300;
+}
+.incident-header__edit {
+  @apply shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-50;
+}
+.incident-header__popover {
+  @apply absolute right-3 top-full mt-1 grid w-[min(32rem,calc(100vw-1.5rem))] grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xl;
+}
+.incident-header__popover label {
+  @apply flex flex-col gap-1 text-xs font-semibold text-slate-600;
+}
+.incident-header__popover input,
+.incident-header__popover select {
+  @apply min-h-10 rounded-lg border border-slate-300 bg-white px-2 text-sm font-normal text-slate-900;
 }
 
 .map-mobile-actions,
@@ -173,11 +193,9 @@ select:focus-visible {
     display: flex;
   }
   .map-title {
-    left: 0.5rem;
-    top: 0.5rem;
-    max-width: calc(100% - 4.75rem);
+    max-width: calc(100vw - 8rem);
   }
-  .map-title > div:nth-child(2) {
+  .map-title > div {
     padding-block: 0;
   }
   .map-title__subtitle {

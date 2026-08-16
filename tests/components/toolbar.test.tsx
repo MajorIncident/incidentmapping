@@ -157,6 +157,26 @@ describe("Toolbar map title", () => {
     expect(titleControl()).toBeVisible();
   });
 
+  it("edits optional incident details in a compact popover", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(
+      screen.getByLabelText("Incident metadata summary"),
+    ).toBeEmptyDOMElement();
+    await user.click(screen.getByRole("button", { name: "Edit details" }));
+    await user.type(screen.getByLabelText("Incident ID"), "INC-204");
+    await user.type(screen.getByLabelText("Location"), "Plant 4");
+    await user.selectOptions(screen.getByLabelText("Severity"), "High");
+    await user.click(screen.getByRole("button", { name: "Close details" }));
+
+    const summary = screen.getByLabelText("Incident metadata summary");
+    expect(summary).toHaveTextContent("INC-204");
+    expect(summary).toHaveTextContent("Plant 4");
+    expect(summary).toHaveTextContent("High");
+    expect(summary.textContent).not.toMatch(/^[•]|[•]$/);
+  });
+
   it("focuses the new root title so its incident name can be typed immediately", async () => {
     const user = userEvent.setup();
     const app = render(<App />);

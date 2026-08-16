@@ -36,6 +36,33 @@ describe("mapDataSchema", () => {
     expect(mapDataSchema.safeParse(valid).success).toBe(false);
   });
 
+  it("validates and serializes optional incident metadata", () => {
+    const metadata = {
+      title: "Investigation",
+      incidentId: "INC-204",
+      occurredAt: "2026-08-16T09:30",
+      location: "Plant 4",
+      severity: "Critical" as const,
+      status: "Open" as const,
+    };
+    expect(mapDataSchema.parse({ ...sampleMap, metadata }).metadata).toEqual(
+      metadata,
+    );
+
+    expect(
+      mapDataSchema.safeParse({
+        ...sampleMap,
+        metadata: { ...metadata, location: "   " },
+      }).success,
+    ).toBe(false);
+    expect(
+      mapDataSchema.safeParse({
+        ...sampleMap,
+        metadata: { ...metadata, severity: "Urgent" },
+      }).success,
+    ).toBe(false);
+  });
+
   it.each(["Effective", "Degraded", "Failed", "Missing"] as const)(
     "accepts the %s barrier status without retired fields",
     (status) => {
