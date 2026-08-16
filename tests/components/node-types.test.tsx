@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import type { NodeProps } from "reactflow";
 import { ReactFlowProvider } from "reactflow";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -109,6 +109,38 @@ describe("ChainNode details", () => {
       "−2",
     );
     expect(screen.queryByText("Recovery")).not.toBeInTheDocument();
+  });
+
+  it("caps detailed evidence at three rows and reports overflow", () => {
+    renderChainNode({
+      evidenceItems: [
+        { id: "E-001", text: "Photo" },
+        { id: "E-002", text: "Interview" },
+        { id: "E-003", text: "Log" },
+        { id: "E-004", text: "Telemetry" },
+        { id: "E-005", text: "Recording" },
+      ],
+    });
+
+    const evidence = screen.getByTestId("evidence-summary");
+    expect(within(evidence).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(evidence).getByText("+2 more")).toBeVisible();
+    expect(within(evidence).queryByText("Telemetry")).not.toBeInTheDocument();
+  });
+
+  it("shows only an evidence count when details are hidden", () => {
+    act(() => useAppStore.getState().actions.setShowDetails(false));
+    renderChainNode({
+      evidenceItems: [
+        { id: "opaque-a", text: "Photo" },
+        { id: "opaque-b", text: "Interview" },
+      ],
+    });
+
+    expect(screen.getByLabelText("2 evidence items")).toHaveTextContent(
+      "Evidence 2",
+    );
+    expect(screen.queryByText("Photo")).not.toBeInTheDocument();
   });
 
   it("exposes derived root, leaf, path, and unrelated presentation states", () => {

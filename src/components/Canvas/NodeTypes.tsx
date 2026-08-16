@@ -181,9 +181,17 @@ const ChainNodeComponent = ({
   );
   const hasPositivePoints = positivePoints.length > 0;
   const hasNegativePoints = negativePoints.length > 0;
+  const evidenceItems = (data.evidenceItems ?? []).filter(
+    (item) => item.text.trim().length > 0,
+  );
+  const visibleEvidence = evidenceItems.slice(0, 3);
+  const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
   const hasVisibleDetails =
-    hasDescription || hasPositivePoints || hasNegativePoints;
+    hasDescription ||
+    hasPositivePoints ||
+    hasNegativePoints ||
+    evidenceItems.length > 0;
 
   return (
     <div
@@ -322,6 +330,31 @@ const ChainNodeComponent = ({
               ) : null}
             </div>
           ) : null}
+          {evidenceItems.length > 0 ? (
+            <div data-testid="evidence-summary" className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                Evidence
+              </div>
+              <ul className="space-y-1 text-[13px] text-slate-700">
+                {visibleEvidence.map((item) => (
+                  <li key={item.id} className="flex min-w-0 gap-1.5">
+                    <span className="shrink-0 font-semibold text-slate-500">
+                      EV-
+                      {String(
+                        Number(item.id.match(/(\d+)$/)?.[1] ?? 0),
+                      ).padStart(2, "0")}
+                    </span>
+                    <span className="truncate">{item.text}</span>
+                  </li>
+                ))}
+                {evidenceOverflow > 0 ? (
+                  <li className="font-medium text-slate-500">
+                    +{evidenceOverflow} more
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {!isEditing &&
@@ -344,6 +377,16 @@ const ChainNodeComponent = ({
               −{negativePoints.length}
             </span>
           ) : null}
+        </div>
+      ) : null}
+      {!isEditing && !showDetails && evidenceItems.length > 0 ? (
+        <div
+          className="mt-2 flex h-5 items-center"
+          aria-label={`${evidenceItems.length} evidence items`}
+        >
+          <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+            Evidence {evidenceItems.length}
+          </span>
         </div>
       ) : null}
     </div>
