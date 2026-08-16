@@ -21,7 +21,12 @@ const factorCategoryOptions = [
   "Other",
 ].map((value) => ({
   value: value as NonNullable<ChainNodeData["factorCategory"]>,
-  label: value,
+  label:
+    value === "Process"
+      ? "Process / Procedure"
+      : value === "Technology"
+        ? "Technology / System"
+        : value,
 }));
 const significanceOptions = [
   { value: "Normal" as const, label: "Normal" },
@@ -49,6 +54,28 @@ const barrierClasses =
   "relative min-w-[160px] max-w-[220px] rounded-[24px] border-2 px-4 py-3 text-left shadow-node transition";
 
 const titleClasses = "text-sm font-semibold text-slate-800";
+
+const formatLocalDateTime = (value?: string): string | undefined => {
+  if (!value?.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+};
+
+const formatLocalDate = (value?: string): string | undefined => {
+  if (!value?.trim()) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    date,
+  );
+};
 
 const ChainNodeComponent = ({
   id,
@@ -155,7 +182,6 @@ const ChainNodeComponent = ({
   const graphRole = data.graphRole;
   const containerClassName = useMemo(() => {
     const significance = data.factorSignificance ?? "Normal";
-    const root = graphRole?.isRoot ? "border-violet-400" : "border-slate-200";
     const classification =
       data.nodeType === "Factor" && significance === "RootCause"
         ? "border-rose-500 shadow-[0_8px_24px_rgba(190,24,93,0.16)]"
@@ -174,7 +200,7 @@ const ChainNodeComponent = ({
       data.nodeType === "Action"
         ? "border-slate-300 bg-slate-50 shadow-sm"
         : "";
-    return `${containerClasses} ${root} ${classification} ${action} ${related} ${active}`;
+    return `${containerClasses} chain-node-card border-slate-200 ${classification} ${action} ${related} ${active}`;
   }, [data.factorSignificance, data.nodeType, graphRole, selected]);
 
   const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
@@ -196,6 +222,9 @@ const ChainNodeComponent = ({
     hasPositivePoints ||
     hasNegativePoints ||
     evidenceItems.length > 0;
+  const timestamp = formatLocalDateTime(data.timestamp);
+  const dueDate = formatLocalDate(data.actionDueDate);
+  const significance = data.factorSignificance ?? "Normal";
 
   return (
     <div
@@ -207,6 +236,8 @@ const ChainNodeComponent = ({
       data-leaf={graphRole?.isLeaf || undefined}
       data-selected-path={graphRole?.isOnSelectedPath || undefined}
       data-unrelated={graphRole?.isUnrelated || undefined}
+      data-node-type={data.nodeType ?? "Event"}
+      data-significance={data.nodeType === "Factor" ? significance : undefined}
     >
       <>
         <Handle
@@ -228,7 +259,7 @@ const ChainNodeComponent = ({
           tabIndex={-1}
         />
       </>
-      <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
+      <header className="mb-2 flex min-h-6 items-center gap-1.5 border-b border-slate-100 pb-2">
         <NodeTagMenu
           readOnly={data.readOnly}
           label="Node type"
@@ -247,35 +278,7 @@ const ChainNodeComponent = ({
         >
           {data.referenceId ?? "Unassigned"}
         </span>
-        {data.nodeType === "Factor" ? (
-          <>
-            <NodeTagMenu
-              readOnly={data.readOnly}
-              label="Factor category"
-              value={data.factorCategory ?? "Human"}
-              options={factorCategoryOptions}
-              onChange={(value) => setFactorCategory(id, value)}
-            />
-            <NodeTagMenu
-              readOnly={data.readOnly}
-              label="Factor significance"
-              value={data.factorSignificance ?? "Normal"}
-              options={significanceOptions}
-              onChange={(value) => setFactorSignificance(id, value)}
-              className={`node-tag--${(data.factorSignificance ?? "Normal").toLowerCase()}`}
-            />
-          </>
-        ) : null}
-        {data.nodeType === "Action" ? (
-          <NodeTagMenu
-            readOnly={data.readOnly}
-            label="Action status"
-            value={data.actionStatus ?? "Proposed"}
-            options={actionStatusOptions}
-            onChange={(value) => setNodeActionStatus(id, value)}
-          />
-        ) : null}
-      </div>
+      </header>
       <>
         <Handle
           id="bottom"
@@ -313,6 +316,83 @@ const ChainNodeComponent = ({
           {data.title}
         </div>
       )}
+      {!isEditing ? (
+        <div className="mt-2 flex flex-col gap-1 text-[11px] text-slate-600">
+          {data.nodeType === "Impact" && data.severity ? (
+            <div className="node-metadata-row">
+              <span>Severity</span>
+              <strong>{data.severity}</strong>
+            </div>
+          ) : null}
+          {data.nodeType === "Event" && timestamp ? (
+            <div className="node-metadata-row">
+              <span>Occurred</span>
+              <time dateTime={data.timestamp}>{timestamp}</time>
+            </div>
+          ) : null}
+          {data.nodeType === "Factor" ? (
+            <div className="node-metadata-row">
+              <span>Category</span>
+              <NodeTagMenu
+                readOnly={data.readOnly}
+                label="Factor category"
+                value={data.factorCategory}
+                placeholder="Category"
+                options={factorCategoryOptions}
+                onChange={(next) => setFactorCategory(id, next)}
+              />
+            </div>
+          ) : null}
+          {data.nodeType === "Factor" && significance !== "Normal" ? (
+            <div className="node-metadata-row">
+              <span>Significance</span>
+              <NodeTagMenu
+                readOnly={data.readOnly}
+                label="Factor significance"
+                value={significance}
+                options={significanceOptions}
+                onChange={(next) => setFactorSignificance(id, next)}
+                className={`node-tag--${significance.toLowerCase()}`}
+              />
+            </div>
+          ) : null}
+          {data.nodeType === "Action" ? (
+            <>
+              <div className="node-metadata-row">
+                <span>Status</span>
+                <NodeTagMenu
+                  readOnly={data.readOnly}
+                  label="Action status"
+                  value={data.actionStatus ?? "Proposed"}
+                  options={actionStatusOptions}
+                  onChange={(next) => setNodeActionStatus(id, next)}
+                />
+              </div>
+              {data.owner?.trim() ? (
+                <div className="node-metadata-row">
+                  <span>Owner</span>
+                  <strong>{data.owner}</strong>
+                </div>
+              ) : null}
+              {dueDate ? (
+                <div className="node-metadata-row">
+                  <time dateTime={data.actionDueDate}>Due {dueDate}</time>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+          {(data.nodeType === "Impact" || data.nodeType === "Event") &&
+          evidenceItems.length > 0 ? (
+            <div
+              className="node-metadata-row"
+              aria-label={`${evidenceItems.length} evidence items`}
+            >
+              <span>Evidence</span>
+              <strong>{evidenceItems.length}</strong>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {!isEditing && showDetails && hasVisibleDetails ? (
         <div
           className="mt-2 space-y-2 text-xs text-slate-600"
@@ -377,10 +457,7 @@ const ChainNodeComponent = ({
                 {visibleEvidence.map((item) => (
                   <li key={item.id} className="flex min-w-0 gap-1.5">
                     <span className="shrink-0 font-semibold text-slate-500">
-                      EV-
-                      {String(
-                        Number(item.id.match(/(\d+)$/)?.[1] ?? 0),
-                      ).padStart(2, "0")}
+                      {item.id}
                     </span>
                     <span className="truncate">{item.text}</span>
                   </li>
@@ -417,7 +494,11 @@ const ChainNodeComponent = ({
           ) : null}
         </div>
       ) : null}
-      {!isEditing && !showDetails && evidenceItems.length > 0 ? (
+      {!isEditing &&
+      !showDetails &&
+      evidenceItems.length > 0 &&
+      data.nodeType !== "Impact" &&
+      data.nodeType !== "Event" ? (
         <div
           className="mt-2 flex h-5 items-center"
           aria-label={`${evidenceItems.length} evidence items`}
@@ -449,6 +530,8 @@ const BarrierNodeComponent = ({
   } as const;
   const description = data.description?.trim();
   const failureDetails = data.failureDetails?.trim();
+  const showDetails = useAppStore((state) => state.showDetails);
+  const failureReason = data.failureReason?.replace(/([a-z])([A-Z])/g, "$1 $2");
 
   return (
     <div
@@ -478,25 +561,25 @@ const BarrierNodeComponent = ({
           tabIndex={-1}
         />
       </>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-sky-800">
-          Control
+      <header className="flex items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-800">
+          CONTROL
         </div>
         <span
           className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClasses[data.status]}`}
         >
           {data.status}
         </span>
-      </div>
+      </header>
       <p className="mt-1 text-sm text-slate-700">
         {description ?? "No control purpose provided."}
       </p>
       {data.status !== "Effective" && data.failureReason ? (
         <p className="mt-2 text-xs font-semibold text-slate-700">
-          Why it failed: {data.failureReason}
+          Failure reason: {failureReason}
         </p>
       ) : null}
-      {data.status !== "Effective" && failureDetails ? (
+      {showDetails && data.status !== "Effective" && failureDetails ? (
         <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
           {failureDetails}
         </p>
