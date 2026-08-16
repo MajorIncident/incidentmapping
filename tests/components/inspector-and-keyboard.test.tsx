@@ -81,7 +81,7 @@ describe("Inspector and keyboard workflows", () => {
     });
 
     const titleInput = await screen.findByRole("textbox", { name: /^Title$/i });
-    expect(titleInput).toHaveValue("New ChainNode");
+    expect(titleInput).toHaveValue("New Event");
 
     const ownerInput = screen.getByRole("textbox", { name: /^Owner$/i });
     await act(async () => {
@@ -119,7 +119,7 @@ describe("Inspector and keyboard workflows", () => {
       render(<App />);
     });
 
-    await screen.findByRole("button", { name: "Add a new chain node" });
+    await screen.findByRole("button", { name: "Add Event" });
     await waitFor(() => {
       expect(useAppStore.getState().nodes).toHaveLength(1);
     });

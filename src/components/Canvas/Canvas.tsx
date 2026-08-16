@@ -26,6 +26,13 @@ export type GraphPresentation = {
   unrelated: Set<string>;
 };
 
+export const viewportAnimationDuration = (duration: number): number =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 0
+    : duration;
+
 /** Derives transient visual state from the directed graph; nothing is persisted. */
 export const deriveGraphPresentation = (
   nodeIds: string[],
@@ -94,7 +101,10 @@ export const Canvas = ({
   const [guideOpen, setGuideOpen] = useState(false);
 
   const fitMap = useCallback(() => {
-    void reactFlow.fitView({ padding: 0.2, duration: 400 });
+    void reactFlow.fitView({
+      padding: 0.2,
+      duration: viewportAnimationDuration(400),
+    });
   }, [reactFlow]);
 
   const { nodes, renderedEdges } = useMemo(() => {
@@ -244,9 +254,12 @@ export const Canvas = ({
       if (requestedNodes.length > 0) {
         void reactFlow.fitBounds(getNodesBounds(requestedNodes), {
           padding: 0.25,
-          duration: 400,
+          duration: viewportAnimationDuration(400),
         });
-        setTimeout(() => clearViewportRequest(viewportRequest.id), 400);
+        setTimeout(
+          () => clearViewportRequest(viewportRequest.id),
+          viewportAnimationDuration(400),
+        );
       } else {
         clearViewportRequest(viewportRequest.id);
       }
@@ -275,7 +288,7 @@ export const Canvas = ({
         if (selectedNode) {
           void reactFlow.fitBounds(getNodesBounds([selectedNode]), {
             padding: 0.6,
-            duration: 250,
+            duration: viewportAnimationDuration(250),
           });
         }
       });
@@ -340,6 +353,7 @@ export const Canvas = ({
           className="map-overlay-button"
           onClick={fitMap}
           aria-label="Fit map"
+          title="Fit Map (F)"
         >
           <span aria-hidden="true">⌗</span>
         </button>

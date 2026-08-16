@@ -137,7 +137,7 @@ describe("useAppStore actions", () => {
 
     actions.undo();
     state = useAppStore.getState();
-    expect(state.nodes[0]?.data.title).toBe("New ChainNode");
+    expect(state.nodes[0]?.data.title).toBe("New Event");
     expect(state.canRedo).toBe(true);
 
     actions.redo();

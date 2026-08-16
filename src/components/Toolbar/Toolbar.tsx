@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
+import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
   onAddChainNode: () => void;
@@ -16,45 +17,97 @@ type ToolbarProps = FileMenuRenderProps & {
 };
 
 const buttonBase =
-  "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "command-button inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium shadow-sm";
 const menuItem =
-  "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50";
-
-const Icon = ({ children }: { children: ReactNode }) => (
-  <span aria-hidden="true" className="w-5 text-center text-lg leading-none">
-    {children}
-  </span>
-);
+  "command-button flex min-h-11 w-full items-center gap-3 rounded-lg border border-transparent px-3 text-left text-sm font-medium";
 
 const Menu = ({
   label,
+  icon,
   align = "left",
   children,
 }: {
   label: string;
+  icon: IconName;
   align?: "left" | "right";
   children: ReactNode;
-}) => (
-  <details className="group relative">
-    <summary
-      className={`${buttonBase} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-      aria-label={`${label} menu`}
-      title={`${label} menu`}
-    >
-      <Icon>{label === "File" ? "▤" : "•••"}</Icon>
-      <span className="hidden sm:inline">{label}</span>
-      <span aria-hidden="true" className="hidden text-xs sm:inline">
-        ▾
-      </span>
-    </summary>
-    <div
-      className={`absolute top-[calc(100%+0.5rem)] z-50 min-w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ${align === "right" ? "right-0" : "left-0"}`}
-      role="menu"
-      aria-label={`${label} actions`}
-    >
-      {children}
+}) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
+  const closeAndReturnFocus = () => {
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    const items = [
+      ...(rootRef.current?.querySelectorAll<HTMLButtonElement>(
+        '[role="menuitem"]:not(:disabled)',
+      ) ?? []),
+    ];
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAndReturnFocus();
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      items[(index + delta + items.length) % items.length]?.focus();
+    }
+  };
+  return (
+    <div ref={rootRef} className="relative" onKeyDown={handleKeyDown}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={buttonBase}
+        aria-label={`${label} menu`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={`${label} menu`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Icon name={icon} />
+        <span className="hidden sm:inline">{label}</span>
+        <span aria-hidden="true" className="hidden text-xs sm:inline">
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <div
+          className={`command-popover absolute top-[calc(100%+0.5rem)] z-50 min-w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ${align === "right" ? "right-0" : "left-0"}`}
+          role="menu"
+          aria-label={`${label} actions`}
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest('[role="menuitem"]'))
+              closeAndReturnFocus();
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
     </div>
-  </details>
+  );
+};
+
+const Item = ({
+  icon,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName }) => (
+  <button type="button" role="menuitem" className={menuItem} {...props}>
+    <Icon name={icon} />
+    {children}
+  </button>
 );
 
 export const Toolbar = (props: ToolbarProps): JSX.Element => (
@@ -67,88 +120,97 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
         aria-label="Create a new map"
         title="Create a new map"
       >
-        <Icon>＋</Icon>
+        <Icon name="add" />
         <span className="hidden sm:inline">New</span>
       </button>
-      <Menu label="File">
-        <button
-          className={menuItem}
+      <Menu label="File" icon="file">
+        <Item
+          icon="open"
           onClick={() => void props.onOpen()}
           aria-label="Open an existing map"
         >
-          <Icon>↥</Icon>Open…
-        </button>
-        <button
-          className={menuItem}
+          Open…
+        </Item>
+        <Item
+          icon="save"
           onClick={() => void props.onSave()}
           aria-label="Save the current map"
         >
-          <Icon>↓</Icon>Save
-        </button>
-        <button
-          className={menuItem}
+          Save <span className="ml-auto text-xs text-slate-500">Ctrl/⌘ S</span>
+        </Item>
+        <Item
+          icon="export"
           onClick={props.onExportPng}
           aria-label="Export the current map as a PNG"
         >
-          <Icon>▧</Icon>Export PNG
-        </button>
+          Export PNG
+        </Item>
       </Menu>
+      <span
+        className={`save-state ${props.isSaved ? "save-state--saved" : "save-state--unsaved"}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span aria-hidden="true">●</span> {props.isSaved ? "Saved" : "Unsaved"}
+      </span>
     </nav>
     <nav className="flex items-center gap-2" aria-label="Editing commands">
       <button
         type="button"
-        className={`${buttonBase} border-sky-600 bg-sky-600 text-white hover:bg-sky-700`}
+        className={`${buttonBase} command-button--primary`}
         onClick={props.onAddChainNode}
-        aria-label="Add a new chain node"
-        title="Add a new chain node"
+        aria-label="Add Event"
+        title="Add Event (Enter)"
       >
-        <Icon>＋</Icon>
-        <span className="hidden sm:inline">Add node</span>
+        <Icon name="add" />
+        <span>Add Event</span>
       </button>
-      <Menu label="More" align="right">
-        <button
-          className={menuItem}
+      <Menu label="More" icon="more" align="right">
+        <Item
+          icon="undo"
           onClick={props.onUndo}
           disabled={!props.canUndo}
           aria-label="Undo the last action"
+          title="Undo (Ctrl/⌘ Z)"
         >
-          <Icon>↶</Icon>Undo
-        </button>
-        <button
-          className={menuItem}
+          Undo <span className="ml-auto text-xs text-slate-500">Ctrl/⌘ Z</span>
+        </Item>
+        <Item
+          icon="redo"
           onClick={props.onRedo}
           disabled={!props.canRedo}
           aria-label="Redo the previously undone action"
+          title="Redo (Ctrl/⌘ Shift Z)"
         >
-          <Icon>↷</Icon>Redo
-        </button>
-        <button
-          className={menuItem}
+          Redo{" "}
+          <span className="ml-auto text-xs text-slate-500">Ctrl/⌘ ⇧ Z</span>
+        </Item>
+        <Item
+          icon="arrange"
           onClick={props.onOrganize}
           disabled={!props.canOrganize}
-          aria-label="Organize all nodes"
+          aria-label="Arrange Map"
         >
-          <Icon>⌘</Icon>Organize
-        </button>
-        <button
-          className={menuItem}
+          Arrange Map
+        </Item>
+        <Item
+          icon="details"
           onClick={props.onToggleDetails}
-          aria-label="Toggle node detail visibility"
+          aria-label="Toggle event detail visibility"
+          aria-pressed={props.showDetails}
         >
-          <Icon>◫</Icon>
-          {props.showDetails ? "Hide details" : "Show details"}
-        </button>
-        <button
-          className={`${menuItem} text-rose-700`}
+          {props.showDetails ? "Hide event details" : "Show event details"}
+        </Item>
+        <Item
+          icon="delete"
+          className={`${menuItem} command-button--danger`}
           onClick={props.onDeleteSelection}
           disabled={!props.canDelete}
-          aria-label="Delete the selected node"
+          aria-label="Delete selected event"
+          title="Delete selected event (Delete)"
         >
-          <Icon>⌫</Icon>Delete selection
-        </button>
-        <div className="mt-1 border-t border-slate-200 px-3 pt-2 text-xs text-slate-500 sm:hidden">
-          Privacy · EULA
-        </div>
+          Delete
+        </Item>
       </Menu>
     </nav>
   </header>

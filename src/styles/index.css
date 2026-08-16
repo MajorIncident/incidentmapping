@@ -49,12 +49,57 @@ input[type="checkbox"] {
   @apply grid place-items-center rounded-xl border border-slate-300 bg-white text-lg font-bold text-slate-700 shadow-sm;
 }
 
-button:focus-visible {
+.command-button,
+.map-overlay-button,
+.react-flow__controls button {
+  @apply border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.command-button[aria-pressed="true"] {
+  @apply border-sky-300 bg-sky-50 text-sky-800;
+}
+
+.command-button--primary {
+  @apply border-sky-700 bg-sky-600 font-semibold text-white hover:border-sky-800 hover:bg-sky-700 active:bg-sky-800;
+}
+
+.command-button--danger {
+  @apply text-rose-700 hover:border-rose-200 hover:bg-rose-50 active:bg-rose-100;
+}
+
+.save-state {
+  @apply hidden items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium sm:inline-flex;
+}
+
+.save-state--saved {
+  @apply bg-emerald-50 text-emerald-700;
+}
+.save-state--unsaved {
+  @apply bg-amber-50 text-amber-800;
+}
+
+button:focus-visible,
+summary:focus-visible,
+[role="menuitem"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   @apply outline-none ring-2 ring-offset-2 ring-canvas-accent;
 }
 
 .react-flow__node:focus-visible {
   @apply rounded-2xl outline-none ring-4 ring-sky-500 ring-offset-2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 .incident-edge path.react-flow__edge-path {

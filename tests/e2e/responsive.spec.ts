@@ -10,9 +10,7 @@ for (const width of [375, 768, 1280]) {
     await expect(
       page.getByRole("button", { name: "Create a new map" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Add a new chain node" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Event" })).toBeVisible();
     await page.getByLabel("File menu").click();
     await expect(
       page.getByRole("button", { name: "Open an existing map" }),
@@ -29,7 +27,7 @@ for (const width of [375, 768, 1280]) {
           document.documentElement.clientWidth,
       ),
     ).toBe(true);
-    for (const selector of ["Create a new map", "Add a new chain node"]) {
+    for (const selector of ["Create a new map", "Add Event"]) {
       const box = await page
         .getByRole("button", { name: selector })
         .boundingBox();
