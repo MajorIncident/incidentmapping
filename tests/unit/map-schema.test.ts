@@ -1,191 +1,274 @@
 import { describe, expect, it } from "vitest";
-import { mapDataSchema } from "../../src/features/maps/schema";
+import {
+  mapDataSchema,
+  mapDataV1Schema,
+  mapDataV2Schema,
+} from "../../src/features/maps/schema";
 import { sampleMap } from "../../src/features/maps/fixtures";
 
-describe("mapDataSchema", () => {
-  it("validates a happy path map", () => {
-    expect(() => mapDataSchema.parse(sampleMap)).not.toThrow();
-  });
-
-  it("rejects missing node titles", () => {
-    const invalid = {
-      ...sampleMap,
-      nodes: sampleMap.nodes.map((node, index) =>
-        index === 0 ? { ...node, title: "" } : node,
-      ),
-    };
-
-    const result = mapDataSchema.safeParse(invalid);
-    expect(result.success).toBe(false);
-  });
-
-  it("persists evidence as non-empty id and text pairs", () => {
-    const valid = {
-      ...sampleMap,
-      nodes: sampleMap.nodes.map((node, index) =>
-        index === 0
-          ? { ...node, evidenceItems: [{ id: "opaque-id", text: "Photo" }] }
-          : node,
-      ),
-    };
-    expect(mapDataSchema.parse(valid).nodes[0].evidenceItems).toEqual([
-      { id: "opaque-id", text: "Photo" },
-    ]);
-
-    valid.nodes[0].evidenceItems = [{ id: "opaque-id", text: "   " }];
-    expect(mapDataSchema.safeParse(valid).success).toBe(false);
-  });
-
-  it("validates and serializes optional incident metadata", () => {
-    const metadata = {
-      title: "Investigation",
-      incidentId: "INC-204",
-      occurredAt: "2026-08-16T09:30",
-      location: "Plant 4",
-      severity: "Critical" as const,
-      status: "Open" as const,
-    };
-    expect(mapDataSchema.parse({ ...sampleMap, metadata }).metadata).toEqual(
-      metadata,
-    );
-
-    expect(
-      mapDataSchema.safeParse({
-        ...sampleMap,
-        metadata: { ...metadata, location: "   " },
-      }).success,
-    ).toBe(false);
-    expect(
-      mapDataSchema.safeParse({
-        ...sampleMap,
-        metadata: { ...metadata, severity: "Urgent" },
-      }).success,
-    ).toBe(false);
-  });
-
-  it("rejects retired node-level incident status", () => {
-    const result = mapDataSchema.safeParse({
-      ...sampleMap,
-      nodes: sampleMap.nodes.map((node, index) =>
-        index === 0 ? { ...node, incidentStatus: "Open" } : node,
-      ),
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts non-contiguous canonical evidence IDs and their high-water mark", () => {
-    const parsed = mapDataSchema.parse({
-      ...sampleMap,
-      metadata: { evidenceReferenceHighWaterMark: 3 },
-      nodes: sampleMap.nodes.map((node, index) => ({
-        ...node,
-        evidenceItems: [
-          {
-            id: index === 0 ? "EV-001" : "EV-003",
-            text: `Evidence ${index + 1}`,
-          },
-        ],
-      })),
-    });
-    expect(parsed.nodes.flatMap((node) => node.evidenceItems)).toEqual([
-      { id: "EV-001", text: "Evidence 1" },
-      { id: "EV-003", text: "Evidence 2" },
-    ]);
-    expect(parsed.metadata?.evidenceReferenceHighWaterMark).toBe(3);
-  });
-
-  it.each(["Effective", "Degraded", "Failed", "Missing"] as const)(
-    "accepts the %s barrier status without retired fields",
-    (status) => {
-      const barrier = { ...sampleMap.barriers[0], status };
-      const parsed = mapDataSchema.parse({ ...sampleMap, barriers: [barrier] });
-      expect(parsed.barriers[0].status).toBe(status);
-      expect(parsed.barriers[0]).not.toHaveProperty("breached");
-      expect(parsed.barriers[0]).not.toHaveProperty("breachedItems");
+const validMap = {
+  schemaVersion: 3 as const,
+  metadata: {
+    title: "Investigation",
+    contextItems: [{ id: "weather", label: " Weather ", value: " Rain " }],
+  },
+  evidence: [
+    {
+      id: "EV-1",
+      type: "Photo" as const,
+      title: "Scene photograph",
+      description: "Overview",
+      source: "Investigator",
+      reference: "IMG-1",
     },
-  );
+    { id: "EV-2", type: "SystemLog" as const, title: "Alarm log" },
+  ],
+  nodes: [
+    {
+      id: "event",
+      kind: "ChainNode" as const,
+      referenceId: "N-1",
+      nodeType: "Event" as const,
+      title: "Leak",
+      eventPhase: "Incident" as const,
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      evidenceIds: ["EV-1"],
+      contextItems: [
+        { id: "shift", label: "Shift", value: "Night", showOnCard: true },
+      ],
+      position: { x: 0, y: 0 },
+    },
+    {
+      id: "factor",
+      kind: "ChainNode" as const,
+      referenceId: "N-2",
+      nodeType: "Factor" as const,
+      title: "Seal wear",
+      factorCategory: "Equipment" as const,
+      factorSignificance: "RootCause" as const,
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      evidenceIds: ["EV-2"],
+      contextItems: [],
+      position: { x: 1, y: 1 },
+    },
+    {
+      id: "action",
+      kind: "ChainNode" as const,
+      referenceId: "N-3",
+      nodeType: "Action" as const,
+      title: "Replace seal",
+      actionType: "Corrective" as const,
+      actionStatus: "Planned" as const,
+      actionDueDate: "2026-09-01",
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      evidenceIds: [],
+      contextItems: [],
+      position: { x: 2, y: 2 },
+    },
+  ],
+  edges: [
+    {
+      id: "causal",
+      kind: "CauseEffectEdge" as const,
+      fromId: "factor",
+      toId: "event",
+    },
+    {
+      id: "action-edge",
+      kind: "ActionEdge" as const,
+      fromId: "event",
+      toId: "action",
+    },
+  ],
+  barriers: [
+    {
+      id: "control",
+      kind: "Barrier" as const,
+      upstreamNodeId: "factor",
+      downstreamNodeId: "event",
+      status: "Effective" as const,
+      controlRole: "Preventive" as const,
+      evidenceIds: ["EV-2"],
+    },
+  ],
+};
+
+const issues = (value: unknown) => {
+  const result = mapDataSchema.safeParse(value);
+  expect(result.success).toBe(false);
+  return result.success ? [] : result.error.issues;
+};
+const mutateNode = (index: number, patch: object) => ({
+  ...validMap,
+  nodes: validMap.nodes.map((node, i) =>
+    i === index ? { ...node, ...patch } : node,
+  ),
+});
+
+describe("mapDataSchema V3", () => {
+  it("accepts a comprehensive V3 document and normalizes metadata context", () => {
+    const parsed = mapDataSchema.parse(validMap);
+    expect(parsed.schemaVersion).toBe(3);
+    expect(parsed.metadata?.contextItems[0]).toMatchObject({
+      label: "Weather",
+      value: "Rain",
+    });
+    expect(
+      mapDataSchema.parse({ ...validMap, metadata: { title: "Minimal" } })
+        .metadata?.contextItems,
+    ).toEqual([]);
+  });
+
+  it("keeps V1 and V2 schemas available but canonical serialization is V3 only", () => {
+    expect(
+      mapDataV1Schema.safeParse({ schemaVersion: 1, nodes: [], edges: [] })
+        .success,
+    ).toBe(true);
+    expect(mapDataV2Schema.safeParse(sampleMap).success).toBe(true);
+    expect(mapDataSchema.safeParse(sampleMap).success).toBe(false);
+  });
 
   it.each([
     [
-      "Duplicate node ID",
-      (map: typeof sampleMap) => ({
-        ...map,
-        nodes: [...map.nodes, { ...map.nodes[0] }],
-      }),
+      "event phase on non-Event",
+      mutateNode(1, { eventPhase: "Recovery" }),
+      ["nodes", 1, "eventPhase"],
     ],
     [
-      "Duplicate node reference ID",
-      (map: typeof sampleMap) => ({
-        ...map,
-        nodes: map.nodes.map((node, index) =>
-          index ? { ...node, referenceId: map.nodes[0].referenceId } : node,
-        ),
-      }),
+      "action type on non-Action",
+      mutateNode(0, { actionType: "Immediate" }),
+      ["nodes", 0, "actionType"],
     ],
     [
-      "Duplicate edge ID",
-      (map: typeof sampleMap) => ({
-        ...map,
-        edges: [...map.edges, { ...map.edges[0] }],
-      }),
+      "action status on non-Action",
+      mutateNode(0, { actionStatus: "Proposed" }),
+      ["nodes", 0, "actionStatus"],
     ],
     [
-      "Duplicate control ID",
-      (map: typeof sampleMap) => ({
-        ...map,
-        barriers: [...map.barriers, { ...map.barriers[0] }],
-      }),
+      "action due date on non-Action",
+      mutateNode(0, { actionDueDate: "tomorrow" }),
+      ["nodes", 0, "actionDueDate"],
     ],
     [
-      "Duplicate evidence ID",
-      (map: typeof sampleMap) => ({
-        ...map,
-        nodes: map.nodes.map((node) => ({
-          ...node,
-          evidenceItems: [{ id: "EV-001", text: "proof" }],
-        })),
-      }),
+      "factor category on non-Factor",
+      mutateNode(0, { factorCategory: "Human" }),
+      ["nodes", 0, "factorCategory"],
     ],
-  ] as const)("reports %s", (message, mutate) => {
-    const result = mapDataSchema.safeParse(mutate(sampleMap));
-    expect(result.success).toBe(false);
-    if (!result.success)
-      expect(
-        result.error.issues.some((item) => item.message.startsWith(message)),
-      ).toBe(true);
-  });
-
-  it("rejects invalid Action and causal relationships", () => {
-    const action = {
-      ...sampleMap.nodes[1],
-      id: "action",
-      referenceId: "N-003",
-      nodeType: "Action" as const,
-    };
-    const orphan = { ...sampleMap, nodes: [...sampleMap.nodes, action] };
-    const orphanResult = mapDataSchema.safeParse(orphan);
+    [
+      "factor significance on non-Factor",
+      mutateNode(0, { factorSignificance: "KeyFactor" }),
+      ["nodes", 0, "factorSignificance"],
+    ],
+    [
+      "context on Action",
+      mutateNode(2, {
+        contextItems: [{ id: "x", label: "Why", value: "Now" }],
+      }),
+      ["nodes", 2, "contextItems"],
+    ],
+  ])("rejects %s", (_name, value, path) =>
     expect(
-      orphanResult.success
-        ? []
-        : orphanResult.error.issues.map((item) => item.message),
-    ).toContain("Orphaned Action: action");
-    const causal = {
-      ...orphan,
-      edges: [
-        ...orphan.edges,
-        {
-          id: "bad",
-          kind: "CauseEffectEdge" as const,
-          fromId: "child",
-          toId: "action",
-        },
+      issues(value).some(
+        (issue) => JSON.stringify(issue.path) === JSON.stringify(path),
+      ),
+    ).toBe(true),
+  );
+
+  it("rejects duplicate registry IDs, duplicate entity references, and unresolved references", () => {
+    expect(
+      issues({
+        ...validMap,
+        evidence: [...validMap.evidence, { ...validMap.evidence[0] }],
+      }).some((i) => i.message.includes("Duplicate evidence ID")),
+    ).toBe(true);
+    expect(
+      issues(mutateNode(0, { evidenceIds: ["EV-1", "EV-1"] })).some((i) =>
+        i.message.includes("Duplicate evidence reference"),
+      ),
+    ).toBe(true);
+    expect(
+      issues(mutateNode(0, { evidenceIds: ["missing"] })).some((i) =>
+        i.message.includes("Missing evidence reference"),
+      ),
+    ).toBe(true);
+    const badControl = {
+      ...validMap,
+      barriers: [
+        { ...validMap.barriers[0], evidenceIds: ["missing", "missing"] },
       ],
     };
-    const causalResult = mapDataSchema.safeParse(causal);
     expect(
-      causalResult.success
-        ? []
-        : causalResult.error.issues.map((item) => item.message),
-    ).toContain("Causal edge touches Action node: bad");
+      issues(badControl).filter((i) => i.path[0] === "barriers").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("uses strict enums and rejects retired or invented persisted fields", () => {
+    expect(issues(mutateNode(0, { eventPhase: "Before" }))[0].path).toEqual([
+      "nodes",
+      0,
+      "eventPhase",
+    ]);
+    expect(
+      issues({
+        ...validMap,
+        evidence: [{ ...validMap.evidence[0], type: "URL" }],
+      })[0].path,
+    ).toEqual(["evidence", 0, "type"]);
+    expect(
+      issues(mutateNode(0, { evidenceItems: [] })).some(
+        (i) => i.code === "unrecognized_keys",
+      ),
+    ).toBe(true);
+    expect(
+      issues({
+        ...validMap,
+        evidence: [{ ...validMap.evidence[0], url: "https://example.test" }],
+      }).some((i) => i.code === "unrecognized_keys"),
+    ).toBe(true);
+  });
+
+  it("rejects blank context labels and values", () => {
+    expect(
+      issues(
+        mutateNode(0, {
+          contextItems: [{ id: "x", label: "  ", value: "ok" }],
+        }),
+      )[0].path,
+    ).toEqual(["nodes", 0, "contextItems", 0, "label"]);
+    expect(
+      issues({
+        ...validMap,
+        metadata: { contextItems: [{ id: "x", label: "x", value: "  " }] },
+      })[0].path,
+    ).toEqual(["metadata", "contextItems", 0, "value"]);
+  });
+
+  it("retains graph, Action, endpoint, and Control-pair integrity", () => {
+    expect(
+      issues({
+        ...validMap,
+        edges: [
+          ...validMap.edges,
+          { ...validMap.edges[0], id: "bad", toId: "missing" },
+        ],
+      }).some((i) => i.message.includes("Missing edge target")),
+    ).toBe(true);
+    expect(
+      issues({
+        ...validMap,
+        edges: validMap.edges.filter((e) => e.kind !== "ActionEdge"),
+      }).some((i) => i.message.includes("Orphaned Action")),
+    ).toBe(true);
+    expect(
+      issues({
+        ...validMap,
+        barriers: [{ ...validMap.barriers[0], downstreamNodeId: "action" }],
+      }).some((i) =>
+        i.message.includes("does not match a causal relationship"),
+      ),
+    ).toBe(true);
   });
 });

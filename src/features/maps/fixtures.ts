@@ -1,4 +1,4 @@
-import type { MapData } from "./schema";
+import type { MapDataV2 as MapData } from "./schema";
 
 export const sampleMap: MapData = {
   schemaVersion: 2,

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import type { MapData } from "../../src/features/maps/schema";
+import type { MapDataV2 as MapData } from "../../src/features/maps/schema";
 
 const firstSave = path.join(os.tmpdir(), "visual-investigation-first.json");
 const reloadedSave = path.join(

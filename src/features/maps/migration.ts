@@ -3,10 +3,10 @@ import {
   actionStatusSchema,
   barrierStatusSchema,
   incidentStatusSchema,
-  mapDataSchema,
+  mapDataV2Schema,
   mapDataV1Schema,
   severitySchema,
-  type MapData,
+  type MapDataV2 as MapData,
 } from "./schema";
 
 const versionEnvelope = z.object({ schemaVersion: z.number() });
@@ -140,7 +140,7 @@ const failureMap = {
 } as const;
 
 const validate = (value: unknown): MapData => {
-  const result = mapDataSchema.safeParse(value);
+  const result = mapDataV2Schema.safeParse(value);
   if (result.success) return result.data;
   const graphIssue = result.error.issues.find((item) => item.code === "custom");
   if (graphIssue) throw new Error(graphIssue.message);
@@ -244,7 +244,7 @@ export const parseAndMigrateMapData = (input: unknown): MapData => {
   const { schemaVersion } = versionEnvelope.parse(input);
   if (schemaVersion === 1) return migrateMapDataV1(input);
   if (schemaVersion === 2) {
-    const canonical = mapDataSchema.safeParse(input);
+    const canonical = mapDataV2Schema.safeParse(input);
     if (canonical.success) return canonical.data;
     return normalizeV2(input);
   }

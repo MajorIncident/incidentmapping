@@ -49,9 +49,40 @@ export const barrierFailureReasonSchema = z.enum([
   "Unknown",
   "Other",
 ]);
+export const eventPhaseSchema = z.enum([
+  "Precursor",
+  "Incident",
+  "Detection",
+  "Response",
+  "Recovery",
+]);
+export const actionTypeSchema = z.enum([
+  "Immediate",
+  "Corrective",
+  "Preventive",
+]);
+export const controlRoleSchema = z.enum([
+  "Preventive",
+  "Detective",
+  "Mitigating",
+]);
+export const evidenceTypeSchema = z.enum([
+  "Note",
+  "Photo",
+  "Video",
+  "Document",
+  "SystemLog",
+  "Interview",
+  "Other",
+]);
+
+export type EventPhase = z.infer<typeof eventPhaseSchema>;
+export type ActionType = z.infer<typeof actionTypeSchema>;
+export type ControlRole = z.infer<typeof controlRoleSchema>;
+export type EvidenceType = z.infer<typeof evidenceTypeSchema>;
 
 export const positionSchema = strictObject({ x: z.number(), y: z.number() });
-export const evidenceItemSchema = strictObject({
+const evidenceItemV2Schema = strictObject({
   id: z.string().min(1),
   text: z.string().trim().min(1),
 });
@@ -94,7 +125,8 @@ export const mapDataV1Schema = z.object({
   barriers: z.array(barrierV1Schema).default([]),
 });
 
-export const chainNodeSchema = strictObject({
+// V2 is frozen for import/migration. Do not make current-contract changes here.
+export const chainNodeV2Schema = strictObject({
   id: z.string().min(1),
   kind: z.literal("ChainNode"),
   referenceId: z.string().min(1),
@@ -110,7 +142,7 @@ export const chainNodeSchema = strictObject({
   actionDueDate: z.string().optional(),
   positiveConsequenceBulletPoints: z.array(z.string()),
   negativeConsequenceBulletPoints: z.array(z.string()),
-  evidenceItems: z.array(evidenceItemSchema),
+  evidenceItems: z.array(evidenceItemV2Schema),
   position: positionSchema,
 });
 export const causeEffectEdgeSchema = strictObject({
@@ -140,7 +172,7 @@ export const barrierSchema = strictObject({
   failureDetails: z.string().optional(),
 });
 const optionalMetadataText = z.string().trim().min(1).optional();
-export const metadataSchema = strictObject({
+export const metadataV2Schema = strictObject({
   title: optionalMetadataText,
   incidentId: optionalMetadataText,
   occurredAt: optionalMetadataText,
@@ -151,6 +183,66 @@ export const metadataSchema = strictObject({
   evidenceReferenceHighWaterMark: z.number().int().nonnegative().optional(),
 }).optional();
 
+export const mapDataV2Schema = strictObject({
+  schemaVersion: z.literal(2),
+  metadata: metadataV2Schema,
+  nodes: z.array(chainNodeV2Schema),
+  edges: z.array(relationshipEdgeSchema),
+  barriers: z.array(barrierSchema),
+});
+
+export const contextItemSchema = strictObject({
+  id: z.string().min(1),
+  label: z.string().trim().min(1),
+  value: z.string().trim().min(1),
+  showOnCard: z.boolean().optional(),
+});
+export const evidenceItemSchema = strictObject({
+  id: z.string().min(1),
+  type: evidenceTypeSchema,
+  title: z.string().min(1),
+  description: z.string().optional(),
+  source: z.string().optional(),
+  reference: z.string().optional(),
+});
+export const chainNodeSchema = strictObject({
+  id: z.string().min(1),
+  kind: z.literal("ChainNode"),
+  referenceId: z.string().min(1),
+  nodeType: nodeTypeSchema,
+  title: z.string().min(1, "ChainNode title is required"),
+  description: z.string().optional(),
+  owner: z.string().optional(),
+  timestamp: z.string().optional(),
+  severity: severitySchema.optional(),
+  factorCategory: factorCategorySchema.optional(),
+  factorSignificance: factorSignificanceSchema.optional(),
+  actionStatus: actionStatusSchema.optional(),
+  actionDueDate: z.string().optional(),
+  eventPhase: eventPhaseSchema.optional(),
+  actionType: actionTypeSchema.optional(),
+  positiveConsequenceBulletPoints: z.array(z.string()),
+  negativeConsequenceBulletPoints: z.array(z.string()),
+  evidenceIds: z.array(z.string().min(1)),
+  contextItems: z.array(contextItemSchema),
+  position: positionSchema,
+});
+export const controlSchema = barrierSchema.extend({
+  controlRole: controlRoleSchema.optional(),
+  evidenceIds: z.array(z.string().min(1)),
+});
+export const metadataSchema = strictObject({
+  title: optionalMetadataText,
+  incidentId: optionalMetadataText,
+  occurredAt: optionalMetadataText,
+  location: optionalMetadataText,
+  severity: severitySchema.optional(),
+  status: incidentStatusSchema.optional(),
+  nodeReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  evidenceReferenceHighWaterMark: z.number().int().nonnegative().optional(),
+  contextItems: z.array(contextItemSchema).default([]),
+}).optional();
+
 const issue = (
   ctx: z.RefinementCtx,
   message: string,
@@ -158,11 +250,12 @@ const issue = (
 ) => ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
 
 export const mapDataSchema = strictObject({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   metadata: metadataSchema,
   nodes: z.array(chainNodeSchema),
   edges: z.array(relationshipEdgeSchema),
-  barriers: z.array(barrierSchema),
+  barriers: z.array(controlSchema),
+  evidence: z.array(evidenceItemSchema),
 }).superRefine((map, ctx) => {
   const seen = (values: string[], label: string) => {
     const ids = new Set<string>();
@@ -188,9 +281,79 @@ export const mapDataSchema = strictObject({
     map.barriers.map((control) => control.id),
     "control ID",
   );
-  seen(
-    map.nodes.flatMap((node) => node.evidenceItems.map((item) => item.id)),
-    "evidence ID",
+  const registryIds = new Set<string>();
+  map.evidence.forEach((item, index) => {
+    if (registryIds.has(item.id))
+      issue(ctx, `Duplicate evidence ID: ${item.id}`, [
+        "evidence",
+        index,
+        "id",
+      ]);
+    registryIds.add(item.id);
+  });
+
+  const evidenceIds = new Set(map.evidence.map((item) => item.id));
+  const checkEvidence = (ids: string[], path: (string | number)[]) => {
+    const local = new Set<string>();
+    ids.forEach((id, index) => {
+      if (local.has(id))
+        issue(ctx, `Duplicate evidence reference: ${id}`, [...path, index]);
+      local.add(id);
+      if (!evidenceIds.has(id))
+        issue(ctx, `Missing evidence reference: ${id}`, [...path, index]);
+    });
+  };
+  map.nodes.forEach((node, index) => {
+    checkEvidence(node.evidenceIds, ["nodes", index, "evidenceIds"]);
+    if (node.nodeType !== "Event" && node.eventPhase !== undefined)
+      issue(ctx, "Event Phase is only valid on Events", [
+        "nodes",
+        index,
+        "eventPhase",
+      ]);
+    if (node.nodeType !== "Action") {
+      if (node.actionType !== undefined)
+        issue(ctx, "Action Type is only valid on Actions", [
+          "nodes",
+          index,
+          "actionType",
+        ]);
+      if (node.actionStatus !== undefined)
+        issue(ctx, "Action status is only valid on Actions", [
+          "nodes",
+          index,
+          "actionStatus",
+        ]);
+      if (node.actionDueDate !== undefined)
+        issue(ctx, "Action due date is only valid on Actions", [
+          "nodes",
+          index,
+          "actionDueDate",
+        ]);
+    }
+    if (node.nodeType !== "Factor") {
+      if (node.factorCategory !== undefined)
+        issue(ctx, "Factor category is only valid on Factors", [
+          "nodes",
+          index,
+          "factorCategory",
+        ]);
+      if (node.factorSignificance !== undefined)
+        issue(ctx, "Factor significance is only valid on Factors", [
+          "nodes",
+          index,
+          "factorSignificance",
+        ]);
+    }
+    if (node.nodeType === "Action" && node.contextItems.length)
+      issue(ctx, "Context is not valid on Actions", [
+        "nodes",
+        index,
+        "contextItems",
+      ]);
+  });
+  map.barriers.forEach((control, index) =>
+    checkEvidence(control.evidenceIds, ["barriers", index, "evidenceIds"]),
   );
 
   const nodes = new Map(map.nodes.map((node) => [node.id, node]));
@@ -256,11 +419,15 @@ export const mapDataSchema = strictObject({
 });
 
 export type MapDataV1 = z.infer<typeof mapDataV1Schema>;
+export type MapDataV2 = z.infer<typeof mapDataV2Schema>;
+export type ChainNodeV2 = z.infer<typeof chainNodeV2Schema>;
 export type MapData = z.infer<typeof mapDataSchema>;
 export type ChainNode = z.infer<typeof chainNodeSchema>;
+export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
+export type ContextItem = z.infer<typeof contextItemSchema>;
 export type RelationshipEdge = z.infer<typeof relationshipEdgeSchema>;
 export type CauseEffectEdge = z.infer<typeof causeEffectEdgeSchema>;
 export type ActionEdge = z.infer<typeof actionEdgeSchema>;
 export type Barrier = z.infer<typeof barrierSchema>;
-export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
 export type MapMetadata = NonNullable<MapData["metadata"]>;
+export type MapMetadataV2 = NonNullable<MapDataV2["metadata"]>;

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseAndMigrateMapData } from "../../src/features/maps/migration";
-import { mapDataSchema, type MapDataV1 } from "../../src/features/maps/schema";
+import {
+  mapDataV2Schema,
+  type MapDataV1,
+} from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
 import { sampleMap } from "../../src/features/maps/fixtures";
 
@@ -99,7 +102,7 @@ describe("parseAndMigrateMapData", () => {
     const current = parseAndMigrateMapData(legacy);
     expect(parseAndMigrateMapData(current)).toEqual(current);
     expect(
-      mapDataSchema.safeParse({
+      mapDataV2Schema.safeParse({
         ...current,
         barriers: [{ ...current.barriers[0], breached: true }],
       }).success,
@@ -217,7 +220,7 @@ describe("parseAndMigrateMapData", () => {
 
     useAppStore.getState().actions.loadMap(parsed);
     const saved = useAppStore.getState().actions.toMap();
-    expect(mapDataSchema.parse(saved)).toEqual(saved);
+    expect(mapDataV2Schema.parse(saved)).toEqual(saved);
     expect(JSON.stringify(saved)).not.toContain("incidentStatus");
   });
 

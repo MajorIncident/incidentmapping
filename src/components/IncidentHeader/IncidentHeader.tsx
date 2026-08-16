@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { MapMetadata } from "../../features/maps/schema";
+import type { MapMetadataV2 as MapMetadata } from "../../features/maps/schema";
 import { useAppStore } from "../../state/useAppStore";
 import { EditableMapTitle } from "../Canvas/EditableMapTitle";
 

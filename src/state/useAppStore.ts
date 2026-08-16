@@ -2,8 +2,8 @@ import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
   Barrier,
-  ChainNode,
-  MapData,
+  ChainNodeV2 as ChainNode,
+  MapDataV2 as MapData,
   MapDataV1,
   RelationshipEdge,
 } from "../features/maps/schema";
