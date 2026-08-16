@@ -14,6 +14,20 @@ html,
 body,
 #root {
   height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+button,
+a,
+summary,
+input[type="checkbox"] {
+  touch-action: manipulation;
+}
+
+.react-flow__controls {
+  margin-left: max(0.5rem, env(safe-area-inset-left));
+  margin-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
 button:focus-visible {
@@ -40,5 +54,21 @@ button:focus-visible {
 }
 
 .react-flow__minimap {
-  @apply !bottom-4 !right-4 overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm;
+  @apply overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm;
+  bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  right: max(1rem, env(safe-area-inset-right)) !important;
+}
+
+@media (max-width: 1023px) {
+  .react-flow__minimap,
+  [aria-label="Incident map legend"] {
+    display: none;
+  }
+  .react-flow__controls {
+    bottom: 55%;
+  }
+  .react-flow__controls button {
+    width: 44px;
+    height: 44px;
+  }
 }

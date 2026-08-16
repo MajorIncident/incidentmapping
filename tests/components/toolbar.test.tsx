@@ -41,28 +41,27 @@ describe("Toolbar map title", () => {
   const titleControl = () =>
     screen.getByRole("button", { name: /untitled map.*edit map title/i });
 
-  it("orders file actions first and keeps Organize with graph actions", () => {
+  it("keeps primary actions visible and exposes lower-frequency menus", () => {
     render(<App />);
 
     const toolbar = screen.getByRole("banner");
-    const buttons = Array.from(toolbar.querySelectorAll("button"));
-    expect(buttons[0]).toHaveAccessibleName("Create a new map");
-    expect(buttons.slice(0, 4).map((button) => button.textContent)).toEqual([
-      "New",
-      "Open…",
-      "Save",
-      "Export PNG",
-    ]);
-
-    const graphActions = screen.getByRole("group", { name: /graph actions/i });
-    expect(graphActions).toContainElement(
-      screen.getByRole("button", { name: /organize all nodes/i }),
+    expect(toolbar).toContainElement(
+      screen.getByRole("button", { name: "Create a new map" }),
+    );
+    expect(toolbar).toContainElement(
+      screen.getByRole("button", { name: "Add a new chain node" }),
+    );
+    expect(screen.getByLabelText("File menu")).toHaveAttribute(
+      "title",
+      "File menu",
+    );
+    expect(screen.getByLabelText("More menu")).toHaveAttribute(
+      "title",
+      "More menu",
     );
     expect(
-      Array.from(graphActions.querySelectorAll("button")).map(
-        (button) => button.textContent,
-      ),
-    ).toEqual(["Add ChainNode", "Organize", "Hide Details"]);
+      screen.getByRole("button", { name: /organize all nodes/i }),
+    ).toBeDisabled();
   });
 
   it("edits the canvas title with a double-click and commits on Enter", async () => {

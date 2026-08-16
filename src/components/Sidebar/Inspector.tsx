@@ -24,7 +24,11 @@ const textAreaClasses =
 const buttonClasses =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent disabled:cursor-not-allowed disabled:opacity-60";
 
-export const Inspector = (): JSX.Element => {
+export const Inspector = ({
+  onClose,
+}: {
+  onClose?: () => void;
+}): JSX.Element => {
   const selectionId = useAppStore((state) => state.selectionId);
   const node = useAppStore(
     (state) =>
@@ -1198,23 +1202,34 @@ export const Inspector = (): JSX.Element => {
 
   return (
     <aside
-      className="flex h-full min-w-[320px] max-w-sm flex-col gap-6 border-l border-slate-200 bg-white p-6 text-slate-700 shadow-xl"
+      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[55%] min-h-[11rem] w-full flex-col gap-4 overflow-y-auto rounded-t-2xl border-t border-slate-200 bg-white px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 text-slate-700 shadow-2xl lg:relative lg:inset-auto lg:max-h-none lg:min-w-[320px] lg:max-w-sm lg:rounded-none lg:border-l lg:border-t-0 lg:p-6"
       role="complementary"
       aria-labelledby="inspector-title-heading"
       onKeyDown={handleKeyDown}
     >
-      <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-10 flex min-h-11 items-center justify-between bg-white">
         <h2
           id="inspector-title-heading"
           className="text-base font-semibold text-slate-900"
         >
           Inspector
         </h2>
-        {selectedEntityId ? (
-          <span className="text-xs text-slate-500" aria-live="polite">
-            ID: {selectedEntityId}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {selectedEntityId ? (
+            <span className="text-xs text-slate-500" aria-live="polite">
+              ID: {selectedEntityId}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className={`${buttonClasses} min-h-11 min-w-11 px-2`}
+            onClick={onClose}
+            aria-label="Close inspector"
+            title="Close inspector"
+          >
+            ×
+          </button>
+        </div>
       </div>
       {body}
     </aside>

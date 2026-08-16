@@ -6,8 +6,10 @@ import { Inspector } from "../components/Sidebar/Inspector";
 import { Footer } from "../components/Footer/Footer";
 import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
+import { useEffect, useState } from "react";
 
 export const App = (): JSX.Element => {
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const addChild = useAppStore((state) => state.actions.addChild);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
@@ -29,11 +31,15 @@ export const App = (): JSX.Element => {
       }).changed,
   );
 
+  useEffect(() => {
+    if (selectionId) setInspectorOpen(true);
+  }, [selectionId]);
+
   return (
     <ReactFlowProvider>
       <FileMenu>
         {(menu) => (
-          <div className="flex h-screen flex-col">
+          <div className="flex h-screen h-dvh max-w-full flex-col overflow-hidden">
             <Toolbar
               {...menu}
               onAddChainNode={() => {
@@ -52,11 +58,13 @@ export const App = (): JSX.Element => {
               onToggleDetails={toggleShowDetails}
               showDetails={showDetails}
             />
-            <div className="flex flex-1 overflow-hidden">
-              <div className="flex-1 bg-slate-100">
-                <Canvas />
+            <div className="relative flex min-h-0 flex-1 overflow-hidden">
+              <div className="min-w-0 flex-1 bg-slate-100">
+                <Canvas onInspect={() => setInspectorOpen(true)} />
               </div>
-              <Inspector />
+              {inspectorOpen ? (
+                <Inspector onClose={() => setInspectorOpen(false)} />
+              ) : null}
             </div>
             <Footer />
           </div>
