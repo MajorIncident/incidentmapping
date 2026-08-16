@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "reactflow";
 import { layoutHierarchy } from "../../src/features/layout/hierarchy";
+import {
+  CHAIN_NODE_HEIGHT,
+  CHAIN_NODE_WIDTH,
+  CONTROL_NODE_HEIGHT,
+  CONTROL_NODE_WIDTH,
+} from "../../src/features/layout/dimensions";
 
 const node = (id: string, x = 0, y = 0): Node => ({
   id,
@@ -19,6 +25,35 @@ const actionNode = (id: string, x = 0, y = 0): Node => ({
 });
 const positions = (nodes: Node[]) =>
   Object.fromEntries(nodes.map((item) => [item.id, item.position]));
+type Rectangle = { x: number; y: number; width: number; height: number };
+const intersects = (left: Rectangle, right: Rectangle) =>
+  left.x < right.x + right.width &&
+  left.x + left.width > right.x &&
+  left.y < right.y + right.height &&
+  left.y + left.height > right.y;
+const controlRectangle = (upstream: Node, downstream: Node): Rectangle => ({
+  x:
+    (upstream.position.x +
+      CHAIN_NODE_WIDTH / 2 +
+      downstream.position.x +
+      CHAIN_NODE_WIDTH / 2) /
+      2 -
+    CONTROL_NODE_WIDTH / 2,
+  y:
+    (upstream.position.y +
+      CHAIN_NODE_HEIGHT / 2 +
+      downstream.position.y +
+      CHAIN_NODE_HEIGHT / 2) /
+      2 -
+    CONTROL_NODE_HEIGHT / 2,
+  width: CONTROL_NODE_WIDTH,
+  height: CONTROL_NODE_HEIGHT,
+});
+const nodeRectangle = (item: Node): Rectangle => ({
+  ...item.position,
+  width: CHAIN_NODE_WIDTH,
+  height: CHAIN_NODE_HEIGHT,
+});
 
 describe("layoutHierarchy", () => {
   it("places a single tree by graph depth", () => {
@@ -84,6 +119,48 @@ describe("layoutHierarchy", () => {
     expect(spacious[1].position.y - spacious[0].position.y).toBeGreaterThan(
       compact[1].position.y - compact[0].position.y,
     );
+  });
+
+  it("separates Controls on adjacent sibling edges from each other", () => {
+    const result = layoutHierarchy(
+      [node("root"), node("left"), node("right")],
+      [edge("root", "left"), edge("root", "right")],
+      {
+        showDetails: false,
+        barrierEdges: [
+          { upstreamNodeId: "root", downstreamNodeId: "left" },
+          { upstreamNodeId: "root", downstreamNodeId: "right" },
+        ],
+      },
+    );
+    const [root, left, right] = result;
+    const leftControl = controlRectangle(root, left);
+    const rightControl = controlRectangle(root, right);
+
+    expect(intersects(leftControl, rightControl)).toBe(false);
+  });
+
+  it("keeps adjacent sibling Controls clear of both edge endpoints", () => {
+    const result = layoutHierarchy(
+      [node("root"), node("left"), node("right")],
+      [edge("root", "left"), edge("root", "right")],
+      {
+        showDetails: false,
+        barrierEdges: [
+          { upstreamNodeId: "root", downstreamNodeId: "left" },
+          { upstreamNodeId: "root", downstreamNodeId: "right" },
+        ],
+      },
+    );
+    const [root, left, right] = result;
+
+    for (const [control, endpoint] of [
+      [controlRectangle(root, left), left],
+      [controlRectangle(root, right), right],
+    ] as const) {
+      expect(intersects(control, nodeRectangle(root))).toBe(false);
+      expect(intersects(control, nodeRectangle(endpoint))).toBe(false);
+    }
   });
 
   it("places actions beside their source without changing causal coordinates", () => {

@@ -1,13 +1,18 @@
 import type { Edge, Node, XYPosition } from "reactflow";
+import {
+  CHAIN_NODE_DETAILS_HEIGHT,
+  CHAIN_NODE_HEIGHT,
+  CHAIN_NODE_WIDTH,
+  CONTROL_NODE_HEIGHT,
+  CONTROL_NODE_WIDTH,
+} from "./dimensions";
 
 export const GRID_SIZE = 8;
 
-export const DEFAULT_NODE_WIDTH = 240;
-export const DEFAULT_NODE_HEIGHT = 140;
-export const DETAILS_HEIGHT = 140;
 export const HORIZONTAL_GAP = 32;
 export const VERTICAL_GAP = 64;
-const BARRIER_CLEARANCE = 176;
+export const CONTROL_VERTICAL_MARGIN = 32;
+export const CONTROL_HORIZONTAL_MARGIN = 32;
 const TREE_GAP = 96;
 export const ACTION_HORIZONTAL_GAP = 64;
 export const ACTION_VERTICAL_GAP = 24;
@@ -27,10 +32,12 @@ export const snapPosition = ({ x, y }: XYPosition): XYPosition => ({
 });
 
 export const getNodeSize = <Data>(node: Node<Data>, showDetails: boolean) => ({
-  width: node.width ?? DEFAULT_NODE_WIDTH,
+  width: node.width ?? CHAIN_NODE_WIDTH,
   height:
     node.height ??
-    (showDetails ? DEFAULT_NODE_HEIGHT + DETAILS_HEIGHT : DEFAULT_NODE_HEIGHT),
+    (showDetails
+      ? CHAIN_NODE_HEIGHT + CHAIN_NODE_DETAILS_HEIGHT
+      : CHAIN_NODE_HEIGHT),
 });
 
 /** Cause/effect adjacency in stable edge order. */
@@ -118,13 +125,49 @@ export const layoutHierarchy = <Data>(
   }
 
   const widths = new Map<string, number>();
+  const barrierEdgeKeys = new Set(
+    barrierEdges.map(
+      ({ upstreamNodeId, downstreamNodeId }) =>
+        `${upstreamNodeId}\u0000${downstreamNodeId}`,
+    ),
+  );
+  const hasBarrier = (source: string, target: string) =>
+    barrierEdgeKeys.has(`${source}\u0000${target}`);
+  const siblingGap = (
+    parentId: string,
+    leftId: string,
+    rightId: string,
+    leftWidth: number,
+    rightWidth: number,
+  ) => {
+    if (!hasBarrier(parentId, leftId) || !hasBarrier(parentId, rightId))
+      return HORIZONTAL_GAP;
+    // Both Control centers lie halfway from their common parent to a child.
+    // Consequently the child centers need twice the Control footprint between
+    // them for the two cards to have the requested margin.
+    return Math.max(
+      HORIZONTAL_GAP,
+      2 * (CONTROL_NODE_WIDTH + CONTROL_HORIZONTAL_MARGIN) -
+        (leftWidth + rightWidth) / 2,
+    );
+  };
   const measure = (id: string): number => {
     const children = forestChildren.get(id) ?? [];
-    const childrenWidth = children.reduce(
-      (sum, childId, index) =>
-        sum + measure(childId) + (index ? HORIZONTAL_GAP : 0),
-      0,
-    );
+    const childWidths = children.map(measure);
+    const childrenWidth = childWidths.reduce((sum, childWidth, index) => {
+      if (!index) return childWidth;
+      return (
+        sum +
+        siblingGap(
+          id,
+          children[index - 1],
+          children[index],
+          childWidths[index - 1],
+          childWidth,
+        ) +
+        childWidth
+      );
+    }, 0);
     const width = Math.max(
       getNodeSize(byId.get(id)!, showDetails).width,
       childrenWidth,
@@ -159,7 +202,9 @@ export const layoutHierarchy = <Data>(
       levelY[level] +
       levelHeights[level] +
       VERTICAL_GAP +
-      (barrierLevels.has(level) ? BARRIER_CLEARANCE : 0);
+      (barrierLevels.has(level)
+        ? CONTROL_NODE_HEIGHT + CONTROL_VERTICAL_MARGIN
+        : 0);
   }
 
   const positions = new Map<string, XYPosition>();
@@ -174,9 +219,21 @@ export const layoutHierarchy = <Data>(
       }),
     );
     let childLeft = left;
-    for (const childId of forestChildren.get(id) ?? []) {
+    const children = forestChildren.get(id) ?? [];
+    for (const [index, childId] of children.entries()) {
       place(childId, childLeft);
-      childLeft += widths.get(childId)! + HORIZONTAL_GAP;
+      const nextId = children[index + 1];
+      if (nextId) {
+        childLeft +=
+          widths.get(childId)! +
+          siblingGap(
+            id,
+            childId,
+            nextId,
+            widths.get(childId)!,
+            widths.get(nextId)!,
+          );
+      }
     }
   };
   let treeLeft = Math.min(...causalNodes.map((node) => node.position.x));
