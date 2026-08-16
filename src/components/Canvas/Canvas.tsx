@@ -73,7 +73,11 @@ export const deriveGraphPresentation = (
   };
 };
 
-export const Canvas = (): JSX.Element => {
+export const Canvas = ({
+  onInspect,
+}: {
+  onInspect?: () => void;
+}): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
   const barriers = useAppStore((state) => state.barriers);
@@ -204,8 +208,9 @@ export const Canvas = (): JSX.Element => {
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
       select(node.id);
+      onInspect?.();
     },
-    [select],
+    [onInspect, select],
   );
 
   const handlePaneClick = useCallback(() => {

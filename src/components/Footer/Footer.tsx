@@ -5,7 +5,7 @@ export const Footer = (): JSX.Element => {
   const { version, commit, builtAtFormatted } = getBuildInfo();
 
   return (
-    <footer className="border-t border-slate-200 bg-white px-6 py-4 text-sm text-slate-600">
+    <footer className="hidden border-t border-slate-200 bg-white px-6 py-4 text-sm text-slate-600 md:block">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <span>© {currentYear} Kepner-Tregoe. All rights reserved.</span>
