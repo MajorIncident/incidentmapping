@@ -67,12 +67,39 @@ export const layoutHierarchy = <Data>(
   const actionNodes = nodes.filter(
     (node) => (node.data as { nodeType?: string }).nodeType === "Action",
   );
+  const actionById = new Map(actionNodes.map((node) => [node.id, node]));
   const causalNodes = nodes.filter(
     (node) => (node.data as { nodeType?: string }).nodeType !== "Action",
   );
   if (!causalNodes.length) return nodes.map((node) => ({ ...node }));
   const causalEdges = edges.filter((edge) => edge.data?.kind !== "ActionEdge");
   const byId = new Map(causalNodes.map((node) => [node.id, node]));
+  // Build these columns before measuring the forest: an action is part of its
+  // source's visual footprint, even though ActionEdges are not causal edges.
+  // Edge order is intentional and provides stable ordering within a column.
+  const actionsBySource = new Map<string, Node<Data>[]>();
+  edges.forEach((edge) => {
+    if (edge.data?.kind !== "ActionEdge" || !byId.has(edge.source)) return;
+    const action = actionById.get(edge.target);
+    if (!action) return;
+    const attached = actionsBySource.get(edge.source) ?? [];
+    if (!attached.some((node) => node.id === action.id)) attached.push(action);
+    actionsBySource.set(edge.source, attached);
+  });
+  const actionColumns = new Map<string, { width: number; height: number }>();
+  actionsBySource.forEach((actions, sourceId) => {
+    actionColumns.set(sourceId, {
+      width: Math.max(
+        ...actions.map((action) => getNodeSize(action, showDetails).width),
+      ),
+      height:
+        actions.reduce(
+          (height, action) => height + getNodeSize(action, showDetails).height,
+          0,
+        ) +
+        ACTION_VERTICAL_GAP * Math.max(0, actions.length - 1),
+    });
+  });
   const adjacency = buildChildrenByParent(
     causalEdges.filter(
       (edge) => byId.has(edge.source) && byId.has(edge.target),
@@ -125,6 +152,7 @@ export const layoutHierarchy = <Data>(
   }
 
   const widths = new Map<string, number>();
+  const causalWidths = new Map<string, number>();
   const barrierEdgeKeys = new Set(
     barrierEdges.map(
       ({ upstreamNodeId, downstreamNodeId }) =>
@@ -168,10 +196,13 @@ export const layoutHierarchy = <Data>(
         childWidth
       );
     }, 0);
-    const width = Math.max(
-      getNodeSize(byId.get(id)!, showDetails).width,
-      childrenWidth,
-    );
+    const nodeWidth = getNodeSize(byId.get(id)!, showDetails).width;
+    const actionColumn = actionColumns.get(id);
+    const causalWidth = Math.max(nodeWidth, childrenWidth);
+    const width = actionColumn
+      ? causalWidth + ACTION_HORIZONTAL_GAP + actionColumn.width
+      : causalWidth;
+    causalWidths.set(id, causalWidth);
     widths.set(id, width);
     return width;
   };
@@ -208,16 +239,28 @@ export const layoutHierarchy = <Data>(
   }
 
   const positions = new Map<string, XYPosition>();
+  const actionPositions = new Map<string, XYPosition>();
   const place = (id: string, left: number) => {
     const node = byId.get(id)!;
-    const footprint = widths.get(id)!;
-    positions.set(
-      id,
-      snapPosition({
-        x: left + (footprint - getNodeSize(node, showDetails).width) / 2,
-        y: levelY[depth.get(id) ?? 0],
-      }),
-    );
+    const nodeSize = getNodeSize(node, showDetails);
+    const causalWidth = causalWidths.get(id)!;
+    const sourcePosition = snapPosition({
+      x: left + (causalWidth - nodeSize.width) / 2,
+      y: levelY[depth.get(id) ?? 0],
+    });
+    positions.set(id, sourcePosition);
+    let actionTop = sourcePosition.y;
+    for (const action of actionsBySource.get(id) ?? []) {
+      actionPositions.set(
+        action.id,
+        snapPosition({
+          x: left + causalWidth + ACTION_HORIZONTAL_GAP,
+          y: actionTop,
+        }),
+      );
+      actionTop +=
+        getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP;
+    }
     let childLeft = left;
     const children = forestChildren.get(id) ?? [];
     for (const [index, childId] of children.entries()) {
@@ -247,43 +290,6 @@ export const layoutHierarchy = <Data>(
     position: positions.get(node.id)!,
   }));
   const placedById = new Map(causalResult.map((node) => [node.id, node]));
-  const actionOrder = new Map(
-    actionNodes.map((node, index) => [node.id, index]),
-  );
-  const actionsBySource = new Map<string, Node<Data>[]>();
-  edges
-    .filter((edge) => edge.data?.kind === "ActionEdge")
-    .forEach((edge) => {
-      const action = actionNodes.find((node) => node.id === edge.target);
-      if (!action || !placedById.has(edge.source)) return;
-      const attached = actionsBySource.get(edge.source) ?? [];
-      if (!attached.some((node) => node.id === action.id))
-        attached.push(action);
-      actionsBySource.set(edge.source, attached);
-    });
-  const actionPositions = new Map<string, XYPosition>();
-  actionsBySource.forEach((actions, sourceId) => {
-    const source = placedById.get(sourceId)!;
-    actions
-      .sort(
-        (a, b) => (actionOrder.get(a.id) ?? 0) - (actionOrder.get(b.id) ?? 0),
-      )
-      .forEach((action, index) => {
-        actionPositions.set(
-          action.id,
-          snapPosition({
-            x:
-              source.position.x +
-              getNodeSize(source, showDetails).width +
-              ACTION_HORIZONTAL_GAP,
-            y:
-              source.position.y +
-              index *
-                (getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP),
-          }),
-        );
-      });
-  });
   return nodes.map((node) =>
     placedById.has(node.id)
       ? placedById.get(node.id)!
