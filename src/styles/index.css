@@ -510,7 +510,16 @@ select:focus-visible {
   @apply inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-1 text-[10px] font-bold text-slate-600 shadow-sm;
 }
 .case-summary {
-  @apply fixed bottom-16 left-4 z-20 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-lg backdrop-blur;
+  @apply fixed bottom-16 left-4 z-20 max-h-[65vh] max-w-sm overflow-y-auto rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-lg backdrop-blur;
+}
+.case-summary header {
+  @apply flex items-center justify-between;
+}
+.case-summary h3 {
+  @apply mt-3 font-semibold text-slate-900;
+}
+.case-summary li button {
+  @apply rounded text-left text-blue-800 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 .case-summary h2 {
   @apply text-sm font-bold text-slate-900;
@@ -523,4 +532,31 @@ select:focus-visible {
 }
 .case-summary details {
   @apply mt-2;
+}
+.lens-picker {
+  @apply flex items-center gap-1;
+}
+.lens-picker strong {
+  @apply px-2 text-xs uppercase tracking-wide text-slate-600;
+}
+.lens-picker button[aria-selected="true"] {
+  @apply bg-slate-900 text-white;
+}
+.presentation-softened {
+  opacity: 0.32;
+}
+.presentation-emphasized {
+  filter: drop-shadow(0 0 5px rgb(37 99 235 / 0.35));
+}
+@media (max-width: 767px) {
+  .lens-picker {
+    @apply max-w-full overflow-x-auto;
+  }
+  .lens-picker button {
+    @apply shrink-0;
+  }
+  .case-summary--sheet {
+    @apply inset-x-0 bottom-14 max-h-[55vh] max-w-none rounded-b-none;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
