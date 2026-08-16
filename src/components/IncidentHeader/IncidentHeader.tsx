@@ -11,7 +11,11 @@ const displayDate = (value: string): string => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 };
 
-export const IncidentHeader = (): JSX.Element => {
+export const IncidentHeader = ({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+}): JSX.Element => {
   const metadata = useAppStore((state) => state.metadata);
   const { setMapTitle, updateMetadata } = useAppStore((state) => state.actions);
   const [open, setOpen] = useState(false);
@@ -33,10 +37,16 @@ export const IncidentHeader = (): JSX.Element => {
 
   return (
     <section className="incident-header" aria-label="Incident header">
-      <EditableMapTitle
-        title={metadata?.title || "Untitled Map"}
-        onCommit={setMapTitle}
-      />
+      {readOnly ? (
+        <h1 className="text-lg font-semibold text-slate-900">
+          {metadata?.title || "Untitled Map"}
+        </h1>
+      ) : (
+        <EditableMapTitle
+          title={metadata?.title || "Untitled Map"}
+          onCommit={setMapTitle}
+        />
+      )}
       <div
         className="incident-header__summary"
         aria-label="Incident metadata summary"
@@ -45,16 +55,18 @@ export const IncidentHeader = (): JSX.Element => {
           <span key={detail}>{detail}</span>
         ))}
       </div>
-      <button
-        type="button"
-        className="incident-header__edit"
-        aria-expanded={open}
-        aria-controls="incident-metadata-editor"
-        onClick={() => setOpen((value) => !value)}
-      >
-        {open ? "Close details" : "Edit details"}
-      </button>
-      {open ? (
+      {!readOnly ? (
+        <button
+          type="button"
+          className="incident-header__edit"
+          aria-expanded={open}
+          aria-controls="incident-metadata-editor"
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? "Close details" : "Edit details"}
+        </button>
+      ) : null}
+      {open && !readOnly ? (
         <div
           ref={panelRef}
           id="incident-metadata-editor"

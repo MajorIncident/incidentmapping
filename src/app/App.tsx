@@ -8,9 +8,11 @@ import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
 import { useEffect, useState } from "react";
+import { Legend } from "../components/Presentation/Legend";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [presenting, setPresenting] = useState(false);
   const addChild = useAppStore((state) => state.actions.addChild);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
@@ -43,39 +45,91 @@ export const App = (): JSX.Element => {
     if (selectionId) setInspectorOpen(true);
   }, [selectionId]);
 
+  useEffect(() => {
+    if (!presenting) return;
+    const exitOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        // Presentation is a review surface: suppress every editing shortcut.
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          ["z", "y"].includes(event.key.toLowerCase())
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+        return;
+      }
+      if (event.defaultPrevented) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+      )
+        return;
+      event.preventDefault();
+      setPresenting(false);
+    };
+    window.addEventListener("keydown", exitOnEscape, true);
+    return () => window.removeEventListener("keydown", exitOnEscape, true);
+  }, [presenting]);
+
   return (
     <ReactFlowProvider>
       <FileMenu>
         {(menu) => (
           <div className="flex h-screen h-dvh max-w-full flex-col overflow-hidden">
-            <Toolbar
-              {...menu}
-              onAddChainNode={() => {
-                addChild(selectionId ?? undefined);
-              }}
-              onDeleteSelection={() => {
-                deleteSelection();
-              }}
-              canDelete={Boolean(selectionId)}
-              onUndo={undo}
-              onRedo={redo}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onOrganize={organizeNodes}
-              canOrganize={canOrganize}
-              onToggleDetails={toggleShowDetails}
-              showDetails={showDetails}
-            />
-            <IncidentHeader />
+            {!presenting ? (
+              <Toolbar
+                {...menu}
+                onAddChainNode={() => {
+                  addChild(selectionId ?? undefined);
+                }}
+                onDeleteSelection={() => {
+                  deleteSelection();
+                }}
+                canDelete={Boolean(selectionId)}
+                onUndo={undo}
+                onRedo={redo}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onOrganize={organizeNodes}
+                canOrganize={canOrganize}
+                onToggleDetails={toggleShowDetails}
+                showDetails={showDetails}
+                onPresent={() => {
+                  useAppStore.getState().actions.finishEditing();
+                  useAppStore.getState().actions.select(null);
+                  setPresenting(true);
+                }}
+              />
+            ) : null}
+            <IncidentHeader readOnly={presenting} />
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
               <div className="min-w-0 flex-1 bg-slate-100">
-                <Canvas onInspect={() => setInspectorOpen(true)} />
+                <Canvas
+                  presenting={presenting}
+                  onInspect={() => setInspectorOpen(true)}
+                />
               </div>
-              {inspectorOpen ? (
+              {inspectorOpen && !presenting ? (
                 <Inspector onClose={() => setInspectorOpen(false)} />
               ) : null}
             </div>
-            <Footer />
+            {presenting ? (
+              <>
+                <Legend />
+                <button
+                  className="presentation-exit"
+                  type="button"
+                  onClick={() => setPresenting(false)}
+                >
+                  Exit Presentation <span aria-hidden="true">Esc</span>
+                </button>
+              </>
+            ) : (
+              <Footer />
+            )}
           </div>
         )}
       </FileMenu>

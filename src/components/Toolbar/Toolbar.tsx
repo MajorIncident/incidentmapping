@@ -14,6 +14,7 @@ type ToolbarProps = FileMenuRenderProps & {
   canOrganize: boolean;
   showDetails: boolean;
   onToggleDetails: () => void;
+  onPresent: () => void;
 };
 
 const buttonBase =
@@ -158,6 +159,15 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
       <button
         type="button"
         className={`${buttonBase} command-button--primary`}
+        onClick={props.onPresent}
+        aria-label="Present map"
+      >
+        <span aria-hidden="true">▶</span>
+        <span>Present</span>
+      </button>
+      <button
+        type="button"
+        className={buttonBase}
         onClick={props.onAddChainNode}
         aria-label="Add Event"
         title="Add Event (Enter)"

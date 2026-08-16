@@ -206,7 +206,7 @@ describe("Toolbar map title", () => {
             id: root.id,
             data: {
               ...root.data,
-              presentation: {
+              graphRole: {
                 isRoot: true,
                 isLeaf: true,
                 isOnSelectedPath: true,

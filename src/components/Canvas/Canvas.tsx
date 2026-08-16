@@ -16,7 +16,7 @@ import {
 } from "../../state/useAppStore";
 import { nodeTypes } from "./NodeTypes";
 
-export type GraphPresentation = {
+export type GraphRole = {
   roots: Set<string>;
   leaves: Set<string>;
   upstream: Set<string>;
@@ -37,7 +37,7 @@ export const deriveGraphPresentation = (
   nodeIds: string[],
   edges: Array<{ source: string; target: string }>,
   selectedId: string | null,
-): GraphPresentation => {
+): GraphRole => {
   const ids = new Set(nodeIds);
   const incoming = new Map(nodeIds.map((id) => [id, [] as string[]]));
   const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
@@ -81,8 +81,10 @@ export const deriveGraphPresentation = (
 
 export const Canvas = ({
   onInspect,
+  presenting = false,
 }: {
   onInspect?: () => void;
+  presenting?: boolean;
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -116,15 +118,16 @@ export const Canvas = ({
     );
     const presentedNodes = chainNodes.map((node) => ({
       ...node,
-      selected: node.id === selectionId,
+      selected: !presenting && node.id === selectionId,
       data: {
         ...node.data,
-        presentation: {
+        graphRole: {
           isRoot: presentation.roots.has(node.id),
           isLeaf: presentation.leaves.has(node.id),
           isOnSelectedPath: presentation.selectedPath.has(node.id),
           isUnrelated: presentation.unrelated.has(node.id),
         },
+        readOnly: presenting,
       },
     }));
     const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
@@ -171,6 +174,7 @@ export const Canvas = ({
           status: matchingBarrier.status,
           failureReason: matchingBarrier.failureReason,
           failureDetails: matchingBarrier.failureDetails,
+          readOnly: presenting,
         },
         position: {
           x:
@@ -181,7 +185,7 @@ export const Canvas = ({
             (downstream.position.y - upstream.position.y) / 2,
         },
         draggable: false,
-        selectable: true,
+        selectable: !presenting,
       };
 
       barrierNodes.push(barrierNode);
@@ -241,19 +245,20 @@ export const Canvas = ({
       nodes: [...presentedNodes, ...barrierNodes],
       renderedEdges: styledEdges,
     };
-  }, [barriers, chainNodes, edges, selectionId]);
+  }, [barriers, chainNodes, edges, presenting, selectionId]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
+      if (presenting) return;
       select(node.id);
       onInspect?.();
     },
-    [onInspect, select],
+    [onInspect, presenting, select],
   );
 
   const handlePaneClick = useCallback(() => {
-    select(null);
-  }, [select]);
+    if (!presenting) select(null);
+  }, [presenting, select]);
 
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
@@ -289,6 +294,21 @@ export const Canvas = ({
 
     return () => cancelAnimationFrame(frame);
   }, [clearViewportRequest, reactFlow, viewportRequest]);
+
+  useEffect(() => {
+    if (!presenting) return;
+    // Wait for the header, legend and read-only node rendering to settle.
+    const firstFrame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void reactFlow.fitView({
+          padding: 0.3,
+          includeHiddenNodes: true,
+          duration: viewportAnimationDuration(400),
+        });
+      });
+    });
+    return () => cancelAnimationFrame(firstFrame);
+  }, [presenting, reactFlow]);
 
   // A mobile inspector changes the usable canvas without changing graph data.
   // Keep the selected node visible when that sheet opens or is resized.
@@ -330,56 +350,60 @@ export const Canvas = ({
       className="relative h-full w-full"
       aria-label={`${mapTitle} incident map`}
     >
-      <aside
-        className="map-guide absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
-        aria-label="Incident map legend"
-      >
-        <div className="mb-1 font-semibold text-slate-900">
-          How to read this map
-        </div>
-        <p>
-          Events flow top to bottom. Dashed purple edges are upstream; heavy
-          blue edges are downstream.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span>
-            <i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500" />
-            Barrier effective
-          </span>
-          <span>
-            <i className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />
-            Barrier failed
-          </span>
-          <span>
-            <b className="text-emerald-700">+</b> positive
-          </span>
-          <span>
-            <b className="text-rose-700">−</b> negative
-          </span>
-        </div>
-      </aside>
-      <div className="map-mobile-actions absolute right-3 top-3 z-20 flex flex-col gap-2">
-        <button
-          type="button"
-          className="map-overlay-button"
-          aria-label="How to read this map"
-          aria-expanded={guideOpen}
-          aria-controls="mobile-map-guide"
-          onClick={() => setGuideOpen((open) => !open)}
+      {!presenting ? (
+        <aside
+          className="map-guide absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
+          aria-label="Incident map legend"
         >
-          <span aria-hidden="true">i</span>
-        </button>
-        <button
-          type="button"
-          className="map-overlay-button"
-          onClick={fitMap}
-          aria-label="Fit map"
-          title="Fit Map (F)"
-        >
-          <span aria-hidden="true">⌗</span>
-        </button>
-      </div>
-      {guideOpen ? (
+          <div className="mb-1 font-semibold text-slate-900">
+            How to read this map
+          </div>
+          <p>
+            Events flow top to bottom. Dashed purple edges are upstream; heavy
+            blue edges are downstream.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            <span>
+              <i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500" />
+              Barrier effective
+            </span>
+            <span>
+              <i className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />
+              Barrier failed
+            </span>
+            <span>
+              <b className="text-emerald-700">+</b> positive
+            </span>
+            <span>
+              <b className="text-rose-700">−</b> negative
+            </span>
+          </div>
+        </aside>
+      ) : null}
+      {!presenting ? (
+        <div className="map-mobile-actions absolute right-3 top-3 z-20 flex flex-col gap-2">
+          <button
+            type="button"
+            className="map-overlay-button"
+            aria-label="How to read this map"
+            aria-expanded={guideOpen}
+            aria-controls="mobile-map-guide"
+            onClick={() => setGuideOpen((open) => !open)}
+          >
+            <span aria-hidden="true">i</span>
+          </button>
+          <button
+            type="button"
+            className="map-overlay-button"
+            onClick={fitMap}
+            aria-label="Fit map"
+            title="Fit Map (F)"
+          >
+            <span aria-hidden="true">⌗</span>
+          </button>
+        </div>
+      ) : null}
+      {guideOpen && !presenting ? (
         <aside
           id="mobile-map-guide"
           className="mobile-map-guide absolute inset-x-3 bottom-3 z-20 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-lg"
@@ -422,17 +446,20 @@ export const Canvas = ({
         onNodeDragStop={handleNodeDragStop}
         snapToGrid
         snapGrid={[8, 8]}
-        nodesFocusable
-        nodesDraggable
-        elementsSelectable
-        selectionOnDrag
+        nodesFocusable={!presenting}
+        nodesDraggable={!presenting}
+        nodesConnectable={!presenting}
+        elementsSelectable={!presenting}
+        selectionOnDrag={!presenting}
       >
         <Background color="#E2E8F0" gap={8} />
-        <Controls
-          position="top-right"
-          showInteractive={false}
-          onFitView={fitMap}
-        />
+        {!presenting ? (
+          <Controls
+            position="top-right"
+            showInteractive={false}
+            onFitView={fitMap}
+          />
+        ) : null}
         <MiniMap
           ariaLabel="Incident map overview"
           pannable
@@ -440,7 +467,7 @@ export const Canvas = ({
           nodeColor={(node) => {
             if (node.type === "Barrier")
               return node.data.status === "Effective" ? "#059669" : "#e11d48";
-            if (node.data.presentation?.isRoot) return "#7c3aed";
+            if (node.data.graphRole?.isRoot) return "#7c3aed";
             if ((node.data.positiveConsequenceBulletPoints?.length ?? 0) > 0)
               return "#059669";
             if ((node.data.negativeConsequenceBulletPoints?.length ?? 0) > 0)

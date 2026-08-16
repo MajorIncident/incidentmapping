@@ -13,12 +13,14 @@ export const NodeTagMenu = <T extends string>({
   options,
   onChange,
   className = "",
+  readOnly = false,
 }: {
   label: string;
   value: T;
   options: readonly NodeTagOption<T>[];
   onChange: (value: T) => void;
   className?: string;
+  readOnly?: boolean;
 }): JSX.Element => {
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -37,6 +39,17 @@ export const NodeTagMenu = <T extends string>({
     return () =>
       document.removeEventListener("pointerdown", closeOnOutsideClick);
   }, [open]);
+
+  if (readOnly) {
+    return (
+      <span
+        className={`node-tag ${className}`}
+        aria-label={`${label}: ${current.label}`}
+      >
+        {current.label}
+      </span>
+    );
+  }
 
   const openAndFocus = (
     index = Math.max(
