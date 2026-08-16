@@ -103,6 +103,7 @@ type AppState = {
   editingId: string | null;
   showDetails: boolean;
   layoutVersion: number;
+  measuredControlDimensions: Record<string, { width: number; height: number }>;
   viewportRequest: { id: number; nodeIds: string[] } | null;
   editorFocusRequest: {
     id: number;
@@ -192,6 +193,9 @@ type AppState = {
     setShowDetails: (visible: boolean) => void;
     toggleShowDetails: () => void;
     organizeNodes: () => void;
+    applyMeasuredLayout: (
+      dimensions: Readonly<Record<string, { width: number; height: number }>>,
+    ) => void;
     updateNodeData: (
       id: string,
       patch: Partial<Omit<ChainNodeData, "title">>,
@@ -385,6 +389,9 @@ const applyLayout = (
   edges: Edge[],
   showDetails: boolean,
   barriers: RuntimeBarrier[] = [],
+  controlDimensions: Readonly<
+    Record<string, { width: number; height: number }>
+  > = {},
 ) => {
   const causalRelationships = new Set(
     edges
@@ -393,6 +400,7 @@ const applyLayout = (
   );
   return applyHierarchyLayout(nodes, edges, {
     showDetails,
+    controlDimensions,
     barrierEdges: barriers.filter((barrier) =>
       causalRelationships.has(
         `${barrier.upstreamNodeId}\u0000${barrier.downstreamNodeId}`,
@@ -528,6 +536,7 @@ export const createNewMapState = () => {
     editingId: rootId,
     showDetails: true,
     layoutVersion: 0,
+    measuredControlDimensions: {},
     viewportRequest: { id: nextNewMapViewportRequestId++, nodeIds: [rootId] },
     editorFocusRequest: {
       id: nextEditorFocusRequestId++,
@@ -587,6 +596,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         editingId: null,
         showDetails: state.showDetails,
         layoutVersion: state.layoutVersion + 1,
+        measuredControlDimensions: {},
         viewportRequest: null,
         editorFocusRequest: null,
         history: createEmptyHistory(),
@@ -1758,6 +1768,56 @@ export const useAppStore = create<AppState>((set, get) => ({
           layoutVersion: changed
             ? state.layoutVersion + 1
             : state.layoutVersion,
+        };
+      });
+    },
+    applyMeasuredLayout: (dimensions) => {
+      set((state) => {
+        const materiallyDifferent = (a: number | null | undefined, b: number) =>
+          a == null || Math.abs(a - b) >= 1;
+        const measuredNodes = state.nodes.map((node) => {
+          const size = dimensions[node.id];
+          if (
+            !size ||
+            (!materiallyDifferent(node.width, size.width) &&
+              !materiallyDifferent(node.height, size.height))
+          )
+            return node;
+          return { ...node, width: size.width, height: size.height };
+        });
+        const measuredControlDimensions = {
+          ...state.measuredControlDimensions,
+        };
+        let dimensionsChanged = measuredNodes.some(
+          (node, index) => node !== state.nodes[index],
+        );
+        state.barriers.forEach((barrier) => {
+          const size = dimensions[barrier.id];
+          if (!size) return;
+          const previous = measuredControlDimensions[barrier.id];
+          if (
+            materiallyDifferent(previous?.width, size.width) ||
+            materiallyDifferent(previous?.height, size.height)
+          ) {
+            measuredControlDimensions[barrier.id] = { ...size };
+            dimensionsChanged = true;
+          }
+        });
+        if (!dimensionsChanged) return {};
+        const result = applyLayout(
+          measuredNodes,
+          state.edges,
+          state.showDetails,
+          state.barriers,
+          measuredControlDimensions,
+        );
+        return {
+          nodes: result.nodes,
+          measuredControlDimensions,
+          layoutVersion:
+            result.changed || dimensionsChanged
+              ? state.layoutVersion + 1
+              : state.layoutVersion,
         };
       });
     },

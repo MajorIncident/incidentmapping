@@ -23,9 +23,14 @@ export type HierarchyLayoutOptions = {
   showDetails: boolean;
   /** Edges containing a rendered barrier card need a larger level gap. */
   barrierEdges?: ReadonlyArray<{
+    id?: string;
     upstreamNodeId: string;
     downstreamNodeId: string;
   }>;
+  /** DOM measurements for generated Control cards. */
+  controlDimensions?: Readonly<
+    Record<string, { width: number; height: number }>
+  >;
 };
 
 export const snapPosition = ({ x, y }: XYPosition): XYPosition => ({
@@ -64,8 +69,11 @@ export const layoutHierarchy = <Data>(
   options: boolean | HierarchyLayoutOptions,
 ): Node<Data>[] => {
   if (!nodes.length) return [];
-  const { showDetails, barrierEdges = [] } =
-    typeof options === "boolean" ? { showDetails: options } : options;
+  const {
+    showDetails,
+    barrierEdges = [],
+    controlDimensions = {},
+  } = typeof options === "boolean" ? { showDetails: options } : options;
   const actionNodes = nodes.filter(
     (node) => (node.data as { nodeType?: string }).nodeType === "Action",
   );
@@ -187,14 +195,14 @@ export const layoutHierarchy = <Data>(
 
   const widths = new Map<string, number>();
   const causalWidths = new Map<string, number>();
-  const barrierEdgeKeys = new Set(
-    barrierEdges.map(
-      ({ upstreamNodeId, downstreamNodeId }) =>
-        `${upstreamNodeId}\u0000${downstreamNodeId}`,
-    ),
+  const barrierByEdge = new Map(
+    barrierEdges.map((barrier) => [
+      `${barrier.upstreamNodeId}\u0000${barrier.downstreamNodeId}`,
+      barrier,
+    ]),
   );
   const hasBarrier = (source: string, target: string) =>
-    barrierEdgeKeys.has(`${source}\u0000${target}`);
+    barrierByEdge.has(`${source}\u0000${target}`);
   const siblingGap = (
     parentId: string,
     leftId: string,
@@ -209,7 +217,17 @@ export const layoutHierarchy = <Data>(
     // them for the two cards to have the requested margin.
     return Math.max(
       HORIZONTAL_GAP,
-      2 * (CONTROL_NODE_WIDTH + CONTROL_HORIZONTAL_MARGIN) -
+      2 *
+        (Math.max(
+          ...[leftId, rightId].map((id) => {
+            const barrier = barrierByEdge.get(`${parentId}\u0000${id}`);
+            return (
+              (barrier?.id && controlDimensions[barrier.id]?.width) ||
+              CONTROL_NODE_WIDTH
+            );
+          }),
+        ) +
+          CONTROL_HORIZONTAL_MARGIN) -
         (leftWidth + rightWidth) / 2,
     );
   };
@@ -251,14 +269,21 @@ export const layoutHierarchy = <Data>(
       getNodeSize(node, showDetails).height,
     );
   });
-  const barrierLevels = new Set<number>();
+  const barrierLevelHeights = new Map<number, number>();
   barrierEdges.forEach((barrier) => {
     const upstreamDepth = depth.get(barrier.upstreamNodeId);
     if (
       upstreamDepth !== undefined &&
       depth.get(barrier.downstreamNodeId) === upstreamDepth + 1
     ) {
-      barrierLevels.add(upstreamDepth);
+      barrierLevelHeights.set(
+        upstreamDepth,
+        Math.max(
+          barrierLevelHeights.get(upstreamDepth) ?? 0,
+          (barrier.id && controlDimensions[barrier.id]?.height) ||
+            CONTROL_NODE_HEIGHT,
+        ),
+      );
     }
   });
   const layoutTop = Math.min(...nonActionNodes.map((node) => node.position.y));
@@ -268,8 +293,8 @@ export const layoutHierarchy = <Data>(
       levelY[level] +
       levelHeights[level] +
       VERTICAL_GAP +
-      (barrierLevels.has(level)
-        ? CONTROL_NODE_HEIGHT + CONTROL_VERTICAL_MARGIN
+      (barrierLevelHeights.has(level)
+        ? barrierLevelHeights.get(level)! + CONTROL_VERTICAL_MARGIN
         : 0);
   }
 

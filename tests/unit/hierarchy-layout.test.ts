@@ -42,28 +42,33 @@ const intersects = (left: Rectangle, right: Rectangle) =>
   left.x + left.width > right.x &&
   left.y < right.y + right.height &&
   left.y + left.height > right.y;
-const controlRectangle = (upstream: Node, downstream: Node): Rectangle => ({
+const controlRectangle = (
+  upstream: Node,
+  downstream: Node,
+  width = CONTROL_NODE_WIDTH,
+  height = CONTROL_NODE_HEIGHT,
+): Rectangle => ({
   x:
     (upstream.position.x +
-      CHAIN_NODE_WIDTH / 2 +
+      (upstream.width ?? CHAIN_NODE_WIDTH) / 2 +
       downstream.position.x +
-      CHAIN_NODE_WIDTH / 2) /
+      (downstream.width ?? CHAIN_NODE_WIDTH) / 2) /
       2 -
-    CONTROL_NODE_WIDTH / 2,
+    width / 2,
   y:
     (upstream.position.y +
-      CHAIN_NODE_HEIGHT / 2 +
+      (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
       downstream.position.y +
-      CHAIN_NODE_HEIGHT / 2) /
+      (downstream.height ?? CHAIN_NODE_HEIGHT) / 2) /
       2 -
-    CONTROL_NODE_HEIGHT / 2,
-  width: CONTROL_NODE_WIDTH,
-  height: CONTROL_NODE_HEIGHT,
+    height / 2,
+  width,
+  height,
 });
 const nodeRectangle = (item: Node): Rectangle => ({
   ...item.position,
-  width: CHAIN_NODE_WIDTH,
-  height: CHAIN_NODE_HEIGHT,
+  width: item.width ?? CHAIN_NODE_WIDTH,
+  height: item.height ?? CHAIN_NODE_HEIGHT,
 });
 
 describe("layoutHierarchy", () => {
@@ -289,15 +294,15 @@ describe("layoutHierarchy", () => {
       result.map((item) => [item.id, nodeRectangle(item)]),
     );
     expect(bounds).toEqual({
-      event: { x: 1016, y: 0, width: 240, height: 140 },
-      "factor-1": { x: 0, y: 208, width: 240, height: 140 },
-      "action-1": { x: 304, y: 208, width: 240, height: 140 },
-      "factor-2": { x: 576, y: 208, width: 240, height: 140 },
-      "action-2": { x: 880, y: 208, width: 240, height: 140 },
-      "factor-3": { x: 1152, y: 208, width: 240, height: 140 },
-      "action-3": { x: 1456, y: 208, width: 240, height: 140 },
-      "factor-4": { x: 1728, y: 208, width: 240, height: 140 },
-      "action-4": { x: 2032, y: 208, width: 240, height: 140 },
+      event: { x: 1016, y: 0, width: 240, height: 176 },
+      "factor-1": { x: 0, y: 240, width: 240, height: 176 },
+      "action-1": { x: 304, y: 240, width: 240, height: 176 },
+      "factor-2": { x: 576, y: 240, width: 240, height: 176 },
+      "action-2": { x: 880, y: 240, width: 240, height: 176 },
+      "factor-3": { x: 1152, y: 240, width: 240, height: 176 },
+      "action-3": { x: 1456, y: 240, width: 240, height: 176 },
+      "factor-4": { x: 1728, y: 240, width: 240, height: 176 },
+      "action-4": { x: 2032, y: 240, width: 240, height: 176 },
     });
 
     const actions = result.filter(
@@ -318,5 +323,99 @@ describe("layoutHierarchy", () => {
           ).toBe(false),
         );
     });
+  });
+});
+
+describe("measured content layout", () => {
+  it("separates measured short and MU566-scale long cards and Controls", () => {
+    const descriptions = {
+      impact: "Short impact",
+      event:
+        "MU566 experienced a prolonged operational event while teams coordinated recovery across multiple handovers and recorded the changing conditions.",
+      factor:
+        "The investigation identified an extended contributing factor description covering procedure, supervision, workload, equipment condition, and communications.",
+      action:
+        "Revise the procedure, brief every affected team, verify competency, and audit the completed corrective work over three review cycles.",
+      control:
+        "The expected preventive control was not consistently available or verified at the point of work.",
+    };
+    const measured: Node[] = [
+      {
+        ...node("impact"),
+        width: 252,
+        height: 154,
+        data: {
+          nodeType: "Impact",
+          description: descriptions.impact,
+          evidenceIds: ["EV-1"],
+        },
+      },
+      {
+        ...eventNode("event", "2026-05-06T06:00:00Z"),
+        width: 252,
+        height: 318,
+        data: {
+          nodeType: "Event",
+          timestamp: "2026-05-06T06:00:00Z",
+          description: descriptions.event,
+          evidenceIds: ["EV-2", "EV-3", "EV-4", "EV-5"],
+        },
+      },
+      {
+        ...node("factor"),
+        width: 268,
+        height: 346,
+        data: {
+          nodeType: "Factor",
+          description: descriptions.factor,
+          evidenceIds: ["EV-6", "EV-7", "EV-8"],
+        },
+      },
+      {
+        ...actionNode("action"),
+        width: 260,
+        height: 292,
+        data: {
+          nodeType: "Action",
+          description: descriptions.action,
+          evidenceIds: ["EV-9", "EV-10"],
+        },
+      },
+    ];
+    const edges: Edge[] = [
+      edge("impact", "event"),
+      edge("event", "factor"),
+      { ...edge("factor", "action"), data: { kind: "ActionEdge" } },
+    ];
+    const result = layoutHierarchy(measured, edges, {
+      showDetails: true,
+      barrierEdges: [
+        { id: "control", upstreamNodeId: "impact", downstreamNodeId: "event" },
+      ],
+      controlDimensions: { control: { width: 236, height: 244 } },
+    });
+    const rectangles = result.map((item) => ({
+      id: item.id,
+      rectangle: { ...item.position, width: item.width!, height: item.height! },
+    }));
+    rectangles.forEach((left, index) =>
+      rectangles
+        .slice(index + 1)
+        .forEach((right) =>
+          expect(
+            intersects(left.rectangle, right.rectangle),
+            `${left.id} overlaps ${right.id}`,
+          ).toBe(false),
+        ),
+    );
+    const byId = new Map(result.map((item) => [item.id, item]));
+    const control = controlRectangle(
+      byId.get("impact")!,
+      byId.get("event")!,
+      236,
+      244,
+    );
+    expect(intersects(control, nodeRectangle(byId.get("impact")!))).toBe(false);
+    expect(intersects(control, nodeRectangle(byId.get("event")!))).toBe(false);
   });
 });
