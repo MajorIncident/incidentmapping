@@ -658,28 +658,30 @@ describe("useAppStore actions", () => {
     ).toEqual([]);
     actions.redo();
     expect(
-      actions.toMap().nodes.find((node) => node.id === secondNode)
-        ?.evidenceItems,
-    ).toEqual([{ id: "EV-010", text: "Global evidence" }]);
+      actions.toMap().nodes.find((node) => node.id === secondNode)?.evidenceIds,
+    ).toEqual(["EV-010"]);
   });
 
   it("preserves sparse evidence through save and reload before allocating the next ID", () => {
     const canonical = {
       ...sampleMap,
-      metadata: { evidenceReferenceHighWaterMark: 3 },
+      metadata: { evidenceReferenceHighWaterMark: 3, contextItems: [] },
       nodes: sampleMap.nodes.map((node, index) => ({
         ...node,
-        evidenceItems: [
-          { id: index === 0 ? "EV-001" : "EV-003", text: "Imported" },
-        ],
+        evidenceIds: [index === 0 ? "EV-001" : "EV-003"],
       })),
+      evidence: [
+        { id: "EV-001", type: "Note" as const, title: "Imported" },
+        { id: "EV-003", type: "Note" as const, title: "Imported" },
+      ],
     };
     const { actions } = useAppStore.getState();
     actions.loadMap(canonical);
     const saved = actions.toMap();
-    expect(
-      saved.nodes.flatMap((node) => node.evidenceItems.map(({ id }) => id)),
-    ).toEqual(["EV-001", "EV-003"]);
+    expect(saved.nodes.flatMap((node) => node.evidenceIds)).toEqual([
+      "EV-001",
+      "EV-003",
+    ]);
     expect(saved.metadata?.evidenceReferenceHighWaterMark).toBe(3);
 
     actions.loadMap(saved);

@@ -3,10 +3,12 @@ import {
   actionStatusSchema,
   barrierStatusSchema,
   incidentStatusSchema,
+  mapDataSchema,
   mapDataV2Schema,
   mapDataV1Schema,
   severitySchema,
-  type MapDataV2 as MapData,
+  type MapData,
+  type MapDataV2,
 } from "./schema";
 
 const versionEnvelope = z.object({ schemaVersion: z.number() });
@@ -140,16 +142,15 @@ const failureMap = {
 } as const;
 
 const validate = (value: unknown): MapData => {
-  const result = mapDataV2Schema.safeParse(value);
+  const result = mapDataSchema.safeParse(value);
   if (result.success) return result.data;
   const graphIssue = result.error.issues.find((item) => item.code === "custom");
   if (graphIssue) throw new Error(graphIssue.message);
   throw result.error;
 };
 
-const normalizeV2 = (input: unknown): MapData => {
+const parseLegacyV2 = (input: unknown): MapDataV2 => {
   const legacy = legacyV2Schema.parse(input);
-  let evidenceNumber = 0;
   const nodes = legacy.nodes.map(
     ({
       evidenceHighWaterMark: _retired,
@@ -166,10 +167,7 @@ const normalizeV2 = (input: unknown): MapData => {
                 : factorCategory,
           }
         : {}),
-      evidenceItems: node.evidenceItems.map(({ text }) => ({
-        id: `EV-${String(++evidenceNumber).padStart(3, "0")}`,
-        text,
-      })),
+      evidenceItems: node.evidenceItems,
     }),
   );
   const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -190,11 +188,10 @@ const normalizeV2 = (input: unknown): MapData => {
       toId: edge.toId,
     };
   });
-  return validate({
+  return mapDataV2Schema.parse({
     schemaVersion: 2,
     metadata: {
       ...(legacy.metadata ?? {}),
-      evidenceReferenceHighWaterMark: evidenceNumber,
     },
     nodes,
     edges,
@@ -212,9 +209,51 @@ const normalizeV2 = (input: unknown): MapData => {
   });
 };
 
+const evidenceNumber = (id: string): number => {
+  const match = /^EV-(\d+)$/.exec(id);
+  return match ? Number(match[1]) : 0;
+};
+
+const migrateV2 = (legacy: MapDataV2): MapData => {
+  const evidence = legacy.nodes.flatMap((node) =>
+    node.evidenceItems.map((item) => ({
+      id: item.id,
+      type: "Note" as const,
+      title: item.text,
+    })),
+  );
+  const largestEvidenceId = evidence.reduce(
+    (largest, item) => Math.max(largest, evidenceNumber(item.id)),
+    0,
+  );
+
+  return validate({
+    schemaVersion: 3,
+    metadata: {
+      ...(legacy.metadata ?? {}),
+      evidenceReferenceHighWaterMark: Math.max(
+        legacy.metadata?.evidenceReferenceHighWaterMark ?? 0,
+        largestEvidenceId,
+      ),
+      contextItems: [],
+    },
+    nodes: legacy.nodes.map(({ evidenceItems, ...node }) => ({
+      ...node,
+      evidenceIds: evidenceItems.map((item) => item.id),
+      contextItems: [],
+    })),
+    edges: legacy.edges,
+    barriers: legacy.barriers.map((control) => ({
+      ...control,
+      evidenceIds: [],
+    })),
+    evidence,
+  });
+};
+
 export const migrateMapDataV1 = (input: unknown): MapData => {
   const legacy = mapDataV1Schema.parse(input);
-  return validate({
+  return migrateV2({
     schemaVersion: 2,
     metadata: {
       ...legacy.metadata,
@@ -245,8 +284,8 @@ export const parseAndMigrateMapData = (input: unknown): MapData => {
   if (schemaVersion === 1) return migrateMapDataV1(input);
   if (schemaVersion === 2) {
     const canonical = mapDataV2Schema.safeParse(input);
-    if (canonical.success) return canonical.data;
-    return normalizeV2(input);
+    return migrateV2(canonical.success ? canonical.data : parseLegacyV2(input));
   }
+  if (schemaVersion === 3) return validate(input);
   throw new Error(`Unsupported map schema version: ${schemaVersion}`);
 };

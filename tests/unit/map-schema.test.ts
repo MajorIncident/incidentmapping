@@ -127,8 +127,8 @@ describe("mapDataSchema V3", () => {
       mapDataV1Schema.safeParse({ schemaVersion: 1, nodes: [], edges: [] })
         .success,
     ).toBe(true);
-    expect(mapDataV2Schema.safeParse(sampleMap).success).toBe(true);
-    expect(mapDataSchema.safeParse(sampleMap).success).toBe(false);
+    expect(mapDataV2Schema.safeParse(sampleMap).success).toBe(false);
+    expect(mapDataSchema.safeParse(sampleMap).success).toBe(true);
   });
 
   it.each([

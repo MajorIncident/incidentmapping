@@ -1,10 +1,8 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
-  Barrier,
-  ChainNodeV2 as ChainNode,
-  MapDataV2 as MapData,
-  MapDataV1,
+  ChainNode,
+  MapData,
   RelationshipEdge,
 } from "../features/maps/schema";
 import { parseAndMigrateMapData } from "../features/maps/migration";
@@ -29,12 +27,15 @@ export type ChainNodeData = {
   timestamp?: string;
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
-  evidenceItems?: ChainNode["evidenceItems"];
+  evidenceItems?: Array<{ id: string; text: string }>;
+  contextItems?: ChainNode["contextItems"];
   severity?: ChainNode["severity"];
   factorCategory?: ChainNode["factorCategory"];
   factorSignificance?: ChainNode["factorSignificance"];
   actionStatus?: ChainNode["actionStatus"];
   actionDueDate?: ChainNode["actionDueDate"];
+  eventPhase?: ChainNode["eventPhase"];
+  actionType?: ChainNode["actionType"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
   graphRole?: {
     isRoot: boolean;
@@ -53,8 +54,8 @@ export type BarrierNodeData = {
   upstreamNodeId: string;
   downstreamNodeId: string;
   description?: string;
-  status: Barrier["status"];
-  failureReason?: Barrier["failureReason"];
+  status: RuntimeBarrier["status"];
+  failureReason?: RuntimeBarrier["failureReason"];
   failureDetails?: string;
   readOnly?: boolean;
   /** Ephemeral detail visibility resolved by the canvas for this view. */
@@ -65,12 +66,18 @@ export type BarrierNodeData = {
   };
 };
 
-type RuntimeBarrier = Barrier;
+type RuntimeBarrier = MapData["barriers"][number];
+type RuntimeMetadata = Omit<
+  NonNullable<MapData["metadata"]>,
+  "contextItems"
+> & {
+  contextItems?: NonNullable<MapData["metadata"]>["contextItems"];
+};
 
 type HistoryEntry = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
-  metadata: MapData["metadata"];
+  metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
   selectionId: string | null;
 };
@@ -83,7 +90,7 @@ type HistoryState = {
 type AppState = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
-  metadata: MapData["metadata"];
+  metadata: RuntimeMetadata | undefined;
   barriers: RuntimeBarrier[];
   selectionId: string | null;
   editingId: string | null;
@@ -100,7 +107,7 @@ type AppState = {
   canRedo: boolean;
   actions: {
     newMap: () => void;
-    loadMap: (map: MapData | MapDataV1) => void;
+    loadMap: (map: unknown) => void;
     toMap: () => MapData;
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
@@ -196,7 +203,10 @@ const resetTextEditDebounce = () => {
   }
 };
 
-const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
+const chainNodeToReactNode = (
+  node: ChainNode,
+  evidence: MapData["evidence"],
+): Node<ChainNodeData> => ({
   id: node.id,
   type: "ChainNode",
   position: snapPosition(node.position),
@@ -209,17 +219,23 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     timestamp: node.timestamp,
     positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
-    evidenceItems: node.evidenceItems.map((item) => ({ ...item })),
+    evidenceItems: node.evidenceIds.map((id) => {
+      const item = evidence.find((candidate) => candidate.id === id)!;
+      return { id, text: item.title };
+    }),
+    contextItems: node.contextItems.map((item) => ({ ...item })),
     severity: node.severity,
     factorCategory: node.factorCategory,
     factorSignificance: node.factorSignificance,
     actionStatus: node.actionStatus,
     actionDueDate: node.actionDueDate,
+    eventPhase: node.eventPhase,
+    actionType: node.actionType,
   },
 });
 
-const mapNodesToReactNodes = (nodes: ChainNode[]): Node<ChainNodeData>[] =>
-  nodes.map(chainNodeToReactNode);
+const mapNodesToReactNodes = (map: MapData): Node<ChainNodeData>[] =>
+  map.nodes.map((node) => chainNodeToReactNode(node, map.evidence));
 
 const mapEdgesToReactEdges = (map: MapData): Edge[] =>
   map.edges.map((edge) => ({
@@ -244,12 +260,15 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     timestamp: node.data.timestamp,
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
-    evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
+    evidenceIds: (node.data.evidenceItems ?? []).map((item) => item.id),
+    contextItems: (node.data.contextItems ?? []).map((item) => ({ ...item })),
     severity: node.data.severity,
     factorCategory: node.data.factorCategory,
     factorSignificance: node.data.factorSignificance,
     actionStatus: node.data.actionStatus,
     actionDueDate: node.data.actionDueDate,
+    eventPhase: node.data.eventPhase,
+    actionType: node.data.actionType,
     position: snapPosition(node.position),
   }));
 
@@ -301,7 +320,7 @@ const applyLayout = (
   nodes: Node<ChainNodeData>[],
   edges: Edge[],
   showDetails: boolean,
-  barriers: Barrier[] = [],
+  barriers: RuntimeBarrier[] = [],
 ) => {
   const causalRelationships = new Set(
     edges
@@ -411,28 +430,31 @@ export const createRootNode = (): ChainNode => ({
   description: "",
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
-  evidenceItems: [],
+  evidenceIds: [],
+  contextItems: [],
   position: snapPosition({ x: 0, y: 0 }),
 });
 
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   metadata: {
     title: "Untitled Map",
     nodeReferenceHighWaterMark: 1,
     evidenceReferenceHighWaterMark: 0,
+    contextItems: [],
   },
   nodes: [createRootNode()],
   edges: [],
   barriers: [],
+  evidence: [],
 });
 
 export const createNewMapState = () => {
   const map = createNewMap();
   const rootId = map.nodes[0].id;
   return {
-    nodes: mapNodesToReactNodes(map.nodes),
+    nodes: mapNodesToReactNodes(map),
     edges: mapEdgesToReactEdges(map),
     metadata: map.metadata ? { ...map.metadata } : undefined,
     barriers: map.barriers ? [...map.barriers] : [],
@@ -469,7 +491,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       resetTextEditDebounce();
       set((state) => ({
         nodes: applyLayout(
-          mapNodesToReactNodes(map.nodes),
+          mapNodesToReactNodes(map),
           mapEdgesToReactEdges(map),
           state.showDetails,
         ).nodes,
@@ -484,10 +506,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           ),
           evidenceReferenceHighWaterMark: Math.max(
             map.metadata?.evidenceReferenceHighWaterMark ?? 0,
-            ...map.nodes.flatMap((node) =>
-              node.evidenceItems.map((item) =>
-                Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
-              ),
+            ...map.evidence.map((item) =>
+              Number(item.id.match(/^EV-(\d+)$/)?.[1] ?? 0),
             ),
           ),
         },
@@ -506,8 +526,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     toMap: () => {
       const { nodes, edges, metadata, barriers } = get();
       return {
-        schemaVersion: 2,
-        metadata,
+        schemaVersion: 3,
+        metadata: metadata
+          ? { ...metadata, contextItems: metadata.contextItems ?? [] }
+          : undefined,
         nodes: serializeNodes(nodes),
         edges: edges.map(
           (edge): RelationshipEdge =>
@@ -536,8 +558,17 @@ export const useAppStore = create<AppState>((set, get) => ({
             failureReason: barrier.failureReason,
             failureDetails: barrier.failureDetails,
             description: description?.length ? description : undefined,
+            controlRole: barrier.controlRole,
+            evidenceIds: [...barrier.evidenceIds],
           };
         }),
+        evidence: nodes.flatMap((node) =>
+          (node.data.evidenceItems ?? []).map((item) => ({
+            id: item.id,
+            type: "Note" as const,
+            title: item.text,
+          })),
+        ),
       };
     },
     addChainNode: (options) => {
@@ -1009,6 +1040,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             upstreamNodeId,
             downstreamNodeId,
             status: "Failed" as const,
+            evidenceIds: [],
           },
         ];
         const candidate = {

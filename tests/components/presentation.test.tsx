@@ -9,7 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { App } from "../../src/app/App";
 import { sampleMap } from "../../src/features/maps/fixtures";
-import type { MapDataV2 as MapData } from "../../src/features/maps/schema";
+import type { MapData } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
 
 const actionMap: MapData = {
@@ -25,7 +25,8 @@ const actionMap: MapData = {
       actionStatus: "Planned",
       positiveConsequenceBulletPoints: [],
       negativeConsequenceBulletPoints: [],
-      evidenceItems: [],
+      evidenceIds: [],
+      contextItems: [],
       position: { x: 260, y: 160 },
     },
   ],
@@ -49,7 +50,7 @@ const detailedMap: MapData = {
           ...node,
           description: "A detailed event description",
           timestamp: "2024-01-02T12:30",
-          evidenceItems: [{ id: "EV-1", text: "Detailed evidence line" }],
+          evidenceIds: ["EV-1"],
           negativeConsequenceBulletPoints: ["Detailed consequence"],
         }
       : node.id === "action"
@@ -57,7 +58,7 @@ const detailedMap: MapData = {
             ...node,
             owner: "Safety team",
             actionDueDate: "2025-03-04",
-            evidenceItems: [{ id: "EV-2", text: "Action evidence line" }],
+            evidenceIds: ["EV-2"],
           }
         : node,
   ),
@@ -71,7 +72,12 @@ const detailedMap: MapData = {
       status: "Failed",
       failureReason: "NotFollowed",
       failureDetails: "Control failure details",
+      evidenceIds: [],
     },
+  ],
+  evidence: [
+    { id: "EV-1", type: "Note", title: "Detailed evidence line" },
+    { id: "EV-2", type: "Note", title: "Action evidence line" },
   ],
 };
 
