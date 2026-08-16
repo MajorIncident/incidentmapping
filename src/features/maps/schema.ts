@@ -43,8 +43,7 @@ export const positionSchema = strictObject({ x: z.number(), y: z.number() });
 
 export const evidenceItemSchema = strictObject({
   id: z.string().min(1),
-  description: z.string().min(1),
-  source: z.string().optional(),
+  text: z.string().trim().min(1),
 });
 
 // V1 remains deliberately independent: changing V2 defaults must never change migration.

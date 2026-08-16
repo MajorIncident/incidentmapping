@@ -304,6 +304,33 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.getByText("This field is required.")).toBeVisible();
   });
 
+  it("adds evidence with Enter, preserves its label, and removes blank edits", async () => {
+    const nodeId = await renderSelectedNode();
+    const user = userEvent.setup();
+    const evidenceHeading = screen.getByRole("heading", { name: "Evidence" });
+    const section = evidenceHeading.parentElement?.parentElement as HTMLElement;
+    await user.click(within(section).getByRole("button", { name: "Add" }));
+
+    const first = screen.getByPlaceholderText("Add supporting evidence");
+    expect(first).toHaveFocus();
+    await user.type(first, "  Witness account  {Enter}");
+
+    const inputs = screen.getAllByPlaceholderText("Add supporting evidence");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[1]).toHaveFocus();
+    expect(useAppStore.getState().nodes[0].data.evidenceItems).toEqual([
+      { id: "E-001", text: "Witness account" },
+    ]);
+    expect(screen.getByText("EV-01")).toBeVisible();
+
+    await user.clear(inputs[0]);
+    await user.tab();
+    expect(
+      useAppStore.getState().nodes.find((candidate) => candidate.id === nodeId)
+        ?.data.evidenceItems,
+    ).toEqual([]);
+  });
+
   it("focuses Add after removing the only empty item and the previous input otherwise", async () => {
     await renderSelectedNode();
     const user = userEvent.setup();

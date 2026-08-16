@@ -167,20 +167,16 @@ describe("useAppStore actions", () => {
     const { actions } = useAppStore.getState();
     const nodeId = actions.addChild() as string;
     const first = actions.addEvidence(nodeId, "Witness statement") as string;
-    const second = actions.addEvidence(
-      nodeId,
-      "Camera footage",
-      " CCTV ",
-    ) as string;
+    const second = actions.addEvidence(nodeId, "Camera footage") as string;
     expect([first, second]).toEqual(["E-001", "E-002"]);
 
     actions.removeEvidence(nodeId, first);
     expect(actions.addEvidence(nodeId, "Operator log")).toBe("E-003");
-    actions.updateEvidence(nodeId, second, { description: "Reviewed footage" });
+    actions.updateEvidence(nodeId, second, "Reviewed footage");
     const changed = useAppStore.getState().nodes[0].data.evidenceItems!;
     actions.undo();
     const restored = useAppStore.getState().nodes[0].data.evidenceItems!;
-    expect(restored.find((item) => item.id === second)?.description).toBe(
+    expect(restored.find((item) => item.id === second)?.text).toBe(
       "Camera footage",
     );
     expect(restored).not.toBe(changed);

@@ -121,15 +121,11 @@ type AppState = {
       id: string,
       value?: ChainNode["actionStatus"],
     ) => void;
-    addEvidence: (
-      nodeId: string,
-      description: string,
-      source?: string,
-    ) => string | null;
+    addEvidence: (nodeId: string, text: string) => string | null;
     updateEvidence: (
       nodeId: string,
       evidenceId: string,
-      patch: { description?: string; source?: string },
+      text: string,
     ) => boolean;
     removeEvidence: (nodeId: string, evidenceId: string) => void;
     setActionStatus: (edgeId: string, status?: ActionEdge["status"]) => void;
@@ -603,8 +599,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().actions.updateNodeData(id, { factorSignificance: value }),
     setNodeActionStatus: (id, value) =>
       get().actions.updateNodeData(id, { actionStatus: value }),
-    addEvidence: (nodeId, description, source) => {
-      const text = description.trim();
+    addEvidence: (nodeId, value) => {
+      const text = value.trim();
       if (!text) return null;
       const node = get().nodes.find((item) => item.id === nodeId);
       if (!node) return null;
@@ -615,32 +611,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       const id = `E-${String(highWater + 1).padStart(3, "0")}`;
       get().actions.updateNodeData(nodeId, {
-        evidenceItems: [
-          ...current,
-          { id, description: text, source: source?.trim() || undefined },
-        ],
+        evidenceItems: [...current, { id, text }],
         evidenceHighWaterMark: highWater + 1,
       });
       return id;
     },
-    updateEvidence: (nodeId, evidenceId, patch) => {
+    updateEvidence: (nodeId, evidenceId, value) => {
       const node = get().nodes.find((item) => item.id === nodeId);
       if (!node) return false;
-      const description = patch.description?.trim();
-      if (patch.description !== undefined && !description) return false;
+      const text = value.trim();
+      if (!text) {
+        get().actions.removeEvidence(nodeId, evidenceId);
+        return false;
+      }
       const evidenceItems = (node.data.evidenceItems ?? []).map((item) =>
-        item.id === evidenceId
-          ? {
-              ...item,
-              ...(patch.description === undefined ? {} : { description }),
-              ...(patch.source === undefined
-                ? {}
-                : { source: patch.source.trim() || undefined }),
-            }
-          : item,
+        item.id === evidenceId ? { ...item, text } : item,
       );
       if (!evidenceItems.some((item) => item.id === evidenceId)) return false;
-      get().actions.updateNodeData(nodeId, { evidenceItems });
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        const nodes = state.nodes.map((candidate) =>
+          candidate.id === nodeId
+            ? { ...candidate, data: { ...candidate.data, evidenceItems } }
+            : candidate,
+        );
+        const history = updateHistoryState(state, prevSnapshot, true, {
+          debounce: "text",
+          debounceKey: `evidence:${nodeId}:${evidenceId}`,
+        });
+        return { nodes, history, canUndo: true, canRedo: false };
+      });
       return true;
     },
     removeEvidence: (nodeId, evidenceId) => {
