@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../../src/app/App";
@@ -309,6 +310,49 @@ describe("presentation mode", () => {
       screen.getByRole("button", { name: /Exit Presentation/i }),
     );
     expect(screen.getByRole("button", { name: "Present map" })).toBeVisible();
+  });
+
+  it("opens, selects from, and closes Chronology without persistence or history mutations", async () => {
+    const chronologyMap: MapData = {
+      ...sampleMap,
+      nodes: sampleMap.nodes.map((node, index) => ({
+        ...node,
+        timestamp: `2026-08-16T0${index + 8}:00:00Z`,
+        eventPhase: index === 0 ? "Incident" : "Detection",
+      })),
+    };
+    act(() => {
+      useAppStore.getState().actions.loadMap(chronologyMap);
+      useAppStore.getState().actions.setMapTitle("Airport investigation");
+      useAppStore.getState().actions.undo();
+    });
+    const before = useAppStore.getState();
+    const serialized = before.actions.toMap();
+    const history = structuredClone(before.history);
+    const availability = { canUndo: before.canUndo, canRedo: before.canRedo };
+    render(<App />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+    await userEvent.click(screen.getByRole("button", { name: "Chronology" }));
+    expect(screen.getByRole("heading", { name: "Incident" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Detection" })).toBeVisible();
+    const chronology = screen.getByRole("complementary", {
+      name: "Chronology",
+    });
+    await userEvent.click(
+      within(chronology).getByRole("button", { name: /Follow-up Event/ }),
+    );
+    expect(useAppStore.getState().selectionId).toBe("child");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close chronology" }),
+    );
+
+    const after = useAppStore.getState();
+    expect(after.actions.toMap()).toEqual(serialized);
+    expect(after.history).toEqual(history);
+    expect({ canUndo: after.canUndo, canRedo: after.canRedo }).toEqual(
+      availability,
+    );
   });
 
   it.each([true, false])(

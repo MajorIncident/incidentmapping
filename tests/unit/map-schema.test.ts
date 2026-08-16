@@ -205,6 +205,79 @@ describe("mapDataSchema V3", () => {
     ).toBeGreaterThanOrEqual(2);
   });
 
+  it.each([
+    [
+      "node IDs",
+      {
+        ...validMap,
+        nodes: [
+          validMap.nodes[0],
+          { ...validMap.nodes[1], id: "event" },
+          validMap.nodes[2],
+        ],
+      },
+      "Duplicate node ID",
+    ],
+    [
+      "node references",
+      mutateNode(1, { referenceId: "N-1" }),
+      "Duplicate node reference",
+    ],
+    [
+      "edge IDs",
+      {
+        ...validMap,
+        edges: [validMap.edges[0], { ...validMap.edges[1], id: "causal" }],
+      },
+      "Duplicate edge ID",
+    ],
+    [
+      "Control IDs",
+      {
+        ...validMap,
+        barriers: [validMap.barriers[0], { ...validMap.barriers[0] }],
+      },
+      "Duplicate control ID",
+    ],
+    [
+      "causal links",
+      {
+        ...validMap,
+        edges: [...validMap.edges, { ...validMap.edges[0], id: "causal-copy" }],
+      },
+      "Duplicate causal relationship",
+    ],
+    [
+      "Action links",
+      {
+        ...validMap,
+        edges: [...validMap.edges, { ...validMap.edges[1], id: "action-copy" }],
+      },
+      "Duplicate action relationship",
+    ],
+  ])("rejects duplicate %s", (_name, value, message) => {
+    expect(issues(value).some((issue) => issue.message.includes(message))).toBe(
+      true,
+    );
+  });
+
+  it("validates node and Control evidence references independently while allowing sharing", () => {
+    expect(mapDataSchema.parse(validMap).nodes[1].evidenceIds).toEqual([
+      "EV-2",
+    ]);
+    expect(mapDataSchema.parse(validMap).barriers[0].evidenceIds).toEqual([
+      "EV-2",
+    ]);
+    expect(
+      issues({
+        ...validMap,
+        barriers: [{ ...validMap.barriers[0], evidenceIds: ["EV-2", "EV-2"] }],
+      }).some((issue) =>
+        issue.message.includes("Duplicate evidence reference"),
+      ),
+    ).toBe(true);
+  });
+
   it("uses strict enums and rejects retired or invented persisted fields", () => {
     expect(issues(mutateNode(0, { eventPhase: "Before" }))[0].path).toEqual([
       "nodes",

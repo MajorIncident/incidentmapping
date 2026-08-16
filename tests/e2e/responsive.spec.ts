@@ -96,9 +96,19 @@ test("expanded presentation legend is contained at mobile 200% zoom", async ({
   expect(box!.x + box!.width).toBeLessThanOrEqual(375);
   expect(box!.y + box!.height).toBeLessThanOrEqual(900);
   await page.getByRole("button", { name: "Chronology" }).click();
-  await expect(
-    page.getByRole("button", { name: "Close chronology" }),
-  ).toBeVisible();
+  const chronology = page.getByRole("dialog", { name: "Chronology" });
+  await expect(chronology).toBeVisible();
+  await expect(chronology).toContainText("Untimed Events");
+  const event = chronology.getByRole("button", { name: /Root Event/ });
+  await event.click();
+  await expect(event).toHaveAttribute("aria-current", "true");
+  const close = chronology.getByRole("button", { name: "Close chronology" });
+  const closeBox = await close.boundingBox();
+  expect(closeBox!.width).toBeGreaterThanOrEqual(22); // 44 CSS px at 200% zoom.
+  expect(closeBox!.height).toBeGreaterThanOrEqual(22);
+  await close.click();
+  await expect(chronology).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Chronology" })).toBeFocused();
 });
 
 test("mobile inspector closes and reopens when a node is tapped", async ({

@@ -118,6 +118,30 @@ describe("presentation relationships", () => {
     expect(result.unrelated.has("sibling-factor")).toBe(true);
   });
 
+  it("keeps causal, Action, and branch-specific Control highlighting independent of chronology metadata", () => {
+    const timedNodes = nodes.map((node, index) => ({
+      ...node,
+      timestamp: `2026-08-16T0${index + 8}:00:00Z`,
+      eventPhase: index === 0 ? "Incident" : "Recovery",
+    }));
+    const baseline = deriveRelationshipPresentation(
+      nodes,
+      edges,
+      controls,
+      "control",
+    );
+    const chronological = deriveRelationshipPresentation(
+      timedNodes,
+      edges,
+      controls,
+      "control",
+    );
+    expect(chronological.selectedPath).toEqual(baseline.selectedPath);
+    expect(chronological.unrelated).toEqual(baseline.unrelated);
+    expect(chronological.upstream).toEqual(baseline.upstream);
+    expect(chronological.downstream).toEqual(baseline.downstream);
+  });
+
   it("disables fitting animation when reduced motion is requested", () => {
     vi.spyOn(window, "matchMedia").mockReturnValue({
       matches: true,
