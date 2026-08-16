@@ -71,14 +71,25 @@ const detailedMap: MapData = {
       downstreamNodeId: "child",
       description: "Control purpose details",
       status: "Failed",
+      referenceId: "C-001",
       failureReason: "NotFollowed",
       failureDetails: "Control failure details",
       evidenceIds: [],
     },
   ],
   evidence: [
-    { id: "EV-1", type: "Note", title: "Detailed evidence line" },
-    { id: "EV-2", type: "Note", title: "Action evidence line" },
+    {
+      id: "EV-1",
+      type: "Note",
+      title: "Detailed evidence line",
+      attachmentIds: [],
+    },
+    {
+      id: "EV-2",
+      type: "Note",
+      title: "Action evidence line",
+      attachmentIds: [],
+    },
   ],
 };
 
@@ -208,6 +219,7 @@ describe("presentation mode", () => {
           downstreamNodeId: "child",
           description: "Alarm",
           status: "Failed",
+          referenceId: "C-001",
           controlRole: "Detective",
           evidenceIds: [],
         },

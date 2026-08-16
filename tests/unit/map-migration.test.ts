@@ -50,11 +50,13 @@ const v1: MapDataV1 = {
 describe("parseAndMigrateMapData", () => {
   it("migrates V1 to deterministic canonical V3 without inferred classifications", () => {
     const migrated = parseAndMigrateMapData(v1);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.metadata).toEqual({
       title: "Original investigation",
       nodeReferenceHighWaterMark: 2,
       evidenceReferenceHighWaterMark: 0,
+      controlReferenceHighWaterMark: 1,
+      attachmentReferenceHighWaterMark: 0,
       contextItems: [],
     });
     expect(migrated.nodes.map((node) => node.referenceId)).toEqual([
@@ -76,6 +78,7 @@ describe("parseAndMigrateMapData", () => {
       upstreamNodeId: "earlier",
       downstreamNodeId: "later",
       status: "Failed",
+      referenceId: "C-001",
       failureDetails: "First failure\nSecond failure",
       evidenceIds: [],
     });
@@ -92,6 +95,7 @@ describe("parseAndMigrateMapData", () => {
       id: "EV-010",
       type: "Note",
       title: "Passenger service log records 42 delayed bags",
+      attachmentIds: [],
     });
     expect(migrated.nodes[0].evidenceIds).toEqual(["EV-010"]);
     expect(migrated.metadata?.evidenceReferenceHighWaterMark).toBe(11);
@@ -185,7 +189,7 @@ describe("parseAndMigrateMapData", () => {
     const migrated = parseAndMigrateMapData(input);
 
     expect(input).toEqual(original);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.metadata).toMatchObject({
       nodeReferenceHighWaterMark: 41,
       evidenceReferenceHighWaterMark: 27,
