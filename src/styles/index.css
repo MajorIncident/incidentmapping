@@ -176,7 +176,6 @@ select:focus-visible {
 
 .react-flow__node:has([data-read-only="true"]) {
   cursor: default;
-  pointer-events: none;
 }
 .react-flow__handle {
   opacity: 0;
@@ -198,6 +197,15 @@ select:focus-visible {
 }
 .presentation-exit span {
   @apply ml-2 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-400;
+}
+.presentation-hint {
+  @apply absolute left-1/2 top-4 z-30 w-[min(90vw,34rem)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-600 shadow-lg;
+}
+.presentation-hint h2 {
+  @apply pr-8 text-base font-semibold text-slate-900;
+}
+.presentation-hint button {
+  @apply absolute right-2 top-2 h-8 w-8 rounded-lg text-lg text-slate-500 hover:bg-slate-100;
 }
 
 @media (prefers-reduced-motion: reduce) {

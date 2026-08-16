@@ -106,11 +106,87 @@ export const deriveGraphPresentation = (
   };
 };
 
+type PresentationNode = { id: string; nodeType?: ChainNodeData["nodeType"] };
+type PresentationBarrier = {
+  id: string;
+  upstreamNodeId: string;
+  downstreamNodeId: string;
+};
+
+/** Resolves causal, Action, and Control selections onto one review relationship. */
+export const deriveRelationshipPresentation = (
+  nodes: PresentationNode[],
+  edges: Array<{ source: string; target: string; kind?: string }>,
+  barriers: PresentationBarrier[],
+  selectedId: string | null,
+): GraphRole => {
+  const causalIds = nodes
+    .filter((node) => node.nodeType !== "Action")
+    .map((node) => node.id);
+  const causalEdges = edges.filter((edge) => edge.kind !== "ActionEdge");
+  const action = nodes.find(
+    (node) => node.id === selectedId && node.nodeType === "Action",
+  );
+  const control = barriers.find((barrier) => barrier.id === selectedId);
+  const actionEdge = action
+    ? edges.find(
+        (edge) => edge.kind === "ActionEdge" && edge.target === action.id,
+      )
+    : undefined;
+  const anchors = control
+    ? [control.upstreamNodeId, control.downstreamNodeId]
+    : actionEdge
+      ? [actionEdge.source]
+      : selectedId
+        ? [selectedId]
+        : [];
+  const roles = anchors.map((anchor) =>
+    deriveGraphPresentation(causalIds, causalEdges, anchor),
+  );
+  const selectedPath = new Set(roles.flatMap((role) => [...role.selectedPath]));
+  if (action) selectedPath.add(action.id);
+  if (control) selectedPath.add(control.id);
+  // Actions attached to the selected relationship remain part of its context.
+  edges
+    .filter(
+      (edge) => edge.kind === "ActionEdge" && selectedPath.has(edge.source),
+    )
+    .forEach((edge) => selectedPath.add(edge.target));
+  barriers
+    .filter(
+      (barrier) =>
+        selectedPath.has(barrier.upstreamNodeId) &&
+        selectedPath.has(barrier.downstreamNodeId),
+    )
+    .forEach((barrier) => selectedPath.add(barrier.id));
+  const allIds = [
+    ...nodes.map((node) => node.id),
+    ...barriers.map((b) => b.id),
+  ];
+  const hasSelection = anchors.length > 0;
+  return {
+    roots:
+      roles[0]?.roots ??
+      deriveGraphPresentation(causalIds, causalEdges, null).roots,
+    leaves:
+      roles[0]?.leaves ??
+      deriveGraphPresentation(causalIds, causalEdges, null).leaves,
+    upstream: new Set(roles.flatMap((role) => [...role.upstream])),
+    downstream: new Set(roles.flatMap((role) => [...role.downstream])),
+    selectedPath,
+    unrelated: new Set(
+      hasSelection ? allIds.filter((id) => !selectedPath.has(id)) : [],
+    ),
+  };
+};
+
 export const Canvas = ({
   onInspect,
+  onPresentationInteract,
   presenting = false,
 }: {
   onInspect?: () => void;
+  onPresentationInteract?: () => void;
   presenting?: boolean;
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
@@ -136,16 +212,19 @@ export const Canvas = ({
   }, [reactFlow]);
 
   const { nodes, renderedEdges } = useMemo(() => {
-    const presentation = deriveGraphPresentation(
-      chainNodes
-        .filter((node) => node.data.nodeType !== "Action")
-        .map((node) => node.id),
-      edges.filter((edge) => edge.data?.kind !== "ActionEdge"),
+    const presentation = deriveRelationshipPresentation(
+      chainNodes.map((node) => ({ id: node.id, nodeType: node.data.nodeType })),
+      edges.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        kind: edge.data?.kind,
+      })),
+      barriers,
       selectionId,
     );
     const presentedNodes = chainNodes.map((node) => ({
       ...node,
-      selected: !presenting && node.id === selectionId,
+      selected: node.id === selectionId,
       data: {
         ...node.data,
         graphRole: {
@@ -168,7 +247,11 @@ export const Canvas = ({
                 presentation.downstream.has(edge.source)) &&
               presentation.downstream.has(edge.target)
             ? "downstream"
-            : undefined;
+            : edge.data?.kind !== "ActionEdge" &&
+                presentation.selectedPath.has(edge.source) &&
+                presentation.selectedPath.has(edge.target)
+              ? "upstream"
+              : undefined;
       const presentedEdge = {
         ...edge,
         data: { ...edge.data, presentationRole },
@@ -202,6 +285,10 @@ export const Canvas = ({
           failureReason: matchingBarrier.failureReason,
           failureDetails: matchingBarrier.failureDetails,
           readOnly: presenting,
+          graphRole: {
+            isOnSelectedPath: presentation.selectedPath.has(matchingBarrier.id),
+            isUnrelated: presentation.unrelated.has(matchingBarrier.id),
+          },
         },
         position: {
           x:
@@ -212,7 +299,7 @@ export const Canvas = ({
             (downstream.position.y - upstream.position.y) / 2,
         },
         draggable: false,
-        selectable: !presenting,
+        selectable: true,
       };
 
       barrierNodes.push(barrierNode);
@@ -235,13 +322,18 @@ export const Canvas = ({
       const isAction = edge.data?.kind === "ActionEdge";
       const upstream = edge.data?.presentationRole === "upstream";
       const downstream = edge.data?.presentationRole === "downstream";
-      const highlighted = upstream || downstream;
+      const highlighted =
+        upstream ||
+        downstream ||
+        (isAction &&
+          presentation.selectedPath.has(edge.source) &&
+          presentation.selectedPath.has(edge.target));
       const unrelated = Boolean(selectionId) && !highlighted;
       return {
         ...edge,
         type: "step",
         className: isAction
-          ? "incident-edge incident-edge--action"
+          ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${highlighted ? " incident-edge--related" : ""}`
           : highlighted
             ? `incident-edge incident-edge--${upstream ? "upstream" : "downstream"}`
             : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
@@ -272,16 +364,17 @@ export const Canvas = ({
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
-      if (presenting) return;
       select(node.id);
-      onInspect?.();
+      if (presenting) onPresentationInteract?.();
+      else onInspect?.();
     },
-    [onInspect, presenting, select],
+    [onInspect, onPresentationInteract, presenting, select],
   );
 
   const handlePaneClick = useCallback(() => {
-    if (!presenting) select(null);
-  }, [presenting, select]);
+    select(null);
+    if (presenting) onPresentationInteract?.();
+  }, [onPresentationInteract, presenting, select]);
 
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
@@ -447,10 +540,10 @@ export const Canvas = ({
         onNodeDragStop={handleNodeDragStop}
         snapToGrid
         snapGrid={[8, 8]}
-        nodesFocusable={!presenting}
+        nodesFocusable
         nodesDraggable={!presenting}
         nodesConnectable={false}
-        elementsSelectable={!presenting}
+        elementsSelectable
         selectionOnDrag={!presenting}
       >
         <Background color="#E2E8F0" gap={8} />

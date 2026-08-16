@@ -56,6 +56,10 @@ export type BarrierNodeData = {
   failureReason?: Barrier["failureReason"];
   failureDetails?: string;
   readOnly?: boolean;
+  graphRole?: {
+    isOnSelectedPath: boolean;
+    isUnrelated: boolean;
+  };
 };
 
 type RuntimeBarrier = Barrier;
