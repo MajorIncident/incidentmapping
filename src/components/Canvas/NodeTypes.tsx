@@ -3,6 +3,39 @@ import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
+import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
+
+const nodeTypeOptions = ["Event", "Factor", "Impact", "Action"].map(
+  (value) => ({
+    value: value as NonNullable<ChainNodeData["nodeType"]>,
+    label: value,
+  }),
+);
+const factorCategoryOptions = [
+  "Human",
+  "Equipment",
+  "Environment",
+  "Procedure",
+  "Organization",
+].map((value) => ({
+  value: value as NonNullable<ChainNodeData["factorCategory"]>,
+  label: value,
+}));
+const significanceOptions = [
+  { value: "Normal" as const, label: "Normal" },
+  { value: "KeyFactor" as const, label: "Key Factor" },
+  { value: "RootCause" as const, label: "Root Cause" },
+];
+const actionStatusOptions = [
+  "Proposed",
+  "Planned",
+  "InProgress",
+  "Completed",
+  "Cancelled",
+].map((value) => ({
+  value: value as NonNullable<ChainNodeData["actionStatus"]>,
+  label: value === "InProgress" ? "In Progress" : value,
+}));
 
 const inputClasses =
   "w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 focus:border-canvas-accent focus:outline-none focus:ring-2 focus:ring-canvas-accent";
@@ -21,6 +54,16 @@ const ChainNodeComponent = ({
   selected,
 }: NodeProps<ChainNodeData>): JSX.Element => {
   const renameNode = useAppStore((state) => state.actions.renameNode);
+  const setNodeType = useAppStore((state) => state.actions.setNodeType);
+  const setFactorCategory = useAppStore(
+    (state) => state.actions.setFactorCategory,
+  );
+  const setFactorSignificance = useAppStore(
+    (state) => state.actions.setFactorSignificance,
+  );
+  const setNodeActionStatus = useAppStore(
+    (state) => state.actions.setNodeActionStatus,
+  );
   const startEditing = useAppStore((state) => state.actions.startEditing);
   const finishEditing = useAppStore((state) => state.actions.finishEditing);
   const requestEditorFocus = useAppStore(
@@ -109,9 +152,16 @@ const ChainNodeComponent = ({
 
   const presentation = data.presentation;
   const containerClassName = useMemo(() => {
+    const significance = data.factorSignificance ?? "Normal";
     const root = presentation?.isRoot
-      ? "border-violet-600 bg-violet-50/70 pt-5"
+      ? "border-violet-400"
       : "border-slate-200";
+    const classification =
+      data.nodeType === "Factor" && significance === "RootCause"
+        ? "border-rose-500 shadow-[0_8px_24px_rgba(190,24,93,0.16)]"
+        : data.nodeType === "Factor" && significance === "KeyFactor"
+          ? "border-amber-400"
+          : "";
     const related = presentation?.isUnrelated
       ? "opacity-45 saturate-50"
       : "opacity-100";
@@ -120,8 +170,8 @@ const ChainNodeComponent = ({
       : presentation?.isOnSelectedPath
         ? "ring-2 ring-slate-300"
         : "ring-0";
-    return `${containerClasses} ${root} ${related} ${active}`;
-  }, [presentation, selected]);
+    return `${containerClasses} ${root} ${classification} ${related} ${active}`;
+  }, [data.factorSignificance, data.nodeType, presentation, selected]);
 
   const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
     (point) => point.trim().length > 0,
@@ -145,17 +195,55 @@ const ChainNodeComponent = ({
       data-selected-path={presentation?.isOnSelectedPath || undefined}
       data-unrelated={presentation?.isUnrelated || undefined}
     >
-      {presentation?.isRoot ? (
-        <div className="absolute inset-x-0 top-0 rounded-t-[14px] bg-violet-600 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
-          Root event
-        </div>
-      ) : null}
       <Handle
         id="top"
         type="target"
         position={Position.Top}
         className="!h-3 !w-3 !border-2 !border-white !bg-slate-600"
       />
+      <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
+        <NodeTagMenu
+          label="Node type"
+          value={data.nodeType ?? "Event"}
+          options={nodeTypeOptions}
+          onChange={(value) => setNodeType(id, value)}
+          className={`node-tag--type node-tag--${(data.nodeType ?? "Event").toLowerCase()}`}
+        />
+        <span
+          className="node-reference"
+          aria-label={`Reference ${data.referenceId ?? "Unassigned"}`}
+        >
+          {data.referenceId ?? "Unassigned"}
+        </span>
+        {presentation?.isRoot ? (
+          <span className="node-structural-tag">Top Event</span>
+        ) : null}
+        {data.nodeType === "Factor" ? (
+          <>
+            <NodeTagMenu
+              label="Factor category"
+              value={data.factorCategory ?? "Human"}
+              options={factorCategoryOptions}
+              onChange={(value) => setFactorCategory(id, value)}
+            />
+            <NodeTagMenu
+              label="Factor significance"
+              value={data.factorSignificance ?? "Normal"}
+              options={significanceOptions}
+              onChange={(value) => setFactorSignificance(id, value)}
+              className={`node-tag--${(data.factorSignificance ?? "Normal").toLowerCase()}`}
+            />
+          </>
+        ) : null}
+        {data.nodeType === "Action" ? (
+          <NodeTagMenu
+            label="Action status"
+            value={data.actionStatus ?? "Proposed"}
+            options={actionStatusOptions}
+            onChange={(value) => setNodeActionStatus(id, value)}
+          />
+        ) : null}
+      </div>
       <Handle
         id="bottom"
         type="source"

@@ -34,6 +34,7 @@ export type ChainNodeData = {
   incidentStatus?: ChainNode["incidentStatus"];
   factorCategory?: ChainNode["factorCategory"];
   factorSignificance?: ChainNode["factorSignificance"];
+  actionStatus?: ChainNode["actionStatus"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
   presentation?: {
     isRoot: boolean;
@@ -115,6 +116,10 @@ type AppState = {
     setFactorSignificance: (
       id: string,
       value?: ChainNode["factorSignificance"],
+    ) => void;
+    setNodeActionStatus: (
+      id: string,
+      value?: ChainNode["actionStatus"],
     ) => void;
     addEvidence: (
       nodeId: string,
@@ -216,6 +221,7 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     incidentStatus: node.incidentStatus,
     factorCategory: node.factorCategory,
     factorSignificance: node.factorSignificance,
+    actionStatus: node.actionStatus,
   },
 });
 
@@ -258,6 +264,7 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     incidentStatus: node.data.incidentStatus,
     factorCategory: node.data.factorCategory,
     factorSignificance: node.data.factorSignificance,
+    actionStatus: node.data.actionStatus,
     position: snapPosition(node.position),
   }));
 
@@ -594,6 +601,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().actions.updateNodeData(id, { factorCategory: value }),
     setFactorSignificance: (id, value) =>
       get().actions.updateNodeData(id, { factorSignificance: value }),
+    setNodeActionStatus: (id, value) =>
+      get().actions.updateNodeData(id, { actionStatus: value }),
     addEvidence: (nodeId, description, source) => {
       const text = description.trim();
       if (!text) return null;
