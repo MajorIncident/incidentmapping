@@ -108,7 +108,30 @@ describe("presentation mode", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Incident header")).toBeVisible();
-    expect(screen.getByLabelText("Presentation legend")).toBeVisible();
+    const legend = screen.getByLabelText("Presentation legend");
+    expect(legend).toBeVisible();
+    for (const heading of ["Nodes", "Analysis", "Controls"]) {
+      expect(
+        screen.getByRole("heading", { name: heading }),
+      ).toBeInTheDocument();
+    }
+    for (const label of [
+      "Impact",
+      "Event",
+      "Factor",
+      "Action",
+      "Key Factor",
+      "Root Cause",
+      "Effective",
+      "Degraded",
+      "Failed",
+      "Missing",
+    ]) {
+      expect(legend).toHaveTextContent(label);
+    }
+    expect(legend).not.toHaveTextContent("Top Event");
+    expect(legend).not.toHaveTextContent("Root Cause / failed control");
+    expect(legend.querySelectorAll('[aria-hidden="true"]')).toHaveLength(10);
     const handles = document.querySelectorAll(".react-flow__handle");
     expect(handles.length).toBeGreaterThan(0);
     handles.forEach((handle) => {
