@@ -128,6 +128,20 @@ describe("ChainNode details", () => {
     expect(node).toHaveAttribute("data-leaf", "true");
     expect(node).toHaveAttribute("data-selected-path", "true");
     expect(node).toHaveClass("ring-4", "border-sky-700");
-    expect(screen.getByText("Root event")).toBeInTheDocument();
+    expect(screen.getByText("Top Event")).toBeInTheDocument();
+    expect(screen.queryByText(/Root event/i)).not.toBeInTheDocument();
   });
+
+  it.each(["Event", "Factor", "Impact", "Action"] as const)(
+    "renders the %s type treatment and stable reference",
+    (nodeType) => {
+      renderChainNode({ nodeType, referenceId: "N-042" });
+      expect(
+        screen.getByRole("button", { name: `Node type: ${nodeType}` }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Reference N-042")).toHaveTextContent(
+        "N-042",
+      );
+    },
+  );
 });

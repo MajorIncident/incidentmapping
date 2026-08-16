@@ -42,6 +42,16 @@ export const Inspector = ({
   );
   const renameNode = useAppStore((state) => state.actions.renameNode);
   const updateNodeData = useAppStore((state) => state.actions.updateNodeData);
+  const setNodeType = useAppStore((state) => state.actions.setNodeType);
+  const setFactorCategory = useAppStore(
+    (state) => state.actions.setFactorCategory,
+  );
+  const setFactorSignificance = useAppStore(
+    (state) => state.actions.setFactorSignificance,
+  );
+  const setNodeActionStatus = useAppStore(
+    (state) => state.actions.setNodeActionStatus,
+  );
   const addBarrier = useAppStore((state) => state.actions.addBarrier);
   const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
   const updateBarrierData = useAppStore(
@@ -831,6 +841,124 @@ export const Inspector = ({
 
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-node-type" className={labelClasses}>
+              Type
+            </label>
+            <select
+              id="inspector-node-type"
+              className={inputClasses}
+              value={node.data.nodeType ?? "Event"}
+              onChange={(event) =>
+                setNodeType(
+                  node.id,
+                  event.target.value as NonNullable<typeof node.data.nodeType>,
+                )
+              }
+            >
+              {(["Event", "Factor", "Impact", "Action"] as const).map(
+                (value) => (
+                  <option key={value}>{value}</option>
+                ),
+              )}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className={labelClasses}>Reference</span>
+            <span className="flex min-h-[38px] items-center text-sm font-semibold text-slate-600">
+              {node.data.referenceId ?? "Unassigned"}
+            </span>
+          </div>
+          {node.data.nodeType === "Factor" ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="inspector-factor-category"
+                  className={labelClasses}
+                >
+                  Category
+                </label>
+                <select
+                  id="inspector-factor-category"
+                  className={inputClasses}
+                  value={node.data.factorCategory ?? "Human"}
+                  onChange={(event) =>
+                    setFactorCategory(
+                      node.id,
+                      event.target.value as NonNullable<
+                        typeof node.data.factorCategory
+                      >,
+                    )
+                  }
+                >
+                  {(
+                    [
+                      "Human",
+                      "Equipment",
+                      "Environment",
+                      "Procedure",
+                      "Organization",
+                    ] as const
+                  ).map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="inspector-factor-significance"
+                  className={labelClasses}
+                >
+                  Significance
+                </label>
+                <select
+                  id="inspector-factor-significance"
+                  className={inputClasses}
+                  value={node.data.factorSignificance ?? "Normal"}
+                  onChange={(event) =>
+                    setFactorSignificance(
+                      node.id,
+                      event.target.value as NonNullable<
+                        typeof node.data.factorSignificance
+                      >,
+                    )
+                  }
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="KeyFactor">Key Factor</option>
+                  <option value="RootCause">Root Cause</option>
+                </select>
+              </div>
+            </>
+          ) : null}
+          {node.data.nodeType === "Action" ? (
+            <div className="col-span-2 flex flex-col gap-1">
+              <label htmlFor="inspector-action-status" className={labelClasses}>
+                Action status
+              </label>
+              <select
+                id="inspector-action-status"
+                className={inputClasses}
+                value={node.data.actionStatus ?? "Proposed"}
+                onChange={(event) =>
+                  setNodeActionStatus(
+                    node.id,
+                    event.target.value as NonNullable<
+                      typeof node.data.actionStatus
+                    >,
+                  )
+                }
+              >
+                <option value="Proposed">Proposed</option>
+                <option value="Planned">Planned</option>
+                <option value="InProgress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+          ) : null}
+        </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="inspector-title" className={labelClasses}>
             Title
@@ -1194,6 +1322,10 @@ export const Inspector = ({
     positiveConsequences,
     positiveErrors,
     removeBarrier,
+    setFactorCategory,
+    setFactorSignificance,
+    setNodeActionStatus,
+    setNodeType,
     select,
     timestampValue,
     title,

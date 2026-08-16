@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .node-tag {
+    @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-4 text-slate-600 transition hover:border-slate-400 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500;
+  }
+  .node-tag--type {
+    @apply uppercase tracking-wide text-slate-700;
+  }
+  .node-tag--event {
+    @apply border-sky-200 bg-sky-50 text-sky-700;
+  }
+  .node-tag--factor {
+    @apply border-amber-200 bg-amber-50 text-amber-800;
+  }
+  .node-tag--impact {
+    @apply border-violet-200 bg-violet-50 text-violet-700;
+  }
+  .node-tag--action {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+  .node-tag--keyfactor {
+    @apply border-amber-400 bg-amber-100 text-amber-900;
+  }
+  .node-tag--rootcause {
+    @apply border-rose-500 bg-rose-100 font-bold text-rose-900;
+  }
+  .node-reference {
+    @apply text-[10px] font-semibold tabular-nums tracking-wide text-slate-400;
+  }
+  .node-structural-tag {
+    @apply ml-auto text-[9px] font-semibold uppercase tracking-wide text-violet-600;
+  }
+  .node-tag-menu {
+    @apply absolute left-0 top-full z-50 mt-1 min-w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-xl;
+  }
+  .node-tag-menu-item {
+    @apply flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 focus:bg-sky-50 focus:outline-none;
+  }
+}
+
 :root {
   color-scheme: light;
 }

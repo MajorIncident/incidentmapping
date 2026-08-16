@@ -10,7 +10,7 @@ export const incidentStatusSchema = z.enum([
   "InProgress",
   "Closed",
 ]);
-export const nodeTypeSchema = z.enum(["Event", "Factor"]);
+export const nodeTypeSchema = z.enum(["Event", "Factor", "Impact", "Action"]);
 export const factorCategorySchema = z.enum([
   "Human",
   "Equipment",
@@ -20,9 +20,8 @@ export const factorCategorySchema = z.enum([
 ]);
 export const factorSignificanceSchema = z.enum([
   "Normal",
-  "Primary",
-  "Contributing",
-  "Potential",
+  "KeyFactor",
+  "RootCause",
 ]);
 export const actionStatusSchema = z.enum([
   "Proposed",
@@ -99,6 +98,7 @@ export const chainNodeSchema = strictObject({
   incidentStatus: incidentStatusSchema.optional(),
   factorCategory: factorCategorySchema.optional(),
   factorSignificance: factorSignificanceSchema.optional(),
+  actionStatus: actionStatusSchema.optional(),
   positiveConsequenceBulletPoints: z.array(z.string()),
   negativeConsequenceBulletPoints: z.array(z.string()),
   evidenceItems: z.array(evidenceItemSchema),
