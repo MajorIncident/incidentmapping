@@ -12,6 +12,7 @@ import {
 import { useReactFlow } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
 import { EvidenceSection } from "../Evidence/EvidenceSection";
+import { ContextEditor } from "../Context/ContextEditor";
 
 export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
@@ -1052,6 +1053,13 @@ export const Inspector = ({
               </div>
             )}
           </div>
+        ) : null}
+
+        {node.data.nodeType !== "Action" ? (
+          <ContextEditor
+            target={node.id}
+            items={node.data.contextItems ?? []}
+          />
         ) : null}
 
         <EvidenceSection target={{ kind: "node", id: node.id }} />

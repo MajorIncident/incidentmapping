@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { MapMetadataV2 as MapMetadata } from "../../features/maps/schema";
 import { useAppStore } from "../../state/useAppStore";
 import { EditableMapTitle } from "../Canvas/EditableMapTitle";
+import { ContextEditor } from "../Context/ContextEditor";
+import { selectPinnedContext } from "../../state/selectors";
 
 const severities = ["Low", "Medium", "High", "Critical"] as const;
 const statuses = ["Draft", "Open", "InProgress", "Closed"] as const;
@@ -34,6 +36,10 @@ export const IncidentHeader = ({
     metadata?.severity,
     metadata?.status === "InProgress" ? "In progress" : metadata?.status,
   ].filter(Boolean);
+  const pinnedContext = selectPinnedContext(metadata?.contextItems ?? []).slice(
+    0,
+    2,
+  );
 
   return (
     <section className="incident-header" aria-label="Incident header">
@@ -55,6 +61,19 @@ export const IncidentHeader = ({
           <span key={detail}>{detail}</span>
         ))}
       </div>
+      {pinnedContext.length ? (
+        <dl
+          className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600"
+          aria-label="Pinned incident context"
+        >
+          {pinnedContext.map((item) => (
+            <div key={item.id} className="flex min-w-0 gap-1">
+              <dt className="font-semibold">{item.label}:</dt>
+              <dd className="max-w-40 truncate">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {!readOnly ? (
         <button
           type="button"
@@ -138,6 +157,10 @@ export const IncidentHeader = ({
               ))}
             </select>
           </label>
+          <ContextEditor
+            target="incident"
+            items={metadata?.contextItems ?? []}
+          />
         </div>
       ) : null}
     </section>
