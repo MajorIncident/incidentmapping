@@ -269,11 +269,13 @@ export const Canvas = ({
   onPresentationInteract,
   presenting = false,
   presentationShowDetails = false,
+  showTimelineEvents = false,
 }: {
   onInspect?: () => void;
   onPresentationInteract?: () => void;
   presenting?: boolean;
   presentationShowDetails?: boolean;
+  showTimelineEvents?: boolean;
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -329,10 +331,63 @@ export const Canvas = ({
     });
   }, [reactFlow]);
 
+  const visibleChainNodes = useMemo(() => {
+    const normal = chainNodes.filter(
+      (node) => node.data.eventDisplay !== "ChronologyOnly",
+    );
+    if (!showTimelineEvents) return normal;
+    const timeline = chainNodes
+      .filter((node) => node.data.eventDisplay === "ChronologyOnly")
+      .slice()
+      .sort(
+        (a, b) =>
+          Date.parse(a.data.timestamp ?? "") -
+            Date.parse(b.data.timestamp ?? "") || a.id.localeCompare(b.id),
+      );
+    const right =
+      Math.max(
+        0,
+        ...normal.map(
+          (node) => node.position.x + (node.width ?? CHAIN_NODE_WIDTH),
+        ),
+      ) + 128;
+    const top = Math.min(0, ...normal.map((node) => node.position.y));
+    return [
+      ...normal,
+      ...timeline.map((node, index) => ({
+        ...node,
+        position: { x: right, y: top + index * (CHAIN_NODE_HEIGHT + 48) },
+        className: `${node.className ?? ""} timeline-event-node`,
+      })),
+    ];
+  }, [chainNodes, showTimelineEvents]);
+  const visibleIds = useMemo(
+    () => new Set(visibleChainNodes.map((node) => node.id)),
+    [visibleChainNodes],
+  );
+  const visibleEdges = useMemo(
+    () =>
+      edges.filter(
+        (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
+      ),
+    [edges, visibleIds],
+  );
+  useEffect(() => {
+    if (
+      selectionId &&
+      !visibleIds.has(selectionId) &&
+      !barriers.some((item) => item.id === selectionId)
+    )
+      select(null);
+  }, [barriers, selectionId, select, visibleIds]);
+
   const { nodes, renderedEdges } = useMemo(() => {
     const presentation = deriveRelationshipPresentation(
-      chainNodes.map((node) => ({ id: node.id, nodeType: node.data.nodeType })),
-      edges.map((edge) => ({
+      visibleChainNodes.map((node) => ({
+        id: node.id,
+        nodeType: node.data.nodeType,
+      })),
+      visibleEdges.map((edge) => ({
         source: edge.source,
         target: edge.target,
         kind: edge.data?.kind,
@@ -340,7 +395,7 @@ export const Canvas = ({
       barriers,
       selectionId,
     );
-    const presentedNodes = chainNodes.map((node) => ({
+    const presentedNodes = visibleChainNodes.map((node) => ({
       ...node,
       selected: node.id === selectionId,
       data: {
@@ -357,7 +412,7 @@ export const Canvas = ({
     }));
     const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
     const barrierNodes: Node<BarrierNodeData>[] = [];
-    const flowEdges = edges.flatMap((edge) => {
+    const flowEdges = visibleEdges.flatMap((edge) => {
       const presentationRole =
         edge.data?.kind !== "ActionEdge" &&
         presentation.selectedPath.has(edge.source) &&
@@ -506,8 +561,8 @@ export const Canvas = ({
     };
   }, [
     barriers,
-    chainNodes,
-    edges,
+    visibleChainNodes,
+    visibleEdges,
     measuredControlDimensions,
     presentationShowDetails,
     presenting,

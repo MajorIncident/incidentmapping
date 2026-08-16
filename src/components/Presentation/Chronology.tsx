@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Node } from "reactflow";
 import type { ChainNodeData } from "../../state/useAppStore";
-import { selectChronologyGroups } from "../../state/selectors";
-
-const formatTimestamp = (timestamp?: string) => {
-  if (!timestamp || !Number.isFinite(Date.parse(timestamp))) return null;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(timestamp));
-};
+import {
+  formatEventDateTime,
+  formatEventDuration,
+  selectChronologyGroups,
+  timestampNeedsSeconds,
+} from "../../state/selectors";
 
 type ChronologyProps = {
   nodes: Node<ChainNodeData>[];
@@ -77,7 +74,21 @@ export const Chronology = ({
               <h3>{group.phase}</h3>
               <ol>
                 {group.events.map((event) => {
-                  const time = formatTimestamp(event.data.timestamp);
+                  const seconds =
+                    timestampNeedsSeconds(event.data.timestamp) ||
+                    timestampNeedsSeconds(event.data.endTimestamp);
+                  const time = formatEventDateTime(
+                    event.data.timestamp,
+                    seconds,
+                  );
+                  const end = formatEventDateTime(
+                    event.data.endTimestamp,
+                    seconds,
+                  );
+                  const duration = formatEventDuration(
+                    event.data.timestamp,
+                    event.data.endTimestamp,
+                  );
                   const selected = selectedId === event.id;
                   return (
                     <li key={event.id}>
@@ -87,13 +98,17 @@ export const Chronology = ({
                         onClick={() => onSelect(event.id)}
                       >
                         {time ? (
-                          <time dateTime={event.data.timestamp}>{time}</time>
+                          <time dateTime={event.data.timestamp}>
+                            {time}
+                            {end ? ` – ${end}` : ""}
+                          </time>
                         ) : (
                           <span className="chronology__no-time">
                             Time not set
                           </span>
                         )}
                         <strong>{event.data.title}</strong>
+                        {duration ? <span>{duration}</span> : null}
                         <span>{event.data.referenceId}</span>
                       </button>
                     </li>

@@ -19,6 +19,8 @@ export const App = (): JSX.Element => {
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
   const [chronologyOpen, setChronologyOpen] = useState(false);
   const [chronologyMobile, setChronologyMobile] = useState(false);
+  const [showTimelineEvents, setShowTimelineEvents] = useState(false);
+  const [timelineAnnouncement, setTimelineAnnouncement] = useState("");
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
@@ -151,6 +153,7 @@ export const App = (): JSX.Element => {
                   presentationShowDetails={presentationShowDetails}
                   onPresentationInteract={() => setPresentationHintOpen(false)}
                   onInspect={() => setInspectorOpen(true)}
+                  showTimelineEvents={showTimelineEvents}
                 />
               </div>
               {inspectorOpen && !presenting ? (
@@ -187,6 +190,18 @@ export const App = (): JSX.Element => {
                     mobile={chronologyMobile}
                     onClose={() => setChronologyOpen(false)}
                     onSelect={(id) => {
+                      const timelineOnly =
+                        useAppStore
+                          .getState()
+                          .nodes.find((node) => node.id === id)?.data
+                          .eventDisplay === "ChronologyOnly";
+                      if (timelineOnly && !showTimelineEvents) {
+                        setShowTimelineEvents(true);
+                        setTimelineAnnouncement(
+                          "Timeline Event revealed and focused in the auxiliary lane.",
+                        );
+                      } else
+                        setTimelineAnnouncement("Event focused on the map.");
                       select(id);
                       setPresentationHintOpen(false);
                       if (chronologyMobile) setChronologyOpen(false);
@@ -202,6 +217,18 @@ export const App = (): JSX.Element => {
                   >
                     Chronology
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={showTimelineEvents}
+                    onClick={() => setShowTimelineEvents((visible) => !visible)}
+                  >
+                    {showTimelineEvents
+                      ? "Hide Timeline Events"
+                      : "Show Timeline Events"}
+                  </button>
+                  <span className="sr-only" aria-live="polite">
+                    {timelineAnnouncement}
+                  </span>
                   <button
                     type="button"
                     aria-pressed={presentationShowDetails}

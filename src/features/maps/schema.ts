@@ -433,7 +433,7 @@ export type MapMetadataV3 = NonNullable<MapDataV3["metadata"]>;
 export type MapMetadataV2 = NonNullable<MapDataV2["metadata"]>;
 
 // V3 above is frozen as an import-only contract. All newly persisted maps use V4.
-export const eventDisplaySchema = z.enum(["Map", "Timeline"]);
+export const eventDisplaySchema = z.enum(["Map", "ChronologyOnly"]);
 export const assertionStateSchema = z.enum([
   "Unverified",
   "Supported",

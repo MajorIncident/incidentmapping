@@ -155,6 +155,9 @@ type AppState = {
     ) => void;
     setNodeActionDueDate: (id: string, dueDate?: string) => void;
     setEventPhase: (id: string, value?: ChainNode["eventPhase"]) => void;
+    setEventDisplay: (id: string, value: ChainNode["eventDisplay"]) => void;
+    setEventTimestamp: (id: string, value?: string) => void;
+    setEventEndTimestamp: (id: string, value?: string) => void;
     setActionType: (id: string, value?: ChainNode["actionType"]) => void;
     setControlRole: (id: string, value?: RuntimeBarrier["controlRole"]) => void;
     addContext: (
@@ -766,6 +769,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         factorCategory: undefined,
         factorSignificance: value === "Factor" ? "Normal" : undefined,
         eventPhase: value === "Event" ? node.data.eventPhase : undefined,
+        eventDisplay:
+          value === "Event" ? (node.data.eventDisplay ?? "Map") : undefined,
+        endTimestamp: value === "Event" ? node.data.endTimestamp : undefined,
         actionType: undefined,
         actionStatus: undefined,
         actionDueDate: undefined,
@@ -801,6 +807,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       const node = get().nodes.find((item) => item.id === id);
       if (node?.data.nodeType !== "Event") return;
       get().actions.updateNodeData(id, { eventPhase: value });
+    },
+    setEventDisplay: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (node?.data.nodeType !== "Event") return;
+      get().actions.updateNodeData(id, { eventDisplay: value });
+    },
+    setEventTimestamp: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (node?.data.nodeType !== "Event") return;
+      get().actions.updateNodeData(id, { timestamp: value });
+    },
+    setEventEndTimestamp: (id, value) => {
+      const node = get().nodes.find((item) => item.id === id);
+      if (node?.data.nodeType !== "Event") return;
+      get().actions.updateNodeData(id, { endTimestamp: value });
     },
     setActionType: (id, value) => {
       const node = get().nodes.find((item) => item.id === id);

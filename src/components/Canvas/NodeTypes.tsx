@@ -2,7 +2,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
-import { resolveEvidence, selectPinnedContext } from "../../state/selectors";
+import {
+  formatEventDateTime,
+  formatEventDuration,
+  resolveEvidence,
+  selectPinnedContext,
+  timestampNeedsSeconds,
+} from "../../state/selectors";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 
@@ -76,16 +82,6 @@ const barrierClasses =
   "relative min-w-[160px] max-w-[220px] rounded-[24px] border-2 px-4 py-3 text-left shadow-node transition";
 
 const titleClasses = "text-sm font-semibold text-slate-800";
-
-const formatLocalDateTime = (value?: string): string | undefined => {
-  if (!value?.trim()) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-};
 
 const formatLocalDate = (value?: string): string | undefined => {
   if (!value?.trim()) return undefined;
@@ -263,7 +259,14 @@ const ChainNodeComponent = ({
     hasNegativePoints ||
     evidenceItems.length > 0 ||
     contextItems.length > 0;
-  const timestamp = formatLocalDateTime(data.timestamp);
+  const showSeconds =
+    timestampNeedsSeconds(data.timestamp) ||
+    timestampNeedsSeconds(data.endTimestamp);
+  const timestamp =
+    formatEventDateTime(data.timestamp, showSeconds) ?? undefined;
+  const endTimestamp =
+    formatEventDateTime(data.endTimestamp, showSeconds) ?? undefined;
+  const eventDuration = formatEventDuration(data.timestamp, data.endTimestamp);
   const dueDate = formatLocalDate(data.actionDueDate);
   const significance = data.factorSignificance ?? "Normal";
 
@@ -397,7 +400,18 @@ const ChainNodeComponent = ({
           {data.nodeType === "Event" && timestamp ? (
             <div className="node-metadata-row">
               <span>Occurred</span>
-              <time dateTime={data.timestamp}>{timestamp}</time>
+              <span>
+                <time dateTime={data.timestamp}>{timestamp}</time>
+                {endTimestamp ? (
+                  <>
+                    {" "}
+                    – <time dateTime={data.endTimestamp}>{endTimestamp}</time>
+                  </>
+                ) : null}
+                {eventDuration ? (
+                  <small className="block">{eventDuration}</small>
+                ) : null}
+              </span>
             </div>
           ) : null}
           {data.nodeType === "Factor" ? (

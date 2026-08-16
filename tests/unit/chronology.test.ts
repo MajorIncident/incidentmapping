@@ -55,3 +55,16 @@ describe("selectChronologyGroups", () => {
     ]);
   });
 });
+
+describe("Event time formatting", () => {
+  it("formats ordered durations without unnecessary seconds", async () => {
+    const { formatEventDuration, timestampNeedsSeconds } = await import(
+      "../../src/state/selectors"
+    );
+    expect(
+      formatEventDuration("2026-08-16T08:00:00Z", "2026-08-16T09:30:00Z"),
+    ).toBe("1h 30m");
+    expect(timestampNeedsSeconds("2026-08-16T08:00:00Z")).toBe(false);
+    expect(timestampNeedsSeconds("2026-08-16T08:00:01Z")).toBe(true);
+  });
+});

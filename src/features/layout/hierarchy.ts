@@ -95,11 +95,16 @@ export const layoutHierarchy = <Data>(
   });
   const chronologyNodes = nonActionNodes
     .filter((node) => {
-      const data = node.data as { nodeType?: string; timestamp?: string };
+      const data = node.data as {
+        nodeType?: string;
+        timestamp?: string;
+        eventDisplay?: string;
+      };
       return (
         data.nodeType === "Event" &&
-        Number.isFinite(Date.parse(data.timestamp ?? "")) &&
-        !causallyConnectedIds.has(node.id)
+        (data.eventDisplay === "ChronologyOnly" ||
+          (Number.isFinite(Date.parse(data.timestamp ?? "")) &&
+            !causallyConnectedIds.has(node.id)))
       );
     })
     .sort((a, b) => {
