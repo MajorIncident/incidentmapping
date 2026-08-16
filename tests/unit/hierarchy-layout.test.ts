@@ -23,6 +23,17 @@ const actionNode = (id: string, x = 0, y = 0): Node => ({
   ...node(id, x, y),
   data: { nodeType: "Action" },
 });
+const eventNode = (
+  id: string,
+  timestamp: string,
+  x = 0,
+  y = 0,
+  height?: number,
+): Node => ({
+  ...node(id, x, y),
+  height,
+  data: { nodeType: "Event", timestamp },
+});
 const positions = (nodes: Node[]) =>
   Object.fromEntries(nodes.map((item) => [item.id, item.position]));
 type Rectangle = { x: number; y: number; width: number; height: number };
@@ -87,6 +98,55 @@ describe("layoutHierarchy", () => {
     expect(
       result.find((item) => item.id === "orphan")!.position.x,
     ).toBeGreaterThan(result.find((item) => item.id === "a")!.position.x);
+  });
+
+  it("places isolated timestamped Events in a stable chronological lane", () => {
+    const input = [
+      node("root", 16, 24),
+      node("cause", 16, 300),
+      eventNode("later", "2025-04-03T12:00:00Z", 900, 500, 184),
+      eventNode("earlier-b", "2025-04-01T08:00:00Z", 400, 200, 152),
+      eventNode("earlier-a", "2025-04-01T08:00:00Z", 700, 350, 168),
+    ];
+    const edges = [edge("root", "cause")];
+    const once = layoutHierarchy(input, edges, false);
+    const byId = new Map(once.map((item) => [item.id, item]));
+    const chronological = ["earlier-a", "earlier-b", "later"].map(
+      (id) => byId.get(id)!,
+    );
+
+    expect(chronological.map((item) => item.position)).toEqual([
+      { x: 352, y: 24 },
+      { x: 352, y: 256 },
+      { x: 352, y: 472 },
+    ]);
+    expect(new Set(chronological.map((item) => item.position.x)).size).toBe(1);
+    expect(
+      chronological.every(
+        (item) =>
+          item.position.x > byId.get("root")!.position.x + CHAIN_NODE_WIDTH,
+      ),
+    ).toBe(true);
+
+    const forest = [byId.get("root")!, byId.get("cause")!];
+    chronological.forEach((event) => {
+      forest.forEach((cause) =>
+        expect(
+          intersects(
+            {
+              ...event.position,
+              width: CHAIN_NODE_WIDTH,
+              height: event.height!,
+            },
+            nodeRectangle(cause),
+          ),
+        ).toBe(false),
+      );
+    });
+    expect(positions(layoutHierarchy(once, edges, false))).toEqual(
+      positions(once),
+    );
+    expect(edges).toEqual([edge("root", "cause")]);
   });
 
   it("terminates and positions every node in a cycle", () => {
