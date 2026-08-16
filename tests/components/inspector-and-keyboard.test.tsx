@@ -321,9 +321,9 @@ describe("Inspector and keyboard workflows", () => {
     expect(inputs).toHaveLength(2);
     expect(inputs[1]).toHaveFocus();
     expect(useAppStore.getState().nodes[0].data.evidenceItems).toEqual([
-      { id: "E-001", text: "Witness account" },
+      { id: "EV-001", text: "Witness account" },
     ]);
-    expect(screen.getByText("EV-01")).toBeVisible();
+    expect(screen.getByText("EV-001")).toBeVisible();
 
     await user.clear(inputs[0]);
     await user.tab();
@@ -389,7 +389,7 @@ describe("Inspector and keyboard workflows", () => {
     await userEvent.selectOptions(screen.getByLabelText("Status"), "Degraded");
     await userEvent.selectOptions(
       screen.getByLabelText("Why Did It Fail?"),
-      "Inadequate",
+      "InadequateDesign",
     );
     await userEvent.type(
       screen.getByLabelText("Failure Details"),
@@ -399,7 +399,7 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.queryByLabelText("Failure Details")).not.toBeInTheDocument();
     expect(useAppStore.getState().barriers[0]).toMatchObject({
       status: "Effective",
-      failureReason: "Inadequate",
+      failureReason: "InadequateDesign",
       failureDetails: "Coverage gap",
     });
   });

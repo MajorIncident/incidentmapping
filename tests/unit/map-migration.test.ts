@@ -44,8 +44,8 @@ const legacy: MapDataV1 = {
     {
       id: "effective",
       kind: "Barrier",
-      upstreamNodeId: "later",
-      downstreamNodeId: "earlier",
+      upstreamNodeId: "earlier",
+      downstreamNodeId: "later",
       breached: false,
       breachedItems: [],
     },
@@ -62,6 +62,7 @@ describe("parseAndMigrateMapData", () => {
     expect(migrated.metadata).toEqual({
       ...legacy.metadata,
       nodeReferenceHighWaterMark: legacy.nodes.length,
+      evidenceReferenceHighWaterMark: 0,
     });
     expect(migrated.nodes.map(({ referenceId }) => referenceId)).toEqual([
       "N-001",
@@ -86,8 +87,8 @@ describe("parseAndMigrateMapData", () => {
       {
         id: "effective",
         kind: "Barrier",
-        upstreamNodeId: "later",
-        downstreamNodeId: "earlier",
+        upstreamNodeId: "earlier",
+        downstreamNodeId: "later",
         status: "Effective",
       },
     ]);
@@ -146,22 +147,14 @@ describe("parseAndMigrateMapData", () => {
           .filter((node) => node.nodeType === "Factor")
           .map((node) => node.factorCategory),
       ),
-    ).toEqual(
-      new Set([
-        "Human",
-        "Equipment",
-        "Environment",
-        "Procedure",
-        "Organization",
-      ]),
-    );
+    ).toEqual(new Set(["Human", "Process"]));
     expect(
       new Set(
         parsed.nodes
           .filter((node) => node.nodeType === "Factor")
           .map((node) => node.factorSignificance),
       ),
-    ).toEqual(new Set(["Normal", "KeyFactor", "RootCause"]));
+    ).toEqual(new Set(["KeyFactor", "RootCause"]));
     expect(parsed.nodes.filter((node) => node.nodeType === "Factor")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -169,18 +162,58 @@ describe("parseAndMigrateMapData", () => {
           factorSignificance: "KeyFactor",
         }),
         expect.objectContaining({
-          factorCategory: "Procedure",
+          factorCategory: "Process",
           factorSignificance: "RootCause",
           evidenceItems: expect.arrayContaining([
-            expect.objectContaining({ id: "E-2" }),
+            expect.objectContaining({ id: "EV-004" }),
           ]),
         }),
       ]),
     );
     expect(parsed.barriers[0]).toMatchObject({
       status: "Failed",
-      failureReason: "Inadequate",
+      failureReason: "InadequateDesign",
     });
+  });
+
+  it("globally renumbers legacy V2 evidence and gives Action-node accountability precedence", () => {
+    const input = fixture("baggage-incident-v2.json") as {
+      nodes: Array<{
+        evidenceItems: Array<{ id: string; text: string }>;
+        evidenceHighWaterMark?: number;
+      }>;
+      edges: Array<{
+        kind: string;
+        status?: string;
+        dueDate?: string;
+      }>;
+    };
+    input.nodes[0].evidenceItems[0].id = "local-1";
+    input.nodes[1].evidenceItems[0].id = "local-1";
+    input.nodes[0].evidenceHighWaterMark = 99;
+    const actionEdge = input.edges.find((edge) => edge.kind === "ActionEdge");
+    expect(actionEdge).toBeDefined();
+    if (!actionEdge) return;
+    actionEdge.status = "Completed";
+    actionEdge.dueDate = "2099-01-01";
+    const parsed = parseAndMigrateMapData(input);
+    expect(
+      parsed.nodes.flatMap((node) => node.evidenceItems.map((item) => item.id)),
+    ).toEqual(["EV-001", "EV-002", "EV-003", "EV-004"]);
+    expect(parsed.metadata?.evidenceReferenceHighWaterMark).toBe(4);
+    expect(parsed.nodes.find((node) => node.id === "action")).toMatchObject({
+      actionStatus: "Planned",
+      actionDueDate: "2026-07-01",
+    });
+    expect(parsed.edges.find((edge) => edge.kind === "ActionEdge")).toEqual({
+      id: "action-root",
+      kind: "ActionEdge",
+      fromId: "factor-root",
+      toId: "action",
+    });
+    expect(JSON.stringify(parsed)).not.toMatch(
+      /evidenceHighWaterMark|"dueDate"|"status":"Completed"/,
+    );
   });
 
   it("round trips V2 through the store without retired barrier fields", () => {

@@ -168,10 +168,10 @@ describe("useAppStore actions", () => {
     const nodeId = actions.addChild() as string;
     const first = actions.addEvidence(nodeId, "Witness statement") as string;
     const second = actions.addEvidence(nodeId, "Camera footage") as string;
-    expect([first, second]).toEqual(["E-001", "E-002"]);
+    expect([first, second]).toEqual(["EV-001", "EV-002"]);
 
     actions.removeEvidence(nodeId, first);
-    expect(actions.addEvidence(nodeId, "Operator log")).toBe("E-003");
+    expect(actions.addEvidence(nodeId, "Operator log")).toBe("EV-003");
     actions.updateEvidence(nodeId, second, "Reviewed footage");
     const changed = useAppStore.getState().nodes[0].data.evidenceItems!;
     actions.undo();

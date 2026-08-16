@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { Edge, Node, XYPosition } from "reactflow";
 import type {
-  ActionEdge,
   Barrier,
   ChainNode,
   MapData,
@@ -31,12 +30,12 @@ export type ChainNodeData = {
   positiveConsequenceBulletPoints: string[];
   negativeConsequenceBulletPoints: string[];
   evidenceItems?: ChainNode["evidenceItems"];
-  evidenceHighWaterMark?: ChainNode["evidenceHighWaterMark"];
   severity?: ChainNode["severity"];
   incidentStatus?: ChainNode["incidentStatus"];
   factorCategory?: ChainNode["factorCategory"];
   factorSignificance?: ChainNode["factorSignificance"];
   actionStatus?: ChainNode["actionStatus"];
+  actionDueDate?: ChainNode["actionDueDate"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
   graphRole?: {
     isRoot: boolean;
@@ -126,7 +125,10 @@ type AppState = {
       text: string,
     ) => boolean;
     removeEvidence: (nodeId: string, evidenceId: string) => void;
-    setActionStatus: (edgeId: string, status?: ActionEdge["status"]) => void;
+    setActionStatus: (
+      edgeId: string,
+      status?: ChainNode["actionStatus"],
+    ) => void;
     setActionDueDate: (edgeId: string, dueDate?: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
@@ -205,12 +207,12 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
     evidenceItems: node.evidenceItems.map((item) => ({ ...item })),
-    evidenceHighWaterMark: node.evidenceHighWaterMark,
     severity: node.severity,
     incidentStatus: node.incidentStatus,
     factorCategory: node.factorCategory,
     factorSignificance: node.factorSignificance,
     actionStatus: node.actionStatus,
+    actionDueDate: node.actionDueDate,
   },
 });
 
@@ -225,14 +227,7 @@ const mapEdgesToReactEdges = (map: MapData): Edge[] =>
     type: "step",
     sourceHandle: edge.kind === "ActionEdge" ? "right" : "bottom",
     targetHandle: edge.kind === "ActionEdge" ? "left" : "top",
-    data: {
-      kind: edge.kind,
-      ...(edge.kind === "ActionEdge" && edge.status
-        ? { status: edge.status, dueDate: edge.dueDate }
-        : edge.kind === "ActionEdge" && edge.dueDate
-          ? { dueDate: edge.dueDate }
-          : {}),
-    },
+    data: { kind: edge.kind },
   }));
 
 const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
@@ -248,12 +243,12 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
-    evidenceHighWaterMark: node.data.evidenceHighWaterMark,
     severity: node.data.severity,
     incidentStatus: node.data.incidentStatus,
     factorCategory: node.data.factorCategory,
     factorSignificance: node.data.factorSignificance,
     actionStatus: node.data.actionStatus,
+    actionDueDate: node.data.actionDueDate,
     position: snapPosition(node.position),
   }));
 
@@ -416,7 +411,6 @@ export const createRootNode = (): ChainNode => ({
   positiveConsequenceBulletPoints: [],
   negativeConsequenceBulletPoints: [],
   evidenceItems: [],
-  evidenceHighWaterMark: 0,
   factorSignificance: "Normal",
   position: snapPosition({ x: 0, y: 0 }),
 });
@@ -424,7 +418,11 @@ export const createRootNode = (): ChainNode => ({
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
   schemaVersion: 2,
-  metadata: { title: "Untitled Map", nodeReferenceHighWaterMark: 1 },
+  metadata: {
+    title: "Untitled Map",
+    nodeReferenceHighWaterMark: 1,
+    evidenceReferenceHighWaterMark: 0,
+  },
   nodes: [createRootNode()],
   edges: [],
   barriers: [],
@@ -511,8 +509,6 @@ export const useAppStore = create<AppState>((set, get) => ({
                   kind: "ActionEdge",
                   fromId: edge.source,
                   toId: edge.target,
-                  status: edge.data.status,
-                  dueDate: edge.data.dueDate,
                 }
               : {
                   id: edge.id,
@@ -621,14 +617,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       const node = get().nodes.find((item) => item.id === nodeId);
       if (!node) return null;
       const current = node.data.evidenceItems ?? [];
-      const highWater = Math.max(
-        node.data.evidenceHighWaterMark ?? 0,
-        ...current.map((item) => Number(item.id.match(/E-(\d+)/)?.[1] ?? 0)),
-      );
-      const id = `E-${String(highWater + 1).padStart(3, "0")}`;
-      get().actions.updateNodeData(nodeId, {
-        evidenceItems: [...current, { id, text }],
-        evidenceHighWaterMark: highWater + 1,
+      const highWater = get().metadata?.evidenceReferenceHighWaterMark ?? 0;
+      const id = `EV-${String(highWater + 1).padStart(3, "0")}`;
+      const prevSnapshot = snapshotFromState(get());
+      set((state) => {
+        const nodes = state.nodes.map((candidate) =>
+          candidate.id === nodeId
+            ? {
+                ...candidate,
+                data: {
+                  ...candidate.data,
+                  evidenceItems: [...current, { id, text }],
+                },
+              }
+            : candidate,
+        );
+        const metadata = {
+          ...(state.metadata ?? {}),
+          evidenceReferenceHighWaterMark: highWater + 1,
+        };
+        const history = updateHistoryState(state, prevSnapshot, true);
+        return { nodes, metadata, history, canUndo: true, canRedo: false };
       });
       return id;
     },
@@ -669,42 +678,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     },
     setActionStatus: (edgeId, status) => {
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        let changed = false;
-        const edges = state.edges.map((edge) => {
-          if (
-            edge.id !== edgeId ||
-            edge.data?.kind !== "ActionEdge" ||
-            edge.data.status === status
-          )
-            return edge;
-          changed = true;
-          return { ...edge, data: { ...edge.data, status } };
-        });
-        if (!changed) return {};
-        const history = updateHistoryState(state, prevSnapshot, true);
-        return { edges, history, canUndo: true, canRedo: false };
-      });
+      const target = get().edges.find(
+        (edge) => edge.id === edgeId && edge.data?.kind === "ActionEdge",
+      )?.target;
+      if (target)
+        get().actions.updateNodeData(target, { actionStatus: status });
     },
     setActionDueDate: (edgeId, dueDate) => {
       const value = dueDate?.trim() || undefined;
       const prevSnapshot = snapshotFromState(get());
       set((state) => {
         let changed = false;
-        const edges = state.edges.map((edge) => {
-          if (
-            edge.id !== edgeId ||
-            edge.data?.kind !== "ActionEdge" ||
-            edge.data.dueDate === value
-          )
-            return edge;
+        const target = state.edges.find(
+          (edge) => edge.id === edgeId && edge.data?.kind === "ActionEdge",
+        )?.target;
+        const nodes = state.nodes.map((node) => {
+          if (node.id !== target || node.data.actionDueDate === value)
+            return node;
           changed = true;
-          return { ...edge, data: { ...edge.data, dueDate: value } };
+          return { ...node, data: { ...node.data, actionDueDate: value } };
         });
         if (!changed) return {};
         const history = updateHistoryState(state, prevSnapshot, true);
-        return { edges, history, canUndo: true, canRedo: false };
+        return { nodes, history, canUndo: true, canRedo: false };
       });
     },
     addChild: (parentId) => {
@@ -729,7 +725,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
-            evidenceHighWaterMark: 0,
           },
         };
         const outgoingChildCount = parentNode
@@ -861,7 +856,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
-            evidenceHighWaterMark: 0,
           },
         };
         const edge: Edge = {
@@ -871,7 +865,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           type: "step",
           sourceHandle: "right",
           targetHandle: "left",
-          data: { kind: "ActionEdge", status: "Proposed" },
+          data: { kind: "ActionEdge" },
         };
         const nodes = [...state.nodes, action];
         const edges = [...state.edges, edge];
@@ -942,7 +936,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
             evidenceItems: [],
-            evidenceHighWaterMark: 0,
           },
         };
         const nextNodes = [...state.nodes, newNode];
