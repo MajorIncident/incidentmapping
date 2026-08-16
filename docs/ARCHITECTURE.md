@@ -20,7 +20,7 @@ before writing it.
 ## Persisted, derived, and ephemeral state
 
 Persisted state consists of metadata, chain nodes and their domain fields and
-positions, discriminated relationship edges, barriers, and global allocation high-water marks. Evidence numbering is map-wide rather than node-local; Action status and due date belong to Action nodes rather than relationship edges. `toMap()` derives this state from the runtime graph and strips
+positions, discriminated relationship edges, Controls, and global allocation high-water marks. Evidence numbering is map-wide rather than node-local; Action status and due date belong to Action nodes rather than relationship edges. `toMap()` derives this state from the runtime graph and strips
 React Flow rendering data.
 
 Ephemeral UI state is never serialized: selection and inline editing IDs,
@@ -37,8 +37,8 @@ changes therefore do not dirty a map.
 
 All graph semantics first filter relationships by discriminator. Only
 `CauseEffectEdge` participates in roots, causal depth, sibling groups, selected
-upstream paths, and barrier eligibility/placement. `ActionEdge` does **not**
-affect roots, depths, sibling positions, selected causal paths, or barriers.
+upstream paths, and Control eligibility/placement. `ActionEdge` does **not**
+affect roots, depths, sibling positions, selected causal paths, or Controls.
 
 Layout is explicitly two phase:
 
@@ -54,12 +54,12 @@ browser screenshots.
 
 ## History
 
-History snapshots contain nodes, relationships, metadata, barriers, and
+History snapshots contain nodes, relationships, metadata, Controls, and
 selection. A domain mutation pushes the prior snapshot and clears the redo
 stack. Undo/redo restores snapshots by value and recomputes its availability.
 Repeated keyboard movement within 200 ms is one history operation, while text
-and barrier edits use their own short debounce to avoid an entry per keystroke.
-Organizing, metadata edits, classifications, evidence, barrier controls, and
+and Control edits use their own short debounce to avoid an entry per keystroke.
+Organizing, metadata edits, classifications, evidence, Controls, and
 graph edits participate in history. Focus requests, viewport requests, detail
 visibility, saved status, and presentation state do not.
 
@@ -73,11 +73,11 @@ visibility, saved status, and presentation state do not.
   summarized on expanded canvas cards with stable evidence labels.
 - The compact Incident Header keeps title, ID, occurrence, location, severity,
   and status discoverable without consuming canvas space.
-- Barrier cards and Inspector controls expose status, description, and—when
+- Control cards and Inspector fields expose status, description, and—when
   relevant—failure reason and details.
 - Presentation mode is a read-only projection of the same current store state.
   It hides editing chrome and handles, retains the header, legend, semantic tags,
-  evidence summaries, and barriers, and exits without changing persisted data or
+  evidence summaries, and Controls, and exits without changing persisted data or
   history. It is presentation assistance, not a compliance report.
 
 ## Quality boundaries

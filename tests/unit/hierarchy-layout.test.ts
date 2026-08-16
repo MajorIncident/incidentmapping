@@ -73,7 +73,7 @@ describe("layoutHierarchy", () => {
     );
   });
 
-  it("reserves additional vertical space for details and barriers", () => {
+  it("reserves additional vertical space for details and Controls", () => {
     const nodes = [node("a"), node("b")];
     const edges = [edge("a", "b")];
     const compact = layoutHierarchy(nodes, edges, false);

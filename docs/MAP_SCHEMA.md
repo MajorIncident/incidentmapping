@@ -67,7 +67,7 @@ Barrier {
 
 The relationship `kind` is the discriminator. `CauseEffectEdge` expresses the
 causal hierarchy. `ActionEdge` associates an Action with the node it addresses;
-it is not a causal relationship. Barriers refer to an upstream/downstream causal
+it is not a causal relationship. Controls refer to an upstream/downstream causal
 pair rather than to an edge ID.
 
 ## Reference allocation
@@ -82,19 +82,19 @@ deleted references are not reused. Evidence IDs are globally allocated across th
 Version 2 is validated directly; Version 1 is validated against its legacy
 shape, transformed, then validated as Version 2. Unsupported versions fail.
 
-| Version 1 input             | Version 2 output                                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `schemaVersion: 1`          | `schemaVersion: 2`                                                                                            |
-| node in array position _n_  | preserves all legacy content; adds `referenceId: N-{n+1}`, `nodeType: Event`, and empty evidence              |
-| optional consequence arrays | materialized as arrays by legacy validation                                                                   |
-| `metadata.title`            | preserved; node reference high-water mark becomes the node count; global evidence high-water mark becomes `0` |
-| `CauseEffectEdge`           | preserved unchanged                                                                                           |
-| barrier `breached: false`   | `status: Effective`                                                                                           |
-| barrier `breached: true`    | `status: Failed`                                                                                              |
-| non-empty `breachedItems`   | newline-joined into `failureDetails`                                                                          |
+| Version 1 input                  | Version 2 output                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion: 1`               | `schemaVersion: 2`                                                                                            |
+| node in array position _n_       | preserves all legacy content; adds `referenceId: N-{n+1}`, `nodeType: Event`, and empty evidence              |
+| optional consequence arrays      | materialized as arrays by legacy validation                                                                   |
+| `metadata.title`                 | preserved; node reference high-water mark becomes the node count; global evidence high-water mark becomes `0` |
+| `CauseEffectEdge`                | preserved unchanged                                                                                           |
+| legacy Control `breached: false` | `status: Effective`                                                                                           |
+| legacy Control `breached: true`  | `status: Failed`                                                                                              |
+| non-empty `breachedItems`        | newline-joined into `failureDetails`                                                                          |
 
 Descriptions, owners, timestamps, consequences, IDs, coordinates, edge
-endpoints, barrier descriptions, and title are retained. Migration is
+endpoints, Control descriptions, and title are retained. Migration is
 deterministic and does not mutate the input. The retired `breached` and
 `breachedItems` fields are accepted **only** by the Version 1 migration schema;
 they are invalid in a Version 2 document and never emitted by save.

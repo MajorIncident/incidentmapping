@@ -542,7 +542,7 @@ const BarrierNodeComponent = ({
             ? "ring-2 ring-slate-300"
             : "ring-0"
       } ${data.graphRole?.isUnrelated ? "opacity-60 saturate-[.7]" : "opacity-100"} ${treatments[data.status]}`}
-      data-testid="barrier-node"
+      data-testid="control-node"
       data-read-only={data.readOnly || undefined}
     >
       <>

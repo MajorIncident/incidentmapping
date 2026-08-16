@@ -1,135 +1,195 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import type { MapData } from "../../src/features/maps/schema";
 
-const fixture = path.resolve("tests/fixtures/baggage-incident-v2.json");
-const savedInvestigation = path.join(
+const firstSave = path.join(os.tmpdir(), "visual-investigation-first.json");
+const reloadedSave = path.join(
   os.tmpdir(),
-  "baggage-visual-investigation.json",
+  "visual-investigation-reloaded.json",
 );
 
-const openMap = async (page: import("@playwright/test").Page, file: string) => {
+const openMap = async (page: Page, file: string) => {
   const chooserPromise = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "File menu" }).click();
   await page.getByRole("menuitem", { name: /Open/ }).click();
-  const chooser = await chooserPromise;
-  await chooser.setFiles(file);
+  await (await chooserPromise).setFiles(file);
 };
 
-const expectInvestigationOnCanvas = async (
-  page: import("@playwright/test").Page,
-) => {
-  const canvas = page.getByLabel(
-    "Delayed baggage delivery at North Terminal incident map",
-  );
-  await expect(canvas).toBeVisible();
-  await expect(
-    canvas.getByText("Passengers separated from baggage"),
-  ).toBeVisible();
-  await expect(
-    canvas.getByText("Arrival belt stopped during unloading"),
-  ).toBeVisible();
-  await expect(canvas.getByText("Fault alarm was not escalated")).toBeVisible();
-  await expect(
-    canvas.getByText("Inspection omitted photo-eye test"),
-  ).toBeVisible();
-  await expect(
-    canvas.getByText("Add functional photo-eye check"),
-  ).toBeVisible();
-  await expect(canvas.getByText("Impact", { exact: true })).toBeVisible();
-  await expect(canvas.getByText("Event", { exact: true })).toBeVisible();
-  await expect(canvas.getByText("Root Cause", { exact: true })).toBeVisible();
-  await expect(
-    canvas.getByText("Process / Procedure", { exact: true }),
-  ).toBeVisible();
-  await expect(canvas.getByText("Planned", { exact: true })).toBeVisible();
-  await expect(
-    canvas.getByText("Maintenance lead", { exact: true }),
-  ).toBeVisible();
-  await expect(canvas.getByText(/Due Jul 1, 2026/)).toBeVisible();
-  await expect(canvas.getByText("Pre-opening belt inspection")).toBeVisible();
-  await expect(canvas.getByText("Failed", { exact: true })).toBeVisible();
-  await expect(
-    canvas.getByText("Failure reason: Inadequate Design"),
-  ).toBeVisible();
-  await expect(canvas.getByText("Evidence").first()).toBeVisible();
-};
-
-test("complete baggage investigation remains understandable after save and reopen", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await openMap(page, fixture);
-
-  await expect(page.getByLabel("Incident metadata summary")).toContainText(
-    "BAG-2026-0142",
-  );
-  await expect(page.getByLabel("Incident metadata summary")).toContainText(
-    "North Terminal — Belt 4",
-  );
-  await expectInvestigationOnCanvas(page);
-
-  await page.getByRole("button", { name: "More menu" }).click();
-  await page.getByRole("menuitem", { name: "Hide details" }).click();
-  await expect(
-    page.getByText("Approved checklist revision 7 has no photo-eye step"),
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: "Present map" }).click();
-  await expect(page.getByText("Review the investigation")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Exit Presentation/ }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add Below" })).toHaveCount(0);
-  await expect(page.locator(".react-flow__controls")).toHaveCount(0);
-  const edgePath = page.locator(".react-flow__edge-path").first();
-  await expect(edgePath).toBeVisible();
-  await expect(edgePath).toHaveAttribute("d", /\S+/);
-  await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
-  await expectInvestigationOnCanvas(page);
-  await page.getByText("Inspection omitted photo-eye test").click();
-  await expect(page.getByText("Review the investigation")).toHaveCount(0);
-  await expect(
-    page
-      .locator(".react-flow__node")
-      .filter({ hasText: "Inspection omitted photo-eye test" }),
-  ).toHaveClass(/selected/);
-  await page.locator(".react-flow__pane").click({ position: { x: 20, y: 20 } });
-  await expect(page.locator(".react-flow__node.selected")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Add Below" })).toBeVisible();
-  await expect(
-    page.locator(".react-flow__handle:visible").first(),
-  ).toBeVisible();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-
+const saveMap = async (page: Page, file: string) => {
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "File menu" }).click();
   await page.getByRole("menuitem", { name: /Save/ }).click();
-  const download = await downloadPromise;
-  await download.saveAs(savedInvestigation);
+  await (await downloadPromise).saveAs(file);
+  return JSON.parse(await readFile(file, "utf8")) as MapData;
+};
 
-  await page.reload();
-  await openMap(page, savedInvestigation);
+const title = (page: Page) => page.getByRole("textbox", { name: "Node title" });
 
-  // The regression contract is the reviewer's canvas, not merely downloaded JSON.
-  await expectInvestigationOnCanvas(page);
-  await page.getByText("Inspection omitted photo-eye test").click();
-  await expect(page.getByRole("heading", { name: "Evidence" })).toBeVisible();
-  await expect(
-    page.locator(
-      'input[value="Approved checklist revision 7 has no photo-eye step"]',
-    ),
-  ).toBeVisible();
-  await expect(
-    page.locator(
-      'input[value="Technician interview confirms visual-only check"]',
-    ),
-  ).toBeVisible();
+const assertUnique = (values: string[], label: string) => {
+  expect(new Set(values).size, `${label} must be unique`).toBe(values.length);
+};
 
-  await page.getByText("Pre-opening belt inspection").click();
-  await expect(page.getByLabel("Why Did It Fail?")).toHaveValue("Inadequate");
-  await expect(page.getByLabel("Failure Details")).toHaveValue(
-    "Checklist covered visible damage but not functional sensor response.",
+const assertPersistedIntegrity = (document: MapData) => {
+  assertUnique(
+    document.nodes.map((node) => node.id),
+    "node IDs",
   );
+  assertUnique(
+    document.nodes.map((node) => node.referenceId),
+    "node reference IDs",
+  );
+  assertUnique(
+    document.edges.map((edge) => edge.id),
+    "edge IDs",
+  );
+  assertUnique(
+    document.barriers.map((control) => control.id),
+    "Control IDs",
+  );
+  assertUnique(
+    document.nodes.flatMap((node) =>
+      node.evidenceItems.map((evidence) => evidence.id),
+    ),
+    "evidence IDs",
+  );
+  assertUnique(
+    document.edges
+      .filter((edge) => edge.kind === "CauseEffectEdge")
+      .map((edge) => `${edge.fromId}\u0000${edge.toId}`),
+    "causal pairs",
+  );
+  assertUnique(
+    document.edges
+      .filter((edge) => edge.kind === "ActionEdge")
+      .map((edge) => `${edge.fromId}\u0000${edge.toId}`),
+    "Action pairs",
+  );
+  for (const edge of document.edges.filter(
+    (candidate) => candidate.kind === "ActionEdge",
+  )) {
+    expect(edge).not.toHaveProperty("status");
+    expect(edge).not.toHaveProperty("dueDate");
+    expect(edge).not.toHaveProperty("actionStatus");
+    expect(edge).not.toHaveProperty("actionDueDate");
+  }
+};
+
+test("builds a complete visual investigation and preserves it exactly", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // Start with the impact, then work down by asking what happened and why.
+  await title(page).fill("Passengers separated from baggage");
+  await title(page).press("Enter");
+  await page.getByLabel("Type").selectOption("Impact");
+  await page.getByRole("button", { name: "Add Below" }).click();
+  await title(page).fill("Arrival belt stopped during unloading");
+  await title(page).press("Enter");
+  await expect(page.getByText("Event", { exact: true }).last()).toBeVisible();
+
+  // Convert the child to a Factor while its category is deliberately unset,
+  // then complete its investigation classification.
+  await page.getByRole("button", { name: "Add Below" }).click();
+  await title(page).fill("Inspection omitted photo-eye test");
+  await title(page).press("Enter");
+  await page.getByLabel("Type").selectOption("Factor");
+  await expect(page.getByLabel("Category")).toHaveValue("");
+  await page.getByLabel("Category").selectOption("Process");
+  await page.getByLabel("Significance").selectOption("RootCause");
+
+  // Evidence IDs are allocated globally rather than within one node.
+  const evidenceSection = page
+    .getByRole("heading", { name: "Evidence" })
+    .locator("..");
+  await evidenceSection.getByRole("button", { name: "Add" }).click();
+  await page
+    .getByPlaceholder("Add supporting evidence")
+    .fill("Approved checklist revision 7 has no photo-eye step");
+  await page.getByPlaceholder("Add supporting evidence").press("Enter");
+  await page
+    .getByPlaceholder("Add supporting evidence")
+    .last()
+    .fill("Technician interview confirms visual-only check");
+  await page.getByPlaceholder("Add supporting evidence").last().press("Tab");
+
+  // Put the failed Control on the causal connection and record why it failed.
+  await page.getByText("Arrival belt stopped during unloading").click();
+  await page
+    .getByRole("button", {
+      name: "Add Control: Arrival belt stopped during unloading → Inspection omitted photo-eye test",
+    })
+    .click();
+  await page.getByLabel("Control Purpose").fill("Pre-opening belt inspection");
+  await page.getByLabel("Status").selectOption("Failed");
+  await page.getByLabel("Why Did It Fail?").selectOption("InadequateDesign");
+  await page
+    .getByLabel("Failure Details")
+    .fill(
+      "Checklist covered visible damage but not functional sensor response.",
+    );
+
+  // Create the corrective Action from the root cause. Its card belongs to the
+  // right-hand action lane and owns accountability fields itself.
+  await page.getByRole("button", { name: "Select Downstream Node" }).click();
+  await page.getByRole("button", { name: "+ Action" }).click();
+  await title(page).fill("Add functional photo-eye check");
+  await title(page).press("Enter");
+  await page.getByLabel("Owner").fill("Maintenance lead");
+  await page.getByLabel("Due date").fill("2026-07-01");
+  await page.getByLabel("Status").selectOption("Planned");
+
+  const rootCauseCard = page
+    .locator('[data-testid="chain-node"]')
+    .filter({ hasText: "Inspection omitted photo-eye test" });
+  const actionCard = page
+    .locator('[data-testid="chain-node"]')
+    .filter({ hasText: "Add functional photo-eye check" });
+  const [rootBox, actionBox] = await Promise.all([
+    rootCauseCard.boundingBox(),
+    actionCard.boundingBox(),
+  ]);
+  expect(actionBox!.x).toBeGreaterThan(rootBox!.x + rootBox!.width);
+
+  // Presentation supports deliberate selection of each semantic entity.
+  await page.getByRole("button", { name: "Present map" }).click();
+  for (const entity of [
+    rootCauseCard,
+    actionCard,
+    page.getByTestId("control-node"),
+  ]) {
+    await entity.click();
+    await expect(entity).toHaveClass(/selected/);
+  }
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByText("Unsaved", { exact: true })).toBeVisible();
+  const initiallySaved = await saveMap(page, firstSave);
+  assertPersistedIntegrity(initiallySaved);
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  // Reset to a clean canvas before proving the downloaded investigation stands
+  // alone. A new map contains only its blank starting item and no relationships.
+  await page.getByRole("button", { name: "File menu" }).click();
+  await page.getByRole("menuitem", { name: /New/ }).click();
+  await expect(page.locator('[data-testid="chain-node"]')).toHaveCount(1);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+  await expect(page.getByText("Inspection omitted photo-eye test")).toHaveCount(
+    0,
+  );
+
+  await openMap(page, firstSave);
+  await expect(
+    page.getByText("Passengers separated from baggage"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Inspection omitted photo-eye test"),
+  ).toBeVisible();
+  await expect(page.getByText("Add functional photo-eye check")).toBeVisible();
+  await expect(page.getByText("Pre-opening belt inspection")).toBeVisible();
+  const savedAgain = await saveMap(page, reloadedSave);
+  assertPersistedIntegrity(savedAgain);
+  expect(savedAgain).toEqual(initiallySaved);
 });
