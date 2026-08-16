@@ -144,6 +144,9 @@ describe("presentation mode", () => {
     expect(screen.getByLabelText("Incident header")).toBeVisible();
     const legend = screen.getByLabelText("Presentation legend");
     expect(legend).toBeVisible();
+    expect(
+      legend.querySelectorAll("button, a, [role], [tabindex]"),
+    ).toHaveLength(0);
     for (const heading of ["Nodes", "Analysis", "Controls"]) {
       expect(
         screen.getByRole("heading", { name: heading }),
