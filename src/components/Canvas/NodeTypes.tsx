@@ -223,9 +223,12 @@ const ChainNodeComponent = ({
   const evidenceItems = registryEvidence.length
     ? registryEvidence.map((item) => ({
         id: item.id,
-        text: `${item.type === "SystemLog" ? "System Log" : item.type} · ${item.title}`,
+        text: item.title,
+        type: item.type === "SystemLog" ? "System Log" : item.type,
       }))
-    : (data.evidenceItems ?? []).filter((item) => item.text.trim().length > 0);
+    : (data.evidenceItems ?? [])
+        .filter((item) => item.text.trim().length > 0)
+        .map((item) => ({ ...item, type: undefined }));
   const visibleEvidence = evidenceItems.slice(0, 3);
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
@@ -473,6 +476,9 @@ const ChainNodeComponent = ({
                     <span className="shrink-0 font-semibold text-slate-500">
                       {item.id}
                     </span>
+                    {item.type ? (
+                      <span className="shrink-0 text-sky-700">{item.type}</span>
+                    ) : null}
                     <span className="truncate">{item.text}</span>
                   </li>
                 ))}
