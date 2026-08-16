@@ -70,6 +70,49 @@ const nodeRectangle = (item: Node): Rectangle => ({
   width: item.width ?? CHAIN_NODE_WIDTH,
   height: item.height ?? CHAIN_NODE_HEIGHT,
 });
+const hasClearance = (left: Rectangle, right: Rectangle, margin = 32) =>
+  left.x + left.width + margin <= right.x ||
+  right.x + right.width + margin <= left.x ||
+  left.y + left.height + margin <= right.y ||
+  right.y + right.height + margin <= left.y;
+
+const expectUnrelatedClearance = (
+  nodes: Node[],
+  controls: Array<{
+    upstream: string;
+    downstream: string;
+    width?: number;
+    height?: number;
+  }>,
+) => {
+  const byId = new Map(nodes.map((item) => [item.id, item]));
+  const objects = [
+    ...nodes.map((item) => ({
+      id: item.id,
+      owners: new Set([item.id]),
+      rectangle: nodeRectangle(item),
+    })),
+    ...controls.map((control, index) => ({
+      id: `control-${index}`,
+      owners: new Set([control.upstream, control.downstream]),
+      rectangle: controlRectangle(
+        byId.get(control.upstream)!,
+        byId.get(control.downstream)!,
+        control.width,
+        control.height,
+      ),
+    })),
+  ];
+  objects.forEach((left, index) =>
+    objects.slice(index + 1).forEach((right) => {
+      if ([...left.owners].some((owner) => right.owners.has(owner))) return;
+      expect(
+        hasClearance(left.rectangle, right.rectangle),
+        `${left.id} is too close to ${right.id}`,
+      ).toBe(true);
+    }),
+  );
+};
 
 describe("layoutHierarchy", () => {
   it("places a single tree by graph depth", () => {
@@ -417,5 +460,93 @@ describe("measured content layout", () => {
     );
     expect(intersects(control, nodeRectangle(byId.get("impact")!))).toBe(false);
     expect(intersects(control, nodeRectangle(byId.get("event")!))).toBe(false);
+  });
+});
+
+describe("visual subtree bounds", () => {
+  it("separates a controlled sibling from an uncontrolled sibling", () => {
+    const controls = [{ upstream: "root", downstream: "controlled" }];
+    const result = layoutHierarchy(
+      [node("root"), node("controlled"), node("plain")],
+      [edge("root", "controlled"), edge("root", "plain")],
+      {
+        showDetails: false,
+        barrierEdges: controls.map(({ upstream, downstream }) => ({
+          upstreamNodeId: upstream,
+          downstreamNodeId: downstream,
+        })),
+      },
+    );
+    expectUnrelatedClearance(result, controls);
+  });
+
+  it("keeps Controls at consecutive levels clear of the neighboring branch", () => {
+    const controls = [
+      { upstream: "root", downstream: "middle" },
+      { upstream: "middle", downstream: "leaf" },
+    ];
+    const result = layoutHierarchy(
+      [node("root"), node("middle"), node("leaf"), node("sibling")],
+      [edge("root", "middle"), edge("middle", "leaf"), edge("root", "sibling")],
+      {
+        showDetails: false,
+        barrierEdges: controls.map(({ upstream, downstream }) => ({
+          upstreamNodeId: upstream,
+          downstreamNodeId: downstream,
+        })),
+      },
+    );
+    expectUnrelatedClearance(result, controls);
+  });
+
+  it("reserves a controlled branch beside a measured Action column", () => {
+    const controls = [{ upstream: "root", downstream: "controlled" }];
+    const action = { ...actionNode("action"), width: 336, height: 264 };
+    const result = layoutHierarchy(
+      [node("root"), node("with-action"), action, node("controlled")],
+      [
+        edge("root", "with-action"),
+        { ...edge("with-action", "action"), data: { kind: "ActionEdge" } },
+        edge("root", "controlled"),
+      ],
+      {
+        showDetails: false,
+        barrierEdges: controls.map(({ upstream, downstream }) => ({
+          upstreamNodeId: upstream,
+          downstreamNodeId: downstream,
+        })),
+      },
+    );
+    expectUnrelatedClearance(result, controls);
+  });
+
+  it("separates long detailed cards and Controls across multiple roots", () => {
+    const controls = [
+      { upstream: "root-a", downstream: "child-a", width: 280, height: 232 },
+      { upstream: "root-b", downstream: "child-b", width: 248, height: 216 },
+    ];
+    const cards = [
+      { ...node("root-a"), width: 344, height: 352 },
+      { ...node("child-a"), width: 320, height: 384 },
+      { ...node("root-b"), width: 360, height: 336 },
+      { ...node("child-b"), width: 328, height: 400 },
+    ];
+    const result = layoutHierarchy(
+      cards,
+      [edge("root-a", "child-a"), edge("root-b", "child-b")],
+      {
+        showDetails: true,
+        barrierEdges: controls.map(({ upstream, downstream }, index) => ({
+          id: `c${index}`,
+          upstreamNodeId: upstream,
+          downstreamNodeId: downstream,
+        })),
+        controlDimensions: {
+          c0: { width: 280, height: 232 },
+          c1: { width: 248, height: 216 },
+        },
+      },
+    );
+    expectUnrelatedClearance(result, controls);
   });
 });
