@@ -4,7 +4,13 @@
 
 @layer components {
   .node-tag {
-    @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-4 text-slate-600 transition hover:border-slate-400 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500;
+    @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold leading-4 text-slate-600;
+  }
+  .node-tag--interactive {
+    @apply cursor-pointer transition hover:border-slate-400 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500;
+  }
+  .node-tag--readonly {
+    @apply cursor-default;
   }
   .node-tag--type {
     @apply uppercase tracking-wide text-slate-700;
@@ -323,7 +329,7 @@ select:focus-visible {
 }
 
 .map-guide__key-item {
-  @apply inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium transition-colors hover:border-slate-400 hover:bg-white;
+  @apply inline-flex cursor-default items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium;
 }
 
 .map-guide__key-item i {

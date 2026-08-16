@@ -45,7 +45,7 @@ export const NodeTagMenu = <T extends string>({
   if (readOnly) {
     return (
       <span
-        className={`node-tag ${className}`}
+        className={`node-tag node-tag--readonly ${className}`}
         aria-label={`${label}: ${displayLabel}`}
       >
         {displayLabel}
@@ -75,7 +75,7 @@ export const NodeTagMenu = <T extends string>({
       <button
         ref={buttonRef}
         type="button"
-        className={`node-tag ${className}`}
+        className={`node-tag node-tag--interactive ${className}`}
         aria-label={`${label}: ${displayLabel}`}
         aria-haspopup="menu"
         aria-expanded={open}

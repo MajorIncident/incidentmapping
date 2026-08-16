@@ -716,4 +716,27 @@ describe("useAppStore actions", () => {
       actions.toMap().nodes.find((node) => node.id === actionId)?.actionDueDate,
     ).toBe("2026-09-01");
   });
+
+  it("persists factor significance and restores it through undo and redo", () => {
+    const { actions } = useAppStore.getState();
+    const id = actions.addChild() as string;
+    actions.setNodeType(id, "Factor");
+    actions.setFactorSignificance(id, "RootCause");
+    expect(actions.toMap().nodes[0].factorSignificance).toBe("RootCause");
+
+    actions.undo();
+    expect(useAppStore.getState().nodes[0].data.factorSignificance).toBe(
+      "Normal",
+    );
+    actions.redo();
+    expect(useAppStore.getState().nodes[0].data.factorSignificance).toBe(
+      "RootCause",
+    );
+
+    const saved = actions.toMap();
+    actions.loadMap(saved);
+    expect(useAppStore.getState().nodes[0].data.factorSignificance).toBe(
+      "RootCause",
+    );
+  });
 });
