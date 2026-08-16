@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "title": "Delayed baggage delivery at North Terminal",
+    "incidentId": "BAG-2026-0142",
+    "occurredAt": "2026-06-14T18:31",
+    "location": "North Terminal — Belt 4",
+    "severity": "High",
+    "status": "Open",
+    "nodeReferenceHighWaterMark": 8
+  },
+  "nodes": [
+    {
+      "id": "impact",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Impact",
+      "title": "Passengers separated from baggage",
+      "description": "Forty-two passengers waited beyond the service target.",
+      "owner": "Station manager",
+      "timestamp": "2026-06-14T18:42:00Z",
+      "severity": "High",
+      "incidentStatus": "Open",
+      "positiveConsequenceBulletPoints": ["All bags were traced"],
+      "negativeConsequenceBulletPoints": ["Connections put at risk"],
+      "evidenceItems": [
+        {
+          "id": "E-1",
+          "text": "Passenger service log records 42 delayed bags"
+        }
+      ],
+      "evidenceHighWaterMark": 1,
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "event",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Event",
+      "title": "Arrival belt stopped during unloading",
+      "description": "Belt 4 stopped at 18:31.",
+      "owner": "Ramp operations",
+      "timestamp": "2026-06-14T18:31:00Z",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": ["Bags accumulated at induction"],
+      "evidenceItems": [
+        {
+          "id": "E-1",
+          "text": "Belt controller log: photo-eye fault at 18:31"
+        }
+      ],
+      "evidenceHighWaterMark": 1,
+      "position": {
+        "x": 0,
+        "y": 240
+      }
+    },
+    {
+      "id": "factor-human",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Fault alarm was not escalated",
+      "factorCategory": "Human",
+      "factorSignificance": "KeyFactor",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -240,
+        "y": 480
+      }
+    },
+    {
+      "id": "factor-root",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Factor",
+      "title": "Inspection omitted photo-eye test",
+      "description": "The opening checklist did not require a functional sensor test.",
+      "factorCategory": "Procedure",
+      "factorSignificance": "RootCause",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [
+        {
+          "id": "E-1",
+          "text": "Approved checklist revision 7 has no photo-eye step"
+        },
+        {
+          "id": "E-2",
+          "text": "Technician interview confirms visual-only check"
+        }
+      ],
+      "evidenceHighWaterMark": 2,
+      "position": {
+        "x": 240,
+        "y": 480
+      }
+    },
+    {
+      "id": "action",
+      "kind": "ChainNode",
+      "referenceId": "N-005",
+      "nodeType": "Action",
+      "title": "Add functional photo-eye check",
+      "owner": "Maintenance lead",
+      "actionStatus": "Planned",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": 520,
+        "y": 480
+      }
+    },
+    {
+      "id": "factor-equipment",
+      "kind": "ChainNode",
+      "referenceId": "N-006",
+      "nodeType": "Factor",
+      "title": "Photo-eye lens was contaminated",
+      "factorCategory": "Equipment",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -520,
+        "y": 720
+      }
+    },
+    {
+      "id": "factor-equipment",
+      "kind": "ChainNode",
+      "referenceId": "N-006",
+      "nodeType": "Factor",
+      "title": "Photo-eye lens was contaminated",
+      "factorCategory": "Equipment",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -520,
+        "y": 720
+      }
+    },
+    {
+      "id": "factor-environment",
+      "kind": "ChainNode",
+      "referenceId": "N-007",
+      "nodeType": "Factor",
+      "title": "Ramp rain increased sensor contamination",
+      "factorCategory": "Environment",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -280,
+        "y": 720
+      }
+    },
+    {
+      "id": "factor-equipment",
+      "kind": "ChainNode",
+      "referenceId": "N-006",
+      "nodeType": "Factor",
+      "title": "Photo-eye lens was contaminated",
+      "factorCategory": "Equipment",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -520,
+        "y": 720
+      }
+    },
+    {
+      "id": "factor-environment",
+      "kind": "ChainNode",
+      "referenceId": "N-007",
+      "nodeType": "Factor",
+      "title": "Ramp rain increased sensor contamination",
+      "factorCategory": "Environment",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": -280,
+        "y": 720
+      }
+    },
+    {
+      "id": "factor-organization",
+      "kind": "ChainNode",
+      "referenceId": "N-008",
+      "nodeType": "Factor",
+      "title": "Checklist governance had no assigned reviewer",
+      "factorCategory": "Organization",
+      "factorSignificance": "Normal",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": [],
+      "evidenceItems": [],
+      "position": {
+        "x": 520,
+        "y": 720
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-impact-event",
+      "kind": "CauseEffectEdge",
+      "fromId": "impact",
+      "toId": "event"
+    },
+    {
+      "id": "cause-event-human",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-human"
+    },
+    {
+      "id": "cause-event-root",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-root"
+    },
+    {
+      "id": "action-root",
+      "kind": "ActionEdge",
+      "fromId": "factor-root",
+      "toId": "action",
+      "status": "Planned",
+      "dueDate": "2026-07-01"
+    },
+    {
+      "id": "cause-event-factor-equipment",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-equipment"
+    },
+    {
+      "id": "cause-event-factor-equipment",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-equipment"
+    },
+    {
+      "id": "cause-event-factor-environment",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-environment"
+    },
+    {
+      "id": "cause-event-factor-equipment",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-equipment"
+    },
+    {
+      "id": "cause-event-factor-environment",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-environment"
+    },
+    {
+      "id": "cause-event-factor-organization",
+      "kind": "CauseEffectEdge",
+      "fromId": "event",
+      "toId": "factor-organization"
+    }
+  ],
+  "barriers": [
+    {
+      "id": "control-inspection",
+      "kind": "Barrier",
+      "upstreamNodeId": "event",
+      "downstreamNodeId": "factor-root",
+      "description": "Pre-opening belt inspection",
+      "status": "Failed",
+      "failureReason": "Inadequate",
+      "failureDetails": "Checklist covered visible damage but not functional sensor response."
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { parseAndMigrateMapData } from "../../src/features/maps/migration";
 import { mapDataSchema, type MapDataV1 } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
@@ -50,6 +51,9 @@ const legacy: MapDataV1 = {
     },
   ],
 };
+
+const fixture = (name: string): unknown =>
+  JSON.parse(readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8"));
 
 describe("parseAndMigrateMapData", () => {
   it("preserves V1 content while deterministically adding V2 fields", () => {
@@ -104,6 +108,79 @@ describe("parseAndMigrateMapData", () => {
     expect(() => parseAndMigrateMapData({ schemaVersion: 99 })).toThrow(
       "Unsupported map schema version: 99",
     );
+  });
+
+  it("keeps the committed Version 1 baggage investigation content", () => {
+    const migrated = parseAndMigrateMapData(
+      fixture("baggage-incident-v1.json"),
+    );
+    expect(migrated.nodes[0]).toMatchObject({
+      referenceId: "N-001",
+      nodeType: "Event",
+      description: "Passengers waited beyond the service target.",
+      owner: "Station manager",
+      timestamp: "2026-06-14T18:42:00Z",
+      negativeConsequenceBulletPoints: [
+        "Forty-two passengers affected",
+        "Connections put at risk",
+      ],
+    });
+    expect(migrated.barriers[0]).toMatchObject({
+      status: "Failed",
+      failureDetails:
+        "Inspection did not include the photo-eye\nNo escalation recorded",
+    });
+  });
+
+  it("accepts the comprehensive committed Version 2 baggage fixture", () => {
+    const parsed = parseAndMigrateMapData(fixture("baggage-incident-v2.json"));
+    expect(new Set(parsed.nodes.map((node) => node.nodeType))).toEqual(
+      new Set(["Impact", "Event", "Factor", "Action"]),
+    );
+    expect(new Set(parsed.edges.map((edge) => edge.kind))).toEqual(
+      new Set(["CauseEffectEdge", "ActionEdge"]),
+    );
+    expect(
+      new Set(
+        parsed.nodes
+          .filter((node) => node.nodeType === "Factor")
+          .map((node) => node.factorCategory),
+      ),
+    ).toEqual(
+      new Set([
+        "Human",
+        "Equipment",
+        "Environment",
+        "Procedure",
+        "Organization",
+      ]),
+    );
+    expect(
+      new Set(
+        parsed.nodes
+          .filter((node) => node.nodeType === "Factor")
+          .map((node) => node.factorSignificance),
+      ),
+    ).toEqual(new Set(["Normal", "KeyFactor", "RootCause"]));
+    expect(parsed.nodes.filter((node) => node.nodeType === "Factor")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          factorCategory: "Human",
+          factorSignificance: "KeyFactor",
+        }),
+        expect.objectContaining({
+          factorCategory: "Procedure",
+          factorSignificance: "RootCause",
+          evidenceItems: expect.arrayContaining([
+            expect.objectContaining({ id: "E-2" }),
+          ]),
+        }),
+      ]),
+    );
+    expect(parsed.barriers[0]).toMatchObject({
+      status: "Failed",
+      failureReason: "Inadequate",
+    });
   });
 
   it("round trips V2 through the store without retired barrier fields", () => {

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "metadata": { "title": "Baggage belt legacy investigation" },
+  "nodes": [
+    {
+      "id": "arrival-delay",
+      "kind": "ChainNode",
+      "title": "Baggage delivery delayed",
+      "description": "Passengers waited beyond the service target.",
+      "owner": "Station manager",
+      "timestamp": "2026-06-14T18:42:00Z",
+      "positiveConsequenceBulletPoints": ["All bags were eventually returned"],
+      "negativeConsequenceBulletPoints": [
+        "Forty-two passengers affected",
+        "Connections put at risk"
+      ],
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "belt-stop",
+      "kind": "ChainNode",
+      "title": "Arrival belt stopped",
+      "description": "Belt 4 stopped while bags were being unloaded.",
+      "owner": "Ramp operations",
+      "timestamp": "2026-06-14T18:31:00Z",
+      "positiveConsequenceBulletPoints": [],
+      "negativeConsequenceBulletPoints": ["Bags accumulated at induction"],
+      "position": { "x": 0, "y": 240 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "legacy-cause",
+      "kind": "CauseEffectEdge",
+      "fromId": "arrival-delay",
+      "toId": "belt-stop"
+    }
+  ],
+  "barriers": [
+    {
+      "id": "legacy-control",
+      "kind": "Barrier",
+      "upstreamNodeId": "arrival-delay",
+      "downstreamNodeId": "belt-stop",
+      "description": "Pre-opening belt inspection",
+      "breached": true,
+      "breachedItems": [
+        "Inspection did not include the photo-eye",
+        "No escalation recorded"
+      ]
+    }
+  ]
+}
