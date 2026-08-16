@@ -5,6 +5,8 @@ import ReactFlow, {
   MiniMap,
   getNodesBounds,
   type Node,
+  type NodeChange,
+  useNodesInitialized,
   useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -230,12 +232,44 @@ export const Canvas = ({
     (state) => state.metadata?.title || "Untitled Map",
   );
   const viewportRequest = useAppStore((state) => state.viewportRequest);
-  const { clearViewportRequest, moveNode, select } = useAppStore(
-    (state) => state.actions,
+  const measuredControlDimensions = useAppStore(
+    (state) => state.measuredControlDimensions,
   );
+  const { clearViewportRequest, moveNode, select, applyMeasuredLayout } =
+    useAppStore((state) => state.actions);
   const reactFlow = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const measurementFrame = useRef(0);
+  const submitMeasurements = useCallback(
+    (measuredNodes: Node[]) => {
+      if (presenting) return;
+      const dimensions = Object.fromEntries(
+        measuredNodes.flatMap((node) =>
+          node.width && node.height
+            ? [[node.id, { width: node.width, height: node.height }]]
+            : [],
+        ),
+      );
+      if (Object.keys(dimensions).length) applyMeasuredLayout(dimensions);
+    },
+    [applyMeasuredLayout, presenting],
+  );
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (!changes.some((change) => change.type === "dimensions")) return;
+      cancelAnimationFrame(measurementFrame.current);
+      measurementFrame.current = requestAnimationFrame(() =>
+        submitMeasurements(reactFlow.getNodes()),
+      );
+    },
+    [reactFlow, submitMeasurements],
+  );
+
+  useEffect(() => {
+    if (nodesInitialized) submitMeasurements(reactFlow.getNodes());
+  }, [nodesInitialized, reactFlow, submitMeasurements]);
 
   const fitMap = useCallback(() => {
     void reactFlow.fitView({
@@ -300,6 +334,10 @@ export const Canvas = ({
         return [presentedEdge];
       }
 
+      const controlSize = measuredControlDimensions[matchingBarrier.id];
+      const controlWidth = controlSize?.width ?? CONTROL_NODE_WIDTH;
+      const controlHeight = controlSize?.height ?? CONTROL_NODE_HEIGHT;
+
       const barrierNode: Node<BarrierNodeData> = {
         id: matchingBarrier.id,
         type: "Barrier",
@@ -327,7 +365,7 @@ export const Canvas = ({
               (upstream.position.x +
                 (upstream.width ?? CHAIN_NODE_WIDTH) / 2)) /
               2 -
-            CONTROL_NODE_WIDTH / 2,
+            controlWidth / 2,
           y:
             upstream.position.y +
             (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
@@ -336,7 +374,7 @@ export const Canvas = ({
               (upstream.position.y +
                 (upstream.height ?? CHAIN_NODE_HEIGHT) / 2)) /
               2 -
-            CONTROL_NODE_HEIGHT / 2,
+            controlHeight / 2,
         },
         draggable: false,
         selectable: true,
@@ -396,6 +434,7 @@ export const Canvas = ({
     barriers,
     chainNodes,
     edges,
+    measuredControlDimensions,
     presentationShowDetails,
     presenting,
     selectionId,
@@ -577,6 +616,7 @@ export const Canvas = ({
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         onNodeDragStop={handleNodeDragStop}
+        onNodesChange={handleNodesChange}
         snapToGrid
         snapGrid={[8, 8]}
         nodesFocusable

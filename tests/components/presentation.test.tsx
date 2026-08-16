@@ -273,10 +273,24 @@ describe("presentation mode", () => {
     });
     const [upstream, downstream, control] = coordinates;
 
-    // The 240x140 Chain Node and 220x120 Control nominal sizes produce a
-    // ten-pixel offset from the midpoint of the endpoint top-left positions.
-    expect(control.x).toBe((upstream.x + downstream.x) / 2 + 10);
-    expect(control.y).toBe((upstream.y + downstream.y) / 2 + 10);
+    const state = useAppStore.getState();
+    const upstreamSize = state.nodes.find((node) => node.id === "root")!;
+    const downstreamSize = state.nodes.find((node) => node.id === "child")!;
+    const controlSize = state.measuredControlDimensions["barrier-root-child"];
+    expect(control.x + controlSize.width / 2).toBe(
+      (upstream.x +
+        upstreamSize.width! / 2 +
+        downstream.x +
+        downstreamSize.width! / 2) /
+        2,
+    );
+    expect(control.y + controlSize.height / 2).toBe(
+      (upstream.y +
+        upstreamSize.height! / 2 +
+        downstream.y +
+        downstreamSize.height! / 2) /
+        2,
+    );
   });
 
   it("keeps the horizontal ActionEdge rendered", async () => {
@@ -353,11 +367,16 @@ describe("presentation mode", () => {
       useAppStore.getState().actions.setMapTitle("Airport investigation");
       useAppStore.getState().actions.undo();
     });
+    render(<App />);
+    await waitFor(() =>
+      expect(
+        useAppStore.getState().measuredControlDimensions["barrier-root-child"],
+      ).toBeDefined(),
+    );
     const before = useAppStore.getState();
     const serialized = before.actions.toMap();
     const history = structuredClone(before.history);
     const availability = { canUndo: before.canUndo, canRedo: before.canRedo };
-    render(<App />);
 
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
     await userEvent.click(screen.getByRole("button", { name: "Chronology" }));
