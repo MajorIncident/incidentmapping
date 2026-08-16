@@ -9,7 +9,7 @@ const expectCleanRoot = (state: ReturnType<typeof useAppStore.getState>) => {
   expect(state.editingId).toBe(state.nodes[0].id);
   expect(state.viewportRequest?.nodeIds).toEqual([state.nodes[0].id]);
   expect(state.editorFocusRequest).toMatchObject({
-    nodeId: state.nodes[0].id,
+    entityId: state.nodes[0].id,
     field: "title",
   });
   expect(state.history).toEqual({ past: [], future: [] });

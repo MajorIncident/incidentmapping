@@ -9,7 +9,7 @@ import {
   snapPosition,
   VERTICAL_GAP,
 } from "../../src/features/layout/hierarchy";
-import { emptyMap } from "../../src/features/maps/fixtures";
+import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 
 describe("useAppStore actions", () => {
   beforeEach(() => {
@@ -73,7 +73,7 @@ describe("useAppStore actions", () => {
     expect(first.editingId).toBe(root.id);
     expect(first.viewportRequest?.nodeIds).toEqual([root.id]);
     expect(first.editorFocusRequest).toMatchObject({
-      nodeId: root.id,
+      entityId: root.id,
       field: "title",
     });
     expect(first.history).toEqual({ past: [], future: [] });
@@ -184,6 +184,64 @@ describe("useAppStore actions", () => {
       sourceHandle: "bottom",
       targetHandle: "top",
     });
+  });
+
+  it("creates a breached, selected barrier and requests description focus", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    actions.addChild(parentId);
+
+    const barrierId = actions.addBarrier(parentId);
+    const state = useAppStore.getState();
+
+    expect(barrierId).toBeTruthy();
+    expect(state.barriers).toContainEqual(
+      expect.objectContaining({
+        id: barrierId,
+        breached: true,
+        breachedItems: [],
+      }),
+    );
+    expect(state.selectionId).toBe(barrierId);
+    expect(state.editorFocusRequest).toMatchObject({
+      entityId: barrierId,
+      field: "barrier-description",
+    });
+  });
+
+  it("retains the breached state of loaded legacy barriers", () => {
+    useAppStore.getState().actions.loadMap(sampleMap);
+
+    expect(useAppStore.getState().barriers[0]).toMatchObject({
+      id: "barrier-root-child",
+      breached: false,
+    });
+  });
+
+  it("batches live barrier description changes into one undo entry", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    actions.addChild(parentId);
+    const barrierId = actions.addBarrier(parentId) as string;
+    const initialHistoryLength = useAppStore.getState().history.past.length;
+
+    actions.updateBarrierData(
+      barrierId,
+      { description: "F" },
+      { debounceHistory: true },
+    );
+    actions.updateBarrierData(
+      barrierId,
+      { description: "Firewall" },
+      { debounceHistory: true },
+    );
+
+    expect(useAppStore.getState().history.past).toHaveLength(
+      initialHistoryLength + 1,
+    );
+    expect(useAppStore.getState().barriers[0]?.description).toBe("Firewall");
+    actions.undo();
+    expect(useAppStore.getState().barriers[0]?.description).toBeUndefined();
   });
 
   it.each([true, false])(

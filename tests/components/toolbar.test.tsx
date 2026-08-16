@@ -57,7 +57,7 @@ describe("Toolbar map title", () => {
     await user.click(screen.getByRole("button", { name: /create a new map/i }));
     const newMapState = useAppStore.getState();
     expect(newMapState.editorFocusRequest).toMatchObject({
-      nodeId: newMapState.nodes[0].id,
+      entityId: newMapState.nodes[0].id,
       field: "title",
     });
     // Re-mount around jsdom's inability to measure a dynamically inserted

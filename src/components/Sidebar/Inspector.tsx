@@ -38,9 +38,7 @@ export const Inspector = (): JSX.Element => {
   );
   const renameNode = useAppStore((state) => state.actions.renameNode);
   const updateNodeData = useAppStore((state) => state.actions.updateNodeData);
-  const addBarrierForFirstDownstream = useAppStore(
-    (state) => state.actions.addBarrierForFirstDownstream,
-  );
+  const addBarrier = useAppStore((state) => state.actions.addBarrier);
   const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
   const updateBarrierData = useAppStore(
     (state) => state.actions.updateBarrierData,
@@ -68,6 +66,7 @@ export const Inspector = (): JSX.Element => {
   const [breachedErrors, setBreachedErrors] = useState<string[]>([]);
   const [isBreached, setIsBreached] = useState(false);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const barrierDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const nextListItemId = useRef(0);
   const positiveItemIds = useRef<string[]>([]);
   const negativeItemIds = useRef<string[]>([]);
@@ -141,7 +140,7 @@ export const Inspector = (): JSX.Element => {
     if (
       node &&
       editorFocusRequest?.field === "description" &&
-      editorFocusRequest.nodeId === node.id
+      editorFocusRequest.entityId === node.id
     ) {
       descriptionRef.current?.focus();
       descriptionRef.current?.select();
@@ -170,6 +169,17 @@ export const Inspector = (): JSX.Element => {
       breachedItemIds.current = [];
     }
   }, [barrier, createListItemId]);
+
+  useEffect(() => {
+    if (
+      barrier &&
+      editorFocusRequest?.field === "barrier-description" &&
+      editorFocusRequest.entityId === barrier.id
+    ) {
+      barrierDescriptionRef.current?.focus();
+      clearEditorFocusRequest(editorFocusRequest.id);
+    }
+  }, [barrier, clearEditorFocusRequest, editorFocusRequest]);
 
   useEffect(() => {
     if (!pendingFocus) return;
@@ -269,10 +279,24 @@ export const Inspector = (): JSX.Element => {
       return;
     }
     const trimmed = barrierDescription.trim();
-    updateBarrierData(barrier.id, {
-      description: trimmed.length ? trimmed : undefined,
-    });
+    const description = trimmed.length ? trimmed : undefined;
+    setBarrierDescription(description ?? "");
+    updateBarrierData(barrier.id, { description }, { debounceHistory: true });
   }, [barrier, barrierDescription, updateBarrierData]);
+
+  const handleBarrierDescriptionChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      if (!barrier) return;
+      const nextDescription = event.target.value;
+      setBarrierDescription(nextDescription);
+      updateBarrierData(
+        barrier.id,
+        { description: nextDescription },
+        { debounceHistory: true },
+      );
+    },
+    [barrier, updateBarrierData],
+  );
 
   const validateBreachedList = useCallback((values: string[]): string[] => {
     return values.map((value) =>
@@ -637,10 +661,11 @@ export const Inspector = (): JSX.Element => {
               Description
             </label>
             <textarea
+              ref={barrierDescriptionRef}
               id="barrier-description"
               className={textAreaClasses}
               value={barrierDescription}
-              onChange={(event) => setBarrierDescription(event.target.value)}
+              onChange={handleBarrierDescriptionChange}
               onBlur={handleBarrierDescriptionBlur}
               placeholder="Explain what this barrier does"
             />
@@ -898,7 +923,7 @@ export const Inspector = (): JSX.Element => {
               <button
                 type="button"
                 className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={() => addBarrierForFirstDownstream(node.id)}
+                onClick={() => addBarrier(node.id)}
               >
                 Add Barrier
               </button>
@@ -1131,7 +1156,7 @@ export const Inspector = (): JSX.Element => {
       </form>
     );
   }, [
-    addBarrierForFirstDownstream,
+    addBarrier,
     barrier,
     barrierDescription,
     barriers,
@@ -1145,6 +1170,7 @@ export const Inspector = (): JSX.Element => {
     handleBreachedListBlur,
     handleBreachedListChange,
     handleBreachedListKeyDown,
+    handleBarrierDescriptionChange,
     handleBarrierDescriptionBlur,
     handleCenter,
     handleDescriptionBlur,
