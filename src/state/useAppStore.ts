@@ -154,6 +154,7 @@ type AppState = {
       value?: ChainNode["actionStatus"],
     ) => void;
     setNodeActionDueDate: (id: string, dueDate?: string) => void;
+    setNodeActionCompletedAt: (id: string, completedAt?: string) => void;
     setEventPhase: (id: string, value?: ChainNode["eventPhase"]) => void;
     setEventDisplay: (id: string, value: ChainNode["eventDisplay"]) => void;
     setEventTimestamp: (id: string, value?: string) => void;
@@ -775,6 +776,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         actionType: undefined,
         actionStatus: undefined,
         actionDueDate: undefined,
+        actionCompletedAt: undefined,
       });
     },
     setFactorCategory: (id, value) => {
@@ -801,6 +803,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       )
         get().actions.updateNodeData(id, {
           actionDueDate: dueDate?.trim() || undefined,
+        });
+    },
+    setNodeActionCompletedAt: (id, completedAt) => {
+      if (
+        get().nodes.find((node) => node.id === id)?.data.nodeType === "Action"
+      )
+        get().actions.updateNodeData(id, {
+          actionCompletedAt: completedAt?.trim() || undefined,
         });
     },
     setEventPhase: (id, value) => {

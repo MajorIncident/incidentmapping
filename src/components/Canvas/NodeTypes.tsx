@@ -268,6 +268,7 @@ const ChainNodeComponent = ({
     formatEventDateTime(data.endTimestamp, showSeconds) ?? undefined;
   const eventDuration = formatEventDuration(data.timestamp, data.endTimestamp);
   const dueDate = formatLocalDate(data.actionDueDate);
+  const completedAt = formatLocalDate(data.actionCompletedAt);
   const significance = data.factorSignificance ?? "Normal";
 
   return (
@@ -460,9 +461,29 @@ const ChainNodeComponent = ({
                   <strong>{data.owner}</strong>
                 </div>
               ) : null}
-              {dueDate ? (
-                <div className="node-metadata-row">
-                  <time dateTime={data.actionDueDate}>Due {dueDate}</time>
+              {data.actionStatus === "Completed" ? (
+                <div className="node-metadata-row min-w-0 overflow-hidden">
+                  {completedAt ? (
+                    <time
+                      className="min-w-0 truncate"
+                      dateTime={data.actionCompletedAt}
+                      aria-label={`Completed at ${completedAt}`}
+                    >
+                      Completed {completedAt}
+                    </time>
+                  ) : (
+                    <span>Completed</span>
+                  )}
+                </div>
+              ) : dueDate ? (
+                <div className="node-metadata-row min-w-0 overflow-hidden">
+                  <time
+                    className="min-w-0 truncate"
+                    dateTime={data.actionDueDate}
+                    aria-label={`Due date ${dueDate}`}
+                  >
+                    Due {dueDate}
+                  </time>
                 </div>
               ) : null}
             </>

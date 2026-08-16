@@ -918,4 +918,48 @@ describe("useAppStore actions", () => {
       ],
     });
   });
+
+  it("keeps Action due and completion dates independent through history and reload", () => {
+    const { actions } = useAppStore.getState();
+    const sourceId = actions.addChild() as string;
+    const actionId = actions.addAction(sourceId) as string;
+
+    actions.setNodeActionDueDate(actionId, "2026-08-20");
+    actions.setNodeActionStatus(actionId, "Completed");
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === actionId)?.data
+        .actionCompletedAt,
+    ).toBeUndefined();
+
+    actions.setNodeActionCompletedAt(actionId, "2026-08-16");
+    expect(
+      actions.toMap().nodes.find((node) => node.id === actionId),
+    ).toMatchObject({
+      actionStatus: "Completed",
+      actionDueDate: "2026-08-20",
+      actionCompletedAt: "2026-08-16",
+    });
+
+    actions.setNodeActionStatus(actionId, "InProgress");
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === actionId)?.data
+        .actionCompletedAt,
+    ).toBe("2026-08-16");
+    actions.undo();
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === actionId)?.data
+        .actionStatus,
+    ).toBe("Completed");
+    actions.redo();
+
+    const saved = actions.toMap();
+    actions.loadMap(saved);
+    expect(
+      actions.toMap().nodes.find((node) => node.id === actionId),
+    ).toMatchObject({
+      actionStatus: "InProgress",
+      actionDueDate: "2026-08-20",
+      actionCompletedAt: "2026-08-16",
+    });
+  });
 });
