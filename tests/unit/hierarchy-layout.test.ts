@@ -200,4 +200,63 @@ describe("layoutHierarchy", () => {
       positions(once),
     );
   });
+
+  it("reserves the complete footprint of sibling Factors and their Actions", () => {
+    const nodes = [
+      node("event"),
+      node("factor-1"),
+      actionNode("action-1"),
+      node("factor-2"),
+      actionNode("action-2"),
+      node("factor-3"),
+      actionNode("action-3"),
+      node("factor-4"),
+      actionNode("action-4"),
+    ];
+    const edges: Edge[] = [
+      edge("event", "factor-1"),
+      { ...edge("factor-1", "action-1"), data: { kind: "ActionEdge" } },
+      edge("event", "factor-2"),
+      { ...edge("factor-2", "action-2"), data: { kind: "ActionEdge" } },
+      edge("event", "factor-3"),
+      { ...edge("factor-3", "action-3"), data: { kind: "ActionEdge" } },
+      edge("event", "factor-4"),
+      { ...edge("factor-4", "action-4"), data: { kind: "ActionEdge" } },
+    ];
+
+    const result = layoutHierarchy(nodes, edges, false);
+    const bounds = Object.fromEntries(
+      result.map((item) => [item.id, nodeRectangle(item)]),
+    );
+    expect(bounds).toEqual({
+      event: { x: 1016, y: 0, width: 240, height: 140 },
+      "factor-1": { x: 0, y: 208, width: 240, height: 140 },
+      "action-1": { x: 304, y: 208, width: 240, height: 140 },
+      "factor-2": { x: 576, y: 208, width: 240, height: 140 },
+      "action-2": { x: 880, y: 208, width: 240, height: 140 },
+      "factor-3": { x: 1152, y: 208, width: 240, height: 140 },
+      "action-3": { x: 1456, y: 208, width: 240, height: 140 },
+      "factor-4": { x: 1728, y: 208, width: 240, height: 140 },
+      "action-4": { x: 2032, y: 208, width: 240, height: 140 },
+    });
+
+    const actions = result.filter(
+      (item) => (item.data as { nodeType?: string }).nodeType === "Action",
+    );
+    const causal = result.filter((item) => !actions.includes(item));
+    actions.forEach((action, index) => {
+      causal.forEach((cause) =>
+        expect(intersects(nodeRectangle(action), nodeRectangle(cause))).toBe(
+          false,
+        ),
+      );
+      actions
+        .slice(index + 1)
+        .forEach((otherAction) =>
+          expect(
+            intersects(nodeRectangle(action), nodeRectangle(otherAction)),
+          ).toBe(false),
+        );
+    });
+  });
 });
