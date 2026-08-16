@@ -9,6 +9,8 @@ export const HORIZONTAL_GAP = 32;
 export const VERTICAL_GAP = 64;
 const BARRIER_CLEARANCE = 176;
 const TREE_GAP = 96;
+export const ACTION_HORIZONTAL_GAP = 64;
+export const ACTION_VERTICAL_GAP = 24;
 
 export type HierarchyLayoutOptions = {
   showDetails: boolean;
@@ -55,12 +57,22 @@ export const layoutHierarchy = <Data>(
   if (!nodes.length) return [];
   const { showDetails, barrierEdges = [] } =
     typeof options === "boolean" ? { showDetails: options } : options;
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const adjacency = buildChildrenByParent(
-    edges.filter((edge) => byId.has(edge.source) && byId.has(edge.target)),
+  const actionNodes = nodes.filter(
+    (node) => (node.data as { nodeType?: string }).nodeType === "Action",
   );
-  const incoming = new Map(nodes.map((node) => [node.id, 0]));
-  edges.forEach((edge) => {
+  const causalNodes = nodes.filter(
+    (node) => (node.data as { nodeType?: string }).nodeType !== "Action",
+  );
+  if (!causalNodes.length) return nodes.map((node) => ({ ...node }));
+  const causalEdges = edges.filter((edge) => edge.data?.kind !== "ActionEdge");
+  const byId = new Map(causalNodes.map((node) => [node.id, node]));
+  const adjacency = buildChildrenByParent(
+    causalEdges.filter(
+      (edge) => byId.has(edge.source) && byId.has(edge.target),
+    ),
+  );
+  const incoming = new Map(causalNodes.map((node) => [node.id, 0]));
+  causalEdges.forEach((edge) => {
     if (byId.has(edge.source) && byId.has(edge.target)) {
       incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
     }
@@ -69,7 +81,7 @@ export const layoutHierarchy = <Data>(
     a.position.x - b.position.x ||
     a.position.y - b.position.y ||
     a.id.localeCompare(b.id);
-  const discoveredRoots = nodes
+  const discoveredRoots = causalNodes
     .filter((node) => incoming.get(node.id) === 0)
     .sort(stable);
 
@@ -98,7 +110,7 @@ export const layoutHierarchy = <Data>(
   }
   // A disconnected cycle has no zero-incoming node, so promote its first
   // stable member to an additional root and continue until all nodes belong.
-  for (const node of [...nodes].sort(stable)) {
+  for (const node of [...causalNodes].sort(stable)) {
     if (!visited.has(node.id)) {
       roots.push(node.id);
       walk(node.id, 0);
@@ -124,7 +136,7 @@ export const layoutHierarchy = <Data>(
 
   const maxDepth = Math.max(...depth.values());
   const levelHeights = Array.from({ length: maxDepth + 1 }, () => 0);
-  nodes.forEach((node) => {
+  causalNodes.forEach((node) => {
     const level = depth.get(node.id) ?? 0;
     levelHeights[level] = Math.max(
       levelHeights[level],
@@ -141,7 +153,7 @@ export const layoutHierarchy = <Data>(
       barrierLevels.add(upstreamDepth);
     }
   });
-  const levelY = [Math.min(...nodes.map((node) => node.position.y))];
+  const levelY = [Math.min(...causalNodes.map((node) => node.position.y))];
   for (let level = 0; level < maxDepth; level += 1) {
     levelY[level + 1] =
       levelY[level] +
@@ -167,13 +179,59 @@ export const layoutHierarchy = <Data>(
       childLeft += widths.get(childId)! + HORIZONTAL_GAP;
     }
   };
-  let treeLeft = Math.min(...nodes.map((node) => node.position.x));
+  let treeLeft = Math.min(...causalNodes.map((node) => node.position.x));
   roots.forEach((id) => {
     place(id, treeLeft);
     treeLeft += widths.get(id)! + TREE_GAP;
   });
 
-  return nodes.map((node) => ({ ...node, position: positions.get(node.id)! }));
+  const causalResult = causalNodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id)!,
+  }));
+  const placedById = new Map(causalResult.map((node) => [node.id, node]));
+  const actionOrder = new Map(
+    actionNodes.map((node, index) => [node.id, index]),
+  );
+  const actionsBySource = new Map<string, Node<Data>[]>();
+  edges
+    .filter((edge) => edge.data?.kind === "ActionEdge")
+    .forEach((edge) => {
+      const action = actionNodes.find((node) => node.id === edge.target);
+      if (!action || !placedById.has(edge.source)) return;
+      const attached = actionsBySource.get(edge.source) ?? [];
+      if (!attached.some((node) => node.id === action.id))
+        attached.push(action);
+      actionsBySource.set(edge.source, attached);
+    });
+  const actionPositions = new Map<string, XYPosition>();
+  actionsBySource.forEach((actions, sourceId) => {
+    const source = placedById.get(sourceId)!;
+    actions
+      .sort(
+        (a, b) => (actionOrder.get(a.id) ?? 0) - (actionOrder.get(b.id) ?? 0),
+      )
+      .forEach((action, index) => {
+        actionPositions.set(
+          action.id,
+          snapPosition({
+            x:
+              source.position.x +
+              getNodeSize(source, showDetails).width +
+              ACTION_HORIZONTAL_GAP,
+            y:
+              source.position.y +
+              index *
+                (getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP),
+          }),
+        );
+      });
+  });
+  return nodes.map((node) =>
+    placedById.has(node.id)
+      ? placedById.get(node.id)!
+      : { ...node, position: actionPositions.get(node.id) ?? node.position },
+  );
 };
 
 export const applyHierarchyLayout = <Data>(

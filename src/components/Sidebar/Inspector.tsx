@@ -61,6 +61,7 @@ export const Inspector = ({
   const updateEvidence = useAppStore((state) => state.actions.updateEvidence);
   const removeEvidence = useAppStore((state) => state.actions.removeEvidence);
   const addBarrier = useAppStore((state) => state.actions.addBarrier);
+  const addAction = useAppStore((state) => state.actions.addAction);
   const removeBarrier = useAppStore((state) => state.actions.removeBarrier);
   const updateBarrierData = useAppStore(
     (state) => state.actions.updateBarrierData,
@@ -765,7 +766,9 @@ export const Inspector = ({
     }
 
     const downstreamBranches = edges
-      .filter((edge) => edge.source === node.id)
+      .filter(
+        (edge) => edge.source === node.id && edge.data?.kind !== "ActionEdge",
+      )
       .map((edge, index, branchEdges) => ({
         edge,
         node:
@@ -782,6 +785,15 @@ export const Inspector = ({
 
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
+        {node.data.nodeType !== "Action" ? (
+          <button
+            type="button"
+            className={`${buttonClasses} border-sky-300 bg-sky-50 text-sky-800`}
+            onClick={() => addAction(node.id)}
+          >
+            Add Action
+          </button>
+        ) : null}
         <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="inspector-node-type" className={labelClasses}>
@@ -1290,6 +1302,7 @@ export const Inspector = ({
     );
   }, [
     addBarrier,
+    addAction,
     barrier,
     barrierDescription,
     barriers,

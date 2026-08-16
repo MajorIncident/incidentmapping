@@ -109,8 +109,10 @@ export const Canvas = ({
 
   const { nodes, renderedEdges } = useMemo(() => {
     const presentation = deriveGraphPresentation(
-      chainNodes.map((node) => node.id),
-      edges,
+      chainNodes
+        .filter((node) => node.data.nodeType !== "Action")
+        .map((node) => node.id),
+      edges.filter((edge) => edge.data?.kind !== "ActionEdge"),
       selectionId,
     );
     const presentedNodes = chainNodes.map((node) => ({
@@ -200,19 +202,38 @@ export const Canvas = ({
     });
 
     const styledEdges = flowEdges.map((edge) => {
+      const isAction = edge.data?.kind === "ActionEdge";
       const upstream = edge.data?.presentationRole === "upstream";
       const downstream = edge.data?.presentationRole === "downstream";
       const highlighted = upstream || downstream;
       const unrelated = Boolean(selectionId) && !highlighted;
       return {
         ...edge,
-        className: highlighted
-          ? `incident-edge incident-edge--${upstream ? "upstream" : "downstream"}`
-          : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
+        className: isAction
+          ? "incident-edge incident-edge--action"
+          : highlighted
+            ? `incident-edge incident-edge--${upstream ? "upstream" : "downstream"}`
+            : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: isAction ? 14 : 18,
+          height: isAction ? 14 : 18,
+        },
         style: {
-          stroke: upstream ? "#7c3aed" : downstream ? "#0369a1" : "#475569",
-          strokeWidth: highlighted ? 3 : unrelated ? 1.5 : 2.25,
+          stroke: isAction
+            ? "#94a3b8"
+            : upstream
+              ? "#7c3aed"
+              : downstream
+                ? "#0369a1"
+                : "#475569",
+          strokeWidth: isAction
+            ? 1.5
+            : highlighted
+              ? 3
+              : unrelated
+                ? 1.5
+                : 2.25,
           strokeDasharray: upstream ? "7 4" : undefined,
         },
       };

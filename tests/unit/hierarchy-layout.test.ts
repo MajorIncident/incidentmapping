@@ -13,6 +13,10 @@ const edge = (source: string, target: string): Edge => ({
   source,
   target,
 });
+const actionNode = (id: string, x = 0, y = 0): Node => ({
+  ...node(id, x, y),
+  data: { nodeType: "Action" },
+});
 const positions = (nodes: Node[]) =>
   Object.fromEntries(nodes.map((item) => [item.id, item.position]));
 
@@ -79,6 +83,44 @@ describe("layoutHierarchy", () => {
     });
     expect(spacious[1].position.y - spacious[0].position.y).toBeGreaterThan(
       compact[1].position.y - compact[0].position.y,
+    );
+  });
+
+  it("places actions beside their source without changing causal coordinates", () => {
+    const causal = [node("root", 16, 24), node("cause", 16, 300)];
+    const causalEdge = edge("root", "cause");
+    const before = layoutHierarchy(causal, [causalEdge], false);
+    const actionEdge: Edge = {
+      ...edge("root", "action"),
+      data: { kind: "ActionEdge" },
+    };
+    const after = layoutHierarchy(
+      [...causal, actionNode("action")],
+      [causalEdge, actionEdge],
+      false,
+    );
+
+    expect(positions(after.filter((item) => item.id !== "action"))).toEqual(
+      positions(before),
+    );
+    expect(
+      after.find((item) => item.id === "action")!.position.x,
+    ).toBeGreaterThan(after.find((item) => item.id === "root")!.position.x);
+    expect(after.find((item) => item.id === "action")!.position.x % 8).toBe(0);
+  });
+
+  it("stacks actions deterministically and remains idempotent", () => {
+    const nodes = [node("root", 7, 11), actionNode("a2"), actionNode("a1")];
+    const edges: Edge[] = [
+      { ...edge("root", "a2"), data: { kind: "ActionEdge" } },
+      { ...edge("root", "a1"), data: { kind: "ActionEdge" } },
+    ];
+    const once = layoutHierarchy(nodes, edges, false);
+    expect(once.find((item) => item.id === "a2")!.position.y).toBeLessThan(
+      once.find((item) => item.id === "a1")!.position.y,
+    );
+    expect(positions(layoutHierarchy(once, edges, false))).toEqual(
+      positions(once),
     );
   });
 });
