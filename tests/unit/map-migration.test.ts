@@ -152,6 +152,79 @@ describe("parseAndMigrateMapData", () => {
     expect(parseAndMigrateMapData(v3)).toEqual(v3);
   });
 
+  it("preserves V1 ordering, relationships, coordinates, narrative, and empty gaps", () => {
+    const migrated = parseAndMigrateMapData(v1);
+    expect(
+      migrated.nodes.map(({ id, title, position }) => ({
+        id,
+        title,
+        position,
+      })),
+    ).toEqual(
+      v1.nodes.map(({ id, title, position }) => ({ id, title, position })),
+    );
+    expect(migrated.nodes[0].positiveConsequenceBulletPoints).toEqual([
+      "positive",
+    ]);
+    expect(migrated.nodes[0].negativeConsequenceBulletPoints).toEqual([
+      "negative",
+    ]);
+    expect(migrated.edges).toEqual(v1.edges);
+    expect(migrated.evidence).toEqual([]);
+  });
+
+  it("canonicalizes sparse V2 references without lowering either high-water mark", () => {
+    const input = fixture("baggage-incident-v2.json") as MapDataV2;
+    if (!input.metadata) throw new Error("Fixture metadata is required");
+    input.metadata.nodeReferenceHighWaterMark = 41;
+    input.metadata.evidenceReferenceHighWaterMark = 27;
+    input.nodes[0].referenceId = "N-099";
+    input.nodes[0].evidenceItems[0].id = "EV-019";
+    const original = structuredClone(input);
+
+    const migrated = parseAndMigrateMapData(input);
+
+    expect(input).toEqual(original);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.metadata).toMatchObject({
+      nodeReferenceHighWaterMark: 41,
+      evidenceReferenceHighWaterMark: 27,
+    });
+    expect(migrated.nodes[0]).toMatchObject({
+      referenceId: "N-099",
+      evidenceIds: ["EV-019"],
+    });
+    expect(migrated.evidence[0]).toMatchObject({
+      id: "EV-019",
+      type: "Note",
+    });
+  });
+
+  it("does not rewrite preserved V3 Evidence identity or sparse allocation history", () => {
+    const v3 = parseAndMigrateMapData(fixture("baggage-incident-v2.json"));
+    const evidence = v3.evidence.map((item, index) => ({
+      ...item,
+      id: `EV-${String(index * 7 + 3).padStart(3, "0")}`,
+    }));
+    const idMap = new Map(
+      v3.evidence.map((item, index) => [item.id, evidence[index].id]),
+    );
+    const sparse = {
+      ...v3,
+      metadata: {
+        ...v3.metadata,
+        evidenceReferenceHighWaterMark: 90,
+        contextItems: v3.metadata?.contextItems ?? [],
+      },
+      evidence,
+      nodes: v3.nodes.map((node) => ({
+        ...node,
+        evidenceIds: node.evidenceIds.map((id) => idMap.get(id)!),
+      })),
+    };
+    expect(parseAndMigrateMapData(sparse)).toEqual(sparse);
+  });
+
   it("keeps unsupported-version errors explicit", () => {
     expect(() => parseAndMigrateMapData({ schemaVersion: 99 })).toThrow(
       "Unsupported map schema version: 99",

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import type { MapDataV2 as MapData } from "../../src/features/maps/schema";
+import type { MapData } from "../../src/features/maps/schema";
 
 const firstSave = path.join(os.tmpdir(), "visual-investigation-first.json");
 const reloadedSave = path.join(
@@ -48,12 +48,16 @@ const assertPersistedIntegrity = (document: MapData) => {
     document.barriers.map((control) => control.id),
     "Control IDs",
   );
+  expect(document.schemaVersion).toBe(3);
   assertUnique(
-    document.nodes.flatMap((node) =>
-      node.evidenceItems.map((evidence) => evidence.id),
-    ),
+    document.evidence.map((evidence) => evidence.id),
     "evidence IDs",
   );
+  const evidenceIds = new Set(document.evidence.map((item) => item.id));
+  for (const owner of [...document.nodes, ...document.barriers]) {
+    expect(new Set(owner.evidenceIds).size).toBe(owner.evidenceIds.length);
+    owner.evidenceIds.forEach((id) => expect(evidenceIds.has(id)).toBe(true));
+  }
   assertUnique(
     document.edges
       .filter((edge) => edge.kind === "CauseEffectEdge")
@@ -82,13 +86,14 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await page.goto("/");
 
   // Start with the impact, then work down by asking what happened and why.
-  await title(page).fill("Passengers separated from baggage");
+  await title(page).fill("Airport passengers separated from baggage");
   await title(page).press("Enter");
   await page.getByLabel("Type").selectOption("Impact");
   await page.getByRole("button", { name: "Add Below" }).click();
   await title(page).fill("Arrival belt stopped during unloading");
   await title(page).press("Enter");
   await expect(page.getByText("Event", { exact: true }).last()).toBeVisible();
+  await page.getByLabel("Event Phase").selectOption("Incident");
 
   // Convert the child to a Factor while its category is deliberately unset,
   // then complete its investigation classification.
@@ -147,6 +152,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
     .click();
   await page.getByLabel("Control Purpose").fill("Pre-opening belt inspection");
   await page.getByLabel("Status").selectOption("Failed");
+  await page.getByLabel("Control Role").selectOption("Preventive");
   await page.getByLabel("Why Did It Fail?").selectOption("InadequateDesign");
   await page
     .getByLabel("Failure Details")
@@ -163,6 +169,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await page.getByLabel("Owner").fill("Maintenance lead");
   await page.getByLabel("Due date").fill("2026-07-01");
   await page.getByLabel("Status").selectOption("Planned");
+  await page.getByLabel("Action Type").selectOption("Corrective");
 
   const rootCauseCard = page
     .locator('[data-testid="chain-node"]')
@@ -207,11 +214,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await expect(page.getByText("Unsaved", { exact: true })).toBeVisible();
   const initiallySaved = await saveMap(page, firstSave);
   assertPersistedIntegrity(initiallySaved);
-  expect(
-    initiallySaved.nodes.flatMap((node) =>
-      node.evidenceItems.map((item) => item.id),
-    ),
-  ).toEqual(["EV-002"]);
+  expect(initiallySaved.evidence.map((item) => item.id)).toEqual(["EV-002"]);
   expect(initiallySaved.metadata?.evidenceReferenceHighWaterMark).toBe(2);
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
@@ -227,7 +230,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
 
   await openMap(page, firstSave);
   await expect(
-    page.getByText("Passengers separated from baggage"),
+    page.getByText("Airport passengers separated from baggage"),
   ).toBeVisible();
   await expect(
     page.getByText("Inspection omitted photo-eye test"),
@@ -245,11 +248,10 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await page.getByLabel("EV-003 evidence").press("Tab");
   const savedAgain = await saveMap(page, reloadedSave);
   assertPersistedIntegrity(savedAgain);
-  expect(
-    savedAgain.nodes.flatMap((node) =>
-      node.evidenceItems.map((item) => item.id),
-    ),
-  ).toEqual(["EV-002", "EV-003"]);
+  expect(savedAgain.evidence.map((item) => item.id)).toEqual([
+    "EV-002",
+    "EV-003",
+  ]);
   expect(savedAgain.metadata?.evidenceReferenceHighWaterMark).toBe(3);
   expect(savedAgain.nodes.map((node) => node.id)).toEqual(
     initiallySaved.nodes.map((node) => node.id),
