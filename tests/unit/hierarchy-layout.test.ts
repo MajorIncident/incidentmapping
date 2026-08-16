@@ -550,3 +550,27 @@ describe("visual subtree bounds", () => {
     expectUnrelatedClearance(result, controls);
   });
 });
+
+describe("chronology-only layout", () => {
+  it("places explicitly chronology-only connected Events in the auxiliary lane", () => {
+    const nodes = [
+      eventNode("impact", "2026-01-01T00:00:00Z", 0, 0),
+      {
+        ...eventNode("timeline", "2026-01-02T00:00:00Z", 0, 200),
+        data: {
+          nodeType: "Event" as const,
+          timestamp: "2026-01-02T00:00:00Z",
+          eventDisplay: "ChronologyOnly",
+        },
+      },
+    ];
+    const result = layoutHierarchy(
+      nodes,
+      [{ id: "edge", source: "impact", target: "timeline" } as Edge],
+      false,
+    );
+    expect(
+      result.find((node) => node.id === "timeline")!.position.x,
+    ).toBeGreaterThan(result.find((node) => node.id === "impact")!.position.x);
+  });
+});

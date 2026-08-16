@@ -119,6 +119,13 @@ export const Inspector = ({
     (state) => state.actions.setNodeActionStatus,
   );
   const setEventPhase = useAppStore((state) => state.actions.setEventPhase);
+  const setEventDisplay = useAppStore((state) => state.actions.setEventDisplay);
+  const setEventTimestamp = useAppStore(
+    (state) => state.actions.setEventTimestamp,
+  );
+  const setEventEndTimestamp = useAppStore(
+    (state) => state.actions.setEventEndTimestamp,
+  );
   const setActionType = useAppStore((state) => state.actions.setActionType);
   const setControlRole = useAppStore((state) => state.actions.setControlRole);
   const setNodeActionDueDate = useAppStore(
@@ -140,6 +147,10 @@ export const Inspector = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [startDraft, setStartDraft] = useState("");
+  const [endDraft, setEndDraft] = useState("");
+  const [showEndTime, setShowEndTime] = useState(false);
+  const [timingError, setTimingError] = useState<string | null>(null);
   const [positiveConsequences, setPositiveConsequences] = useState<string[]>(
     [],
   );
@@ -182,6 +193,10 @@ export const Inspector = ({
       setTitle(node.data.title);
       setDescription(node.data.description ?? "");
       setTitleError(null);
+      setStartDraft(persistedTimestampToLocalControl(node.data.timestamp));
+      setEndDraft(persistedTimestampToLocalControl(node.data.endTimestamp));
+      setShowEndTime(Boolean(node.data.endTimestamp));
+      setTimingError(null);
       const supportsConsequences =
         node.data.nodeType === "Impact" || node.data.nodeType === "Event";
       setPositiveConsequences(
@@ -326,17 +341,44 @@ export const Inspector = ({
     [node, updateNodeData],
   );
 
-  const handleTimestampChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      if (!node) {
+  const commitEventTiming = useCallback(
+    (field: "start" | "end", localValue: string) => {
+      if (!node || node.data.nodeType !== "Event") return;
+      field === "start" ? setStartDraft(localValue) : setEndDraft(localValue);
+      const persisted = localControlToPersistedTimestamp(localValue);
+      if (localValue.trim() && !persisted) {
+        setTimingError("Enter a valid date and time.");
         return;
       }
-      const localValue = event.target.value;
-      const timestamp = localControlToPersistedTimestamp(localValue);
-      if (localValue.trim() && !timestamp) return;
-      updateNodeData(node.id, { timestamp });
+      const otherLocal = field === "start" ? endDraft : startDraft;
+      const other = localControlToPersistedTimestamp(otherLocal);
+      const start = field === "start" ? persisted : other;
+      const end = field === "end" ? persisted : other;
+      if (start && end && Date.parse(end) < Date.parse(start)) {
+        setTimingError(
+          "End time must be the same as or later than start time.",
+        );
+        return;
+      }
+      setTimingError(null);
+      field === "start"
+        ? setEventTimestamp(node.id, persisted)
+        : setEventEndTimestamp(node.id, persisted);
     },
-    [node, updateNodeData],
+    [endDraft, node, setEventEndTimestamp, setEventTimestamp, startDraft],
+  );
+
+  const handleTimestampChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      if (node?.data.nodeType === "Event")
+        commitEventTiming("start", event.target.value);
+      else if (node) {
+        const timestamp = localControlToPersistedTimestamp(event.target.value);
+        if (!event.target.value.trim() || timestamp)
+          updateNodeData(node.id, { timestamp });
+      }
+    },
+    [commitEventTiming, node, updateNodeData],
   );
 
   const handleBarrierDescriptionBlur = useCallback(() => {
@@ -593,7 +635,10 @@ export const Inspector = ({
   }, [fitView, selectionId]);
 
   const ownerValue = node?.data.owner ?? "";
-  const timestampValue = persistedTimestampToLocalControl(node?.data.timestamp);
+  const timestampValue =
+    node?.data.nodeType === "Event"
+      ? startDraft
+      : persistedTimestampToLocalControl(node?.data.timestamp);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1366,7 +1411,80 @@ export const Inspector = ({
           </div>
         ) : null}
 
-        {node.data.nodeType !== "Action" ? (
+        {node.data.nodeType === "Event" ? (
+          <fieldset
+            className="flex flex-col gap-2"
+            aria-describedby={timingError ? "event-timing-error" : undefined}
+          >
+            <legend className={labelClasses}>Event timing</legend>
+            <label htmlFor="inspector-timestamp" className={labelClasses}>
+              Started
+            </label>
+            <input
+              id="inspector-timestamp"
+              type="datetime-local"
+              step="1"
+              className={inputClasses}
+              value={timestampValue}
+              onChange={handleTimestampChange}
+              aria-invalid={Boolean(timingError)}
+              aria-describedby={timingError ? "event-timing-error" : undefined}
+            />
+            {showEndTime || endDraft ? (
+              <>
+                <label
+                  htmlFor="inspector-end-timestamp"
+                  className={labelClasses}
+                >
+                  Ended
+                </label>
+                <input
+                  id="inspector-end-timestamp"
+                  type="datetime-local"
+                  step="1"
+                  className={inputClasses}
+                  value={endDraft}
+                  onChange={(event) =>
+                    commitEventTiming("end", event.target.value)
+                  }
+                  aria-invalid={Boolean(timingError)}
+                  aria-describedby={
+                    timingError ? "event-timing-error" : undefined
+                  }
+                />
+                <button
+                  type="button"
+                  className={buttonClasses}
+                  onClick={() => {
+                    setEndDraft("");
+                    setShowEndTime(false);
+                    setTimingError(null);
+                    setEventEndTimestamp(node.id, undefined);
+                  }}
+                >
+                  Remove end time
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className={buttonClasses}
+                onClick={() => setShowEndTime(true)}
+              >
+                Add end time
+              </button>
+            )}
+            {timingError ? (
+              <p
+                id="event-timing-error"
+                role="alert"
+                className="text-xs text-red-700"
+              >
+                {timingError}
+              </p>
+            ) : null}
+          </fieldset>
+        ) : node.data.nodeType !== "Action" ? (
           <div className="flex flex-col gap-1">
             <label htmlFor="inspector-timestamp" className={labelClasses}>
               Occurred at
@@ -1379,6 +1497,32 @@ export const Inspector = ({
               value={timestampValue}
               onChange={handleTimestampChange}
             />
+          </div>
+        ) : null}
+
+        {node.data.nodeType === "Event" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-event-display" className={labelClasses}>
+              Event display
+            </label>
+            <select
+              id="inspector-event-display"
+              className={inputClasses}
+              value={node.data.eventDisplay ?? "Map"}
+              onChange={(event) =>
+                setEventDisplay(
+                  node.id,
+                  event.target.value as "Map" | "ChronologyOnly",
+                )
+              }
+            >
+              <option value="Map">Show on map</option>
+              <option value="ChronologyOnly">Chronology only</option>
+            </select>
+            <p className="text-xs text-slate-500">
+              Chronology-only Events remain in Chronology but are hidden from
+              the causal map unless Show Timeline Events is enabled.
+            </p>
           </div>
         ) : null}
 
@@ -1455,7 +1599,9 @@ export const Inspector = ({
     barrierDescription,
     barriers,
     chainNodes,
+    commitEventTiming,
     description,
+    endDraft,
     edges,
     handleAddListItem,
     handleBarrierDescriptionChange,
@@ -1484,9 +1630,13 @@ export const Inspector = ({
     setNodeActionDueDate,
     setNodeType,
     setEventPhase,
+    setEventDisplay,
+    setEventEndTimestamp,
     setActionType,
     setControlRole,
     select,
+    showEndTime,
+    timingError,
     timestampValue,
     title,
     titleError,

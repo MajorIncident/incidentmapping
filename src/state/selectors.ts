@@ -120,3 +120,44 @@ export const selectChronologicalEvents = (nodes: Node<ChainNodeData>[]) =>
   selectChronologyGroups(nodes)
     .filter((group) => group.phase !== "Untimed Events")
     .flatMap((group) => group.events);
+
+/** True when a stored timestamp explicitly represents non-zero seconds. */
+export const timestampNeedsSeconds = (value?: string): boolean =>
+  Boolean(value && /T\d{2}:\d{2}:(?!00(?:\.0+)?(?:Z|[+-]|$))\d{2}/.test(value));
+
+/** Shared, locale-aware Event date/time formatter. */
+export const formatEventDateTime = (
+  value?: string,
+  includeSeconds = timestampNeedsSeconds(value),
+): string | null => {
+  if (!value || !Number.isFinite(Date.parse(value))) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: includeSeconds ? "medium" : "short",
+  }).format(new Date(value));
+};
+
+/** Compact, human-readable duration between two valid ordered timestamps. */
+export const formatEventDuration = (
+  start?: string,
+  end?: string,
+): string | null => {
+  const startMs = Date.parse(start ?? "");
+  const endMs = Date.parse(end ?? "");
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs)
+    return null;
+  let seconds = Math.floor((endMs - startMs) / 1000);
+  const days = Math.floor(seconds / 86400);
+  seconds %= 86400;
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  const parts = [
+    days && `${days}d`,
+    hours && `${hours}h`,
+    minutes && `${minutes}m`,
+    seconds && `${seconds}s`,
+  ].filter(Boolean);
+  return parts.join(" ") || "0m";
+};
