@@ -741,4 +741,63 @@ describe("useAppStore actions", () => {
       "RootCause",
     );
   });
+
+  it("reuses registry evidence and atomically cleans every reference", () => {
+    const { actions } = useAppStore.getState();
+    const first = actions.addChild() as string;
+    const second = actions.addSibling(first) as string;
+    const evidenceId = actions.createEvidence({
+      type: "Document",
+      title: "Shared report",
+      description: "Original",
+    }) as string;
+    expect(actions.linkEvidenceToNode(first, evidenceId)).toBe(true);
+    expect(actions.linkEvidenceToNode(second, evidenceId)).toBe(true);
+    expect(actions.linkEvidenceToNode(second, evidenceId)).toBe(false);
+    actions.deleteEvidence(evidenceId);
+    expect(actions.toMap().evidence).toEqual([]);
+    expect(actions.toMap().nodes.flatMap((node) => node.evidenceIds)).toEqual(
+      [],
+    );
+    actions.undo();
+    expect(actions.toMap().evidence[0]).toMatchObject({ id: evidenceId });
+    expect(actions.toMap().nodes.flatMap((node) => node.evidenceIds)).toEqual([
+      evidenceId,
+      evidenceId,
+    ]);
+    actions.redo();
+    expect(actions.toMap().evidence).toEqual([]);
+  });
+
+  it("persists guarded classifications and collision-safe Context through reload", () => {
+    const { actions } = useAppStore.getState();
+    const eventId = actions.addChild() as string;
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === eventId)?.data
+        .eventPhase,
+    ).toBe("Incident");
+    actions.setEventPhase(eventId, "Recovery");
+    const contextId = actions.addContext(
+      eventId,
+      "Weather",
+      "Rain",
+      true,
+    ) as string;
+    actions.toggleContextShowOnCard(eventId, contextId);
+    actions.setActionType(eventId, "Corrective");
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === eventId)?.data
+        .actionType,
+    ).toBeUndefined();
+    const saved = actions.toMap();
+    actions.loadMap(saved);
+    expect(
+      actions.toMap().nodes.find((node) => node.id === eventId),
+    ).toMatchObject({
+      eventPhase: "Recovery",
+      contextItems: [
+        { id: contextId, label: "Weather", value: "Rain", showOnCard: false },
+      ],
+    });
+  });
 });
