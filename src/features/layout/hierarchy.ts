@@ -14,6 +14,8 @@ export const VERTICAL_GAP = 64;
 export const CONTROL_VERTICAL_MARGIN = 32;
 export const CONTROL_HORIZONTAL_MARGIN = 32;
 const TREE_GAP = 96;
+/** Separates unconnected chronology from the causal forest. */
+export const CHRONOLOGY_LANE_GAP = TREE_GAP;
 export const ACTION_HORIZONTAL_GAP = 64;
 export const ACTION_VERTICAL_GAP = 24;
 
@@ -68,18 +70,50 @@ export const layoutHierarchy = <Data>(
     (node) => (node.data as { nodeType?: string }).nodeType === "Action",
   );
   const actionById = new Map(actionNodes.map((node) => [node.id, node]));
-  const causalNodes = nodes.filter(
+  const nonActionNodes = nodes.filter(
     (node) => (node.data as { nodeType?: string }).nodeType !== "Action",
   );
-  if (!causalNodes.length) return nodes.map((node) => ({ ...node }));
+  if (!nonActionNodes.length) return nodes.map((node) => ({ ...node }));
   const causalEdges = edges.filter((edge) => edge.data?.kind !== "ActionEdge");
+  const nonActionIds = new Set(nonActionNodes.map((node) => node.id));
+  const causallyConnectedIds = new Set<string>();
+  causalEdges.forEach((edge) => {
+    if (!nonActionIds.has(edge.source) || !nonActionIds.has(edge.target))
+      return;
+    causallyConnectedIds.add(edge.source);
+    causallyConnectedIds.add(edge.target);
+  });
+  const chronologyNodes = nonActionNodes
+    .filter((node) => {
+      const data = node.data as { nodeType?: string; timestamp?: string };
+      return (
+        data.nodeType === "Event" &&
+        Number.isFinite(Date.parse(data.timestamp ?? "")) &&
+        !causallyConnectedIds.has(node.id)
+      );
+    })
+    .sort((a, b) => {
+      const aTimestamp = Date.parse(
+        (a.data as { timestamp?: string }).timestamp ?? "",
+      );
+      const bTimestamp = Date.parse(
+        (b.data as { timestamp?: string }).timestamp ?? "",
+      );
+      return aTimestamp - bTimestamp || a.id.localeCompare(b.id);
+    });
+  const chronologyIds = new Set(chronologyNodes.map((node) => node.id));
+  const causalNodes = nonActionNodes.filter(
+    (node) => !chronologyIds.has(node.id),
+  );
   const byId = new Map(causalNodes.map((node) => [node.id, node]));
+  const layoutSourceIds = new Set(nonActionNodes.map((node) => node.id));
   // Build these columns before measuring the forest: an action is part of its
   // source's visual footprint, even though ActionEdges are not causal edges.
   // Edge order is intentional and provides stable ordering within a column.
   const actionsBySource = new Map<string, Node<Data>[]>();
   edges.forEach((edge) => {
-    if (edge.data?.kind !== "ActionEdge" || !byId.has(edge.source)) return;
+    if (edge.data?.kind !== "ActionEdge" || !layoutSourceIds.has(edge.source))
+      return;
     const action = actionById.get(edge.target);
     if (!action) return;
     const attached = actionsBySource.get(edge.source) ?? [];
@@ -208,7 +242,7 @@ export const layoutHierarchy = <Data>(
   };
   roots.forEach(measure);
 
-  const maxDepth = Math.max(...depth.values());
+  const maxDepth = Math.max(0, ...depth.values());
   const levelHeights = Array.from({ length: maxDepth + 1 }, () => 0);
   causalNodes.forEach((node) => {
     const level = depth.get(node.id) ?? 0;
@@ -227,7 +261,8 @@ export const layoutHierarchy = <Data>(
       barrierLevels.add(upstreamDepth);
     }
   });
-  const levelY = [Math.min(...causalNodes.map((node) => node.position.y))];
+  const layoutTop = Math.min(...nonActionNodes.map((node) => node.position.y));
+  const levelY = [layoutTop];
   for (let level = 0; level < maxDepth; level += 1) {
     levelY[level + 1] =
       levelY[level] +
@@ -279,13 +314,43 @@ export const layoutHierarchy = <Data>(
       }
     }
   };
-  let treeLeft = Math.min(...causalNodes.map((node) => node.position.x));
+  let treeLeft = Math.min(...nonActionNodes.map((node) => node.position.x));
+  let causalRight = treeLeft;
   roots.forEach((id) => {
     place(id, treeLeft);
-    treeLeft += widths.get(id)! + TREE_GAP;
+    causalRight = treeLeft + widths.get(id)!;
+    treeLeft = causalRight + TREE_GAP;
   });
 
-  const causalResult = causalNodes.map((node) => ({
+  // Timestamped Events without any causal relationship form a separate visual
+  // chronology. Their order and spacing convey time only; no edges are added.
+  const chronologyX = snapPosition({
+    x: causalRight + (roots.length ? CHRONOLOGY_LANE_GAP : 0),
+    y: 0,
+  }).x;
+  let chronologyTop = layoutTop;
+  chronologyNodes.forEach((node) => {
+    const position = snapPosition({ x: chronologyX, y: chronologyTop });
+    positions.set(node.id, position);
+    let actionTop = position.y;
+    for (const action of actionsBySource.get(node.id) ?? []) {
+      actionPositions.set(
+        action.id,
+        snapPosition({
+          x:
+            chronologyX +
+            getNodeSize(node, showDetails).width +
+            ACTION_HORIZONTAL_GAP,
+          y: actionTop,
+        }),
+      );
+      actionTop +=
+        getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP;
+    }
+    chronologyTop += getNodeSize(node, showDetails).height + VERTICAL_GAP;
+  });
+
+  const causalResult = nonActionNodes.map((node) => ({
     ...node,
     position: positions.get(node.id)!,
   }));

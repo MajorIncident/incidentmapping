@@ -28,6 +28,10 @@ export const GuideContent = (): JSX.Element => (
       downward by asking <strong>why</strong>; lower nodes identify the
       contributing events and factors.
     </p>
+    <p className="map-guide__intro">
+      Unconnected timestamped Events appear in a separate chronological lane.
+      Their order shows time, not causation.
+    </p>
     <div className="map-guide__key" aria-label="Map key">
       {[
         ["Impact", "impact"],
