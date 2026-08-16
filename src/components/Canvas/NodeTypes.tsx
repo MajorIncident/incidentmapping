@@ -44,6 +44,27 @@ const actionStatusOptions = [
   value: value as NonNullable<ChainNodeData["actionStatus"]>,
   label: value === "InProgress" ? "In Progress" : value,
 }));
+const eventPhaseOptions = [
+  "Precursor",
+  "Incident",
+  "Detection",
+  "Response",
+  "Recovery",
+].map((value) => ({
+  value: value as NonNullable<ChainNodeData["eventPhase"]>,
+  label: value,
+}));
+const actionTypeOptions = [
+  { value: "Immediate" as const, label: "Immediate / Containment" },
+  { value: "Corrective" as const, label: "Corrective" },
+  { value: "Preventive" as const, label: "Preventive" },
+];
+const controlRoleOptions = ["Preventive", "Detective", "Mitigating"].map(
+  (value) => ({
+    value: value as NonNullable<BarrierNodeData["controlRole"]>,
+    label: value,
+  }),
+);
 
 const inputClasses =
   "w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-medium text-slate-700 focus:border-canvas-accent focus:outline-none focus:ring-2 focus:ring-canvas-accent";
@@ -94,6 +115,8 @@ const ChainNodeComponent = ({
   const setNodeActionStatus = useAppStore(
     (state) => state.actions.setNodeActionStatus,
   );
+  const setEventPhase = useAppStore((state) => state.actions.setEventPhase);
+  const setActionType = useAppStore((state) => state.actions.setActionType);
   const startEditing = useAppStore((state) => state.actions.startEditing);
   const finishEditing = useAppStore((state) => state.actions.finishEditing);
   const requestEditorFocus = useAppStore(
@@ -297,6 +320,35 @@ const ChainNodeComponent = ({
           {data.referenceId ?? "Unassigned"}
         </span>
       </header>
+      {!isEditing &&
+      (data.nodeType === "Event" || data.nodeType === "Action") &&
+      (data.nodeType === "Event"
+        ? Boolean(data.eventPhase) || selected
+        : Boolean(data.actionType) || selected) ? (
+        <div className="mb-2 flex min-w-0 flex-wrap gap-1.5">
+          {data.nodeType === "Event" ? (
+            <NodeTagMenu
+              readOnly={Boolean(data.readOnly) || !selected}
+              label="Event phase"
+              value={data.eventPhase}
+              placeholder="Set event phase"
+              options={eventPhaseOptions}
+              onChange={(next) => setEventPhase(id, next)}
+              className="node-tag--classification"
+            />
+          ) : (
+            <NodeTagMenu
+              readOnly={Boolean(data.readOnly) || !selected}
+              label="Action type"
+              value={data.actionType}
+              placeholder="Set action type"
+              options={actionTypeOptions}
+              onChange={(next) => setActionType(id, next)}
+              className="node-tag--classification"
+            />
+          )}
+        </div>
+      ) : null}
       <>
         <Handle
           id="bottom"
@@ -565,9 +617,11 @@ const ChainNodeComponent = ({
 };
 
 const BarrierNodeComponent = ({
+  id,
   data,
   selected,
 }: NodeProps<BarrierNodeData>): JSX.Element => {
+  const setControlRole = useAppStore((state) => state.actions.setControlRole);
   const treatments = {
     Effective: "border-emerald-400 bg-emerald-50",
     Degraded: "border-amber-400 bg-amber-50",
@@ -637,6 +691,19 @@ const BarrierNodeComponent = ({
           {data.status}
         </span>
       </header>
+      {data.controlRole || selected ? (
+        <div className="mt-2 flex min-w-0 flex-wrap">
+          <NodeTagMenu
+            readOnly={Boolean(data.readOnly) || !selected}
+            label="Control role"
+            value={data.controlRole}
+            placeholder="Set control role"
+            options={controlRoleOptions}
+            onChange={(next) => setControlRole(id, next)}
+            className="node-tag--classification"
+          />
+        </div>
+      ) : null}
       {!data.readOnly || showDetails ? (
         <p className="mt-1 whitespace-pre-line text-sm text-slate-700">
           {description ?? "No control purpose provided."}

@@ -12,6 +12,9 @@
   .node-tag--readonly {
     @apply cursor-default;
   }
+  .node-tag--classification {
+    @apply min-h-9 max-w-full whitespace-normal border-slate-300 bg-slate-100 text-left font-medium leading-tight text-slate-600;
+  }
   .node-tag--type {
     @apply uppercase tracking-wide text-slate-700;
   }
