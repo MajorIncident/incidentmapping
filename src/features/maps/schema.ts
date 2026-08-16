@@ -19,6 +19,7 @@ export const factorCategorySchema = z.enum([
   "Organization",
 ]);
 export const factorSignificanceSchema = z.enum([
+  "Normal",
   "Primary",
   "Contributing",
   "Potential",
@@ -101,6 +102,7 @@ export const chainNodeSchema = strictObject({
   positiveConsequenceBulletPoints: z.array(z.string()),
   negativeConsequenceBulletPoints: z.array(z.string()),
   evidenceItems: z.array(evidenceItemSchema),
+  evidenceHighWaterMark: z.number().int().nonnegative().optional(),
   position: positionSchema,
 });
 export const causeEffectEdgeSchema = strictObject({
@@ -115,6 +117,7 @@ export const actionEdgeSchema = strictObject({
   fromId: z.string().min(1),
   toId: z.string().min(1),
   status: actionStatusSchema.optional(),
+  dueDate: z.string().optional(),
 });
 export const relationshipEdgeSchema = z.discriminatedUnion("kind", [
   causeEffectEdgeSchema,
@@ -132,6 +135,10 @@ export const barrierSchema = strictObject({
 });
 export const metadataSchema = strictObject({
   title: z.string().optional(),
+  incidentDate: z.string().optional(),
+  location: z.string().optional(),
+  description: z.string().optional(),
+  nodeReferenceHighWaterMark: z.number().int().nonnegative().optional(),
 }).optional();
 export const mapDataSchema = strictObject({
   schemaVersion: z.literal(2),

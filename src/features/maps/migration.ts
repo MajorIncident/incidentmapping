@@ -7,12 +7,16 @@ export const migrateMapDataV1 = (input: unknown): MapData => {
   const legacy = mapDataV1Schema.parse(input);
   return mapDataSchema.parse({
     schemaVersion: 2,
-    metadata: legacy.metadata,
+    metadata: {
+      ...legacy.metadata,
+      nodeReferenceHighWaterMark: legacy.nodes.length,
+    },
     nodes: legacy.nodes.map((node, index) => ({
       ...node,
       referenceId: `N-${String(index + 1).padStart(3, "0")}`,
       nodeType: "Event",
       evidenceItems: [],
+      evidenceHighWaterMark: 0,
     })),
     edges: legacy.edges,
     barriers: legacy.barriers.map(({ breached, breachedItems, ...barrier }) => {
