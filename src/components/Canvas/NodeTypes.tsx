@@ -648,6 +648,8 @@ const BarrierNodeComponent = ({
   );
   const visibleEvidence = evidenceItems.slice(0, 3);
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
+  const reference = data.referenceId ?? "Unassigned";
+  const role = data.controlRole ?? "Unassigned role";
 
   return (
     <div
@@ -660,6 +662,7 @@ const BarrierNodeComponent = ({
       } ${data.graphRole?.isUnrelated ? "opacity-60 saturate-[.7]" : "opacity-100"} ${treatments[data.status]}`}
       data-testid="control-node"
       data-read-only={data.readOnly || undefined}
+      aria-label={`${reference} Control, ${role}, ${data.status}`}
     >
       <>
         <Handle
@@ -681,9 +684,10 @@ const BarrierNodeComponent = ({
           tabIndex={-1}
         />
       </>
-      <header className="flex items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-800">
-          CONTROL
+      <header className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-200/70 pb-2">
+        <div className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-800">
+          CONTROL <span aria-hidden="true">·</span>{" "}
+          <span className="whitespace-nowrap">{reference}</span>
         </div>
         <span
           className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClasses[data.status]}`}
@@ -691,6 +695,9 @@ const BarrierNodeComponent = ({
           {data.status}
         </span>
       </header>
+      <p className="mt-2 text-xs font-semibold text-slate-700">
+        {role} <span aria-hidden="true">·</span> {data.status}
+      </p>
       {data.controlRole || selected ? (
         <div className="mt-2 flex min-w-0 flex-wrap">
           <NodeTagMenu
@@ -705,7 +712,7 @@ const BarrierNodeComponent = ({
         </div>
       ) : null}
       {!data.readOnly || showDetails ? (
-        <p className="mt-1 whitespace-pre-line text-sm text-slate-700">
+        <p className="mt-1 min-w-0 whitespace-pre-line break-words text-sm text-slate-700">
           {description ?? "No control purpose provided."}
         </p>
       ) : null}

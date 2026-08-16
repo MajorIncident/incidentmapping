@@ -1525,7 +1525,9 @@ export const Inspector = ({
                 className="text-right text-xs text-slate-500"
                 aria-live="polite"
               >
-                <strong className="block text-slate-700">Control</strong>
+                <strong className="block text-slate-700">
+                  {barrier.referenceId ?? "Unassigned"} · Control
+                </strong>
                 Between{" "}
                 {chainNodes.find((item) => item.id === barrier.upstreamNodeId)
                   ?.data.referenceId ?? "Unassigned"}{" "}
