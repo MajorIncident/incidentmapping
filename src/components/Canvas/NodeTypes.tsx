@@ -150,24 +150,22 @@ const ChainNodeComponent = ({
     [cancelEdit, commitEdit],
   );
 
-  const presentation = data.presentation;
+  const graphRole = data.graphRole;
   const containerClassName = useMemo(() => {
     const significance = data.factorSignificance ?? "Normal";
-    const root = presentation?.isRoot
-      ? "border-violet-400"
-      : "border-slate-200";
+    const root = graphRole?.isRoot ? "border-violet-400" : "border-slate-200";
     const classification =
       data.nodeType === "Factor" && significance === "RootCause"
         ? "border-rose-500 shadow-[0_8px_24px_rgba(190,24,93,0.16)]"
         : data.nodeType === "Factor" && significance === "KeyFactor"
           ? "border-amber-400"
           : "";
-    const related = presentation?.isUnrelated
+    const related = graphRole?.isUnrelated
       ? "opacity-45 saturate-50"
       : "opacity-100";
     const active = selected
       ? "ring-4 ring-sky-500 ring-offset-2 border-sky-700 shadow-lg"
-      : presentation?.isOnSelectedPath
+      : graphRole?.isOnSelectedPath
         ? "ring-2 ring-slate-300"
         : "ring-0";
     const action =
@@ -175,7 +173,7 @@ const ChainNodeComponent = ({
         ? "border-slate-300 bg-slate-50 shadow-sm"
         : "";
     return `${containerClasses} ${root} ${classification} ${action} ${related} ${active}`;
-  }, [data.factorSignificance, data.nodeType, presentation, selected]);
+  }, [data.factorSignificance, data.nodeType, graphRole, selected]);
 
   const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
     (point) => point.trim().length > 0,
@@ -200,27 +198,33 @@ const ChainNodeComponent = ({
   return (
     <div
       className={containerClassName}
-      onDoubleClick={openEditor}
+      onDoubleClick={data.readOnly ? undefined : openEditor}
+      data-read-only={data.readOnly || undefined}
       data-testid="chain-node"
-      data-root={presentation?.isRoot || undefined}
-      data-leaf={presentation?.isLeaf || undefined}
-      data-selected-path={presentation?.isOnSelectedPath || undefined}
-      data-unrelated={presentation?.isUnrelated || undefined}
+      data-root={graphRole?.isRoot || undefined}
+      data-leaf={graphRole?.isLeaf || undefined}
+      data-selected-path={graphRole?.isOnSelectedPath || undefined}
+      data-unrelated={graphRole?.isUnrelated || undefined}
     >
-      <Handle
-        id="top"
-        type="target"
-        position={Position.Top}
-        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
-      />
-      <Handle
-        id="left"
-        type="target"
-        position={Position.Left}
-        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"}`}
-      />
+      {!data.readOnly ? (
+        <>
+          <Handle
+            id="top"
+            type="target"
+            position={Position.Top}
+            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
+          />
+          <Handle
+            id="left"
+            type="target"
+            position={Position.Left}
+            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-400 ${data.nodeType === "Action" ? "" : "!hidden"}`}
+          />
+        </>
+      ) : null}
       <div className="mb-2 flex min-h-6 flex-wrap items-center gap-1.5">
         <NodeTagMenu
+          readOnly={data.readOnly}
           label="Node type"
           value={data.nodeType ?? "Event"}
           options={nodeTypeOptions}
@@ -233,18 +237,20 @@ const ChainNodeComponent = ({
         >
           {data.referenceId ?? "Unassigned"}
         </span>
-        {presentation?.isRoot ? (
+        {graphRole?.isRoot ? (
           <span className="node-structural-tag">Top Event</span>
         ) : null}
         {data.nodeType === "Factor" ? (
           <>
             <NodeTagMenu
+              readOnly={data.readOnly}
               label="Factor category"
               value={data.factorCategory ?? "Human"}
               options={factorCategoryOptions}
               onChange={(value) => setFactorCategory(id, value)}
             />
             <NodeTagMenu
+              readOnly={data.readOnly}
               label="Factor significance"
               value={data.factorSignificance ?? "Normal"}
               options={significanceOptions}
@@ -255,6 +261,7 @@ const ChainNodeComponent = ({
         ) : null}
         {data.nodeType === "Action" ? (
           <NodeTagMenu
+            readOnly={data.readOnly}
             label="Action status"
             value={data.actionStatus ?? "Proposed"}
             options={actionStatusOptions}
@@ -262,18 +269,22 @@ const ChainNodeComponent = ({
           />
         ) : null}
       </div>
-      <Handle
-        id="bottom"
-        type="source"
-        position={Position.Bottom}
-        className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
-      />
-      <Handle
-        id="right"
-        type="source"
-        position={Position.Right}
-        className="!h-3 !w-3 !border-2 !border-white !bg-slate-400"
-      />
+      {!data.readOnly ? (
+        <>
+          <Handle
+            id="bottom"
+            type="source"
+            position={Position.Bottom}
+            className={`!h-3 !w-3 !border-2 !border-white !bg-slate-600 ${data.nodeType === "Action" ? "!hidden" : ""}`}
+          />
+          <Handle
+            id="right"
+            type="source"
+            position={Position.Right}
+            className="!h-3 !w-3 !border-2 !border-white !bg-slate-400"
+          />
+        </>
+      ) : null}
       {isEditing ? (
         <input
           ref={inputRef}
@@ -434,19 +445,24 @@ const BarrierNodeComponent = ({
         selected ? "ring-2 ring-canvas-accent" : "ring-0"
       } ${treatments[data.status]}`}
       data-testid="barrier-node"
+      data-read-only={data.readOnly || undefined}
     >
-      <Handle
-        id="top"
-        type="target"
-        position={Position.Top}
-        className="!bg-sky-500"
-      />
-      <Handle
-        id="bottom"
-        type="source"
-        position={Position.Bottom}
-        className="!bg-sky-500"
-      />
+      {!data.readOnly ? (
+        <>
+          <Handle
+            id="top"
+            type="target"
+            position={Position.Top}
+            className="!bg-sky-500"
+          />
+          <Handle
+            id="bottom"
+            type="source"
+            position={Position.Bottom}
+            className="!bg-sky-500"
+          />
+        </>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-sky-800">
           Barrier

@@ -43,7 +43,7 @@ describe("App initial canvas", () => {
             id: root.id,
             data: {
               ...root.data,
-              presentation: {
+              graphRole: {
                 isRoot: true,
                 isLeaf: true,
                 isOnSelectedPath: true,

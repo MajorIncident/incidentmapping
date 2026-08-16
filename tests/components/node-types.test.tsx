@@ -146,7 +146,7 @@ describe("ChainNode details", () => {
   it("exposes derived root, leaf, path, and unrelated presentation states", () => {
     renderChainNode(
       {
-        presentation: {
+        graphRole: {
           isRoot: true,
           isLeaf: true,
           isOnSelectedPath: true,

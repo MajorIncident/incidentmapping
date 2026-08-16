@@ -38,12 +38,14 @@ export type ChainNodeData = {
   factorSignificance?: ChainNode["factorSignificance"];
   actionStatus?: ChainNode["actionStatus"];
   /** Ephemeral canvas-only styling hints. This field is never serialized. */
-  presentation?: {
+  graphRole?: {
     isRoot: boolean;
     isLeaf: boolean;
     isOnSelectedPath: boolean;
     isUnrelated: boolean;
   };
+  /** Ephemeral view-only flag. This field is never serialized. */
+  readOnly?: boolean;
 };
 
 export type BarrierNodeData = {
@@ -54,6 +56,7 @@ export type BarrierNodeData = {
   status: Barrier["status"];
   failureReason?: Barrier["failureReason"];
   failureDetails?: string;
+  readOnly?: boolean;
 };
 
 type RuntimeBarrier = Barrier;
@@ -255,7 +258,11 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
   }));
 
 const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => {
-  const { presentation: _presentation, ...persistedData } = node.data;
+  const {
+    graphRole: _graphRole,
+    readOnly: _readOnly,
+    ...persistedData
+  } = node.data;
   return {
     ...node,
     position: { ...node.position },
