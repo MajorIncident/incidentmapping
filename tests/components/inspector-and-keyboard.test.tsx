@@ -155,7 +155,7 @@ describe("Inspector and keyboard workflows", () => {
     render(<App />);
 
     act(() => {
-      useAppStore.getState().actions.addBarrier("root");
+      useAppStore.getState().actions.addBarrier("root", "child");
     });
 
     const description = await screen.findByRole("textbox", {
@@ -176,6 +176,91 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.getByTestId("barrier-node")).toHaveTextContent(
       "No barrier description provided.",
     );
+  });
+
+  it("lists every downstream branch and creates a barrier on a chosen non-first child", async () => {
+    act(() => {
+      useAppStore.getState().actions.loadMap({
+        schemaVersion: 1,
+        nodes: [
+          {
+            id: "parent",
+            kind: "ChainNode",
+            title: "Parent",
+            position: { x: 0, y: 0 },
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+          },
+          {
+            id: "child-one",
+            kind: "ChainNode",
+            title: "Duplicate",
+            position: { x: -200, y: 200 },
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+          },
+          {
+            id: "child-two",
+            kind: "ChainNode",
+            title: "Duplicate",
+            position: { x: 200, y: 200 },
+            positiveConsequenceBulletPoints: [],
+            negativeConsequenceBulletPoints: [],
+          },
+        ],
+        edges: [
+          {
+            id: "edge-one",
+            kind: "CauseEffectEdge",
+            fromId: "parent",
+            toId: "child-one",
+          },
+          {
+            id: "edge-two",
+            kind: "CauseEffectEdge",
+            fromId: "parent",
+            toId: "child-two",
+          },
+        ],
+        barriers: [
+          {
+            id: "existing",
+            kind: "Barrier",
+            upstreamNodeId: "parent",
+            downstreamNodeId: "child-one",
+            breached: false,
+            breachedItems: [],
+          },
+        ],
+      });
+      useAppStore.getState().actions.select("parent");
+    });
+    render(
+      <ReactFlowProvider>
+        <Inspector />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.getByText("Add barrier to branch")).toBeVisible();
+    expect(screen.getByText(/Branch 1 of 2.*ld-one/)).toBeVisible();
+    expect(screen.getByText(/Branch 2 of 2.*ld-two/)).toBeVisible();
+    expect(
+      screen.getByRole("button", {
+        name: "Barrier exists: Parent → Duplicate",
+      }),
+    ).toBeDisabled();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add barrier: Parent → Duplicate" }),
+    );
+    expect(useAppStore.getState().barriers[1]).toMatchObject({
+      downstreamNodeId: "child-two",
+    });
+    expect(
+      await screen.findByRole("heading", {
+        name: "Barrier between Parent and Duplicate",
+      }),
+    ).toBeVisible();
   });
 
   it.each([

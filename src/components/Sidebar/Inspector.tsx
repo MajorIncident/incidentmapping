@@ -649,10 +649,13 @@ export const Inspector = (): JSX.Element => {
           onSubmit={(event) => event.preventDefault()}
         >
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-slate-900">Barrier</h3>
-            <p className="text-xs text-slate-500">
-              Between {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
+            <h3 className="text-sm font-semibold text-slate-900">
+              Barrier between{" "}
+              {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
               {downstreamNode?.data.title ?? barrier.downstreamNodeId}
+            </h3>
+            <p className="text-xs text-slate-500">
+              This barrier applies only to the selected connection.
             </p>
           </div>
 
@@ -806,20 +809,21 @@ export const Inspector = (): JSX.Element => {
       );
     }
 
-    const downstreamEdge =
-      edges.find((edge) => edge.source === node.id) ?? null;
-    const downstreamNode = downstreamEdge
-      ? (chainNodes.find(
-          (candidate) => candidate.id === downstreamEdge.target,
-        ) ?? null)
-      : null;
-    const existingBarrier = downstreamEdge
-      ? (barriers.find(
-          (item) =>
-            item.upstreamNodeId === node.id &&
-            item.downstreamNodeId === downstreamEdge.target,
-        ) ?? null)
-      : null;
+    const downstreamBranches = edges
+      .filter((edge) => edge.source === node.id)
+      .map((edge, index, branchEdges) => ({
+        edge,
+        node:
+          chainNodes.find((candidate) => candidate.id === edge.target) ?? null,
+        barrier:
+          barriers.find(
+            (item) =>
+              item.upstreamNodeId === node.id &&
+              item.downstreamNodeId === edge.target,
+          ) ?? null,
+        index,
+        count: branchEdges.length,
+      }));
 
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
@@ -875,58 +879,51 @@ export const Inspector = (): JSX.Element => {
         <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-center justify-between">
             <span className={labelClasses}>Barrier</span>
-            {existingBarrier ? (
-              <span
-                className={`text-xs font-semibold ${
-                  existingBarrier.breached
-                    ? "text-rose-600"
-                    : "text-emerald-600"
-                }`}
-              >
-                {existingBarrier.breached ? "Breached" : "Holding"}
-              </span>
-            ) : null}
           </div>
-          {!downstreamEdge ? (
+          {downstreamBranches.length === 0 ? (
             <p className="text-xs text-slate-500">
               Add a downstream ChainNode to place a barrier.
             </p>
-          ) : existingBarrier ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-slate-700">
-                Barrier between {node.data.title} and{" "}
-                {downstreamNode?.data.title ?? downstreamEdge.target}.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className={buttonClasses}
-                  onClick={() => select(existingBarrier.id)}
-                >
-                  Edit Barrier
-                </button>
-                <button
-                  type="button"
-                  className={`${buttonClasses} border-rose-200 text-rose-700`}
-                  onClick={() => removeBarrier(existingBarrier.id)}
-                >
-                  Remove Barrier
-                </button>
-              </div>
-            </div>
           ) : (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-slate-700">
-                Insert a barrier between {node.data.title} and{" "}
-                {downstreamNode?.data.title ?? downstreamEdge.target}.
-              </p>
-              <button
-                type="button"
-                className={`${buttonClasses} px-2 py-1 text-xs`}
-                onClick={() => addBarrier(node.id)}
-              >
-                Add Barrier
-              </button>
+            <div className="flex flex-col gap-2">
+              {downstreamBranches.length > 1 ? (
+                <p className="text-sm font-medium text-slate-700">
+                  Add barrier to branch
+                </p>
+              ) : null}
+              {downstreamBranches.map((branch) => {
+                const childTitle =
+                  branch.node?.data.title ?? branch.edge.target;
+                const context =
+                  branch.count > 1
+                    ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
+                    : null;
+                return (
+                  <div
+                    key={branch.edge.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 text-sm text-slate-700">
+                      <span>{childTitle}</span>
+                      {context ? (
+                        <span className="block text-xs text-slate-500">
+                          {context}
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className={`${buttonClasses} px-2 py-1 text-xs`}
+                      disabled={Boolean(branch.barrier)}
+                      onClick={() => addBarrier(node.id, branch.edge.target)}
+                    >
+                      {branch.barrier
+                        ? `Barrier exists: ${node.data.title} → ${childTitle}`
+                        : `Add barrier: ${node.data.title} → ${childTitle}`}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

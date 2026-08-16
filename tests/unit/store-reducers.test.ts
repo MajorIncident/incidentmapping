@@ -189,9 +189,9 @@ describe("useAppStore actions", () => {
   it("creates a breached, selected barrier and requests description focus", () => {
     const { actions } = useAppStore.getState();
     const parentId = actions.addChild() as string;
-    actions.addChild(parentId);
+    const childId = actions.addChild(parentId) as string;
 
-    const barrierId = actions.addBarrier(parentId);
+    const barrierId = actions.addBarrier(parentId, childId);
     const state = useAppStore.getState();
 
     expect(barrierId).toBeTruthy();
@@ -209,6 +209,39 @@ describe("useAppStore actions", () => {
     });
   });
 
+  it("creates barriers only for an explicit existing branch and prevents duplicates per edge", () => {
+    const { actions } = useAppStore.getState();
+    const parentId = actions.addChild() as string;
+    const firstChildId = actions.addChild(parentId) as string;
+    actions.select(parentId);
+    const secondChildId = actions.addChild(parentId) as string;
+
+    expect(actions.addBarrier(parentId, "not-a-child")).toBeNull();
+    expect(actions.addBarrier(parentId, secondChildId)).toBeTruthy();
+    expect(actions.addBarrier(parentId, secondChildId)).toBeNull();
+    expect(actions.addBarrier(parentId, firstChildId)).toBeTruthy();
+    expect(useAppStore.getState().barriers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          upstreamNodeId: parentId,
+          downstreamNodeId: firstChildId,
+        }),
+        expect.objectContaining({
+          upstreamNodeId: parentId,
+          downstreamNodeId: secondChildId,
+        }),
+      ]),
+    );
+  });
+
+  it("does not create a barrier for a node without downstream edges", () => {
+    const { actions } = useAppStore.getState();
+    const leafId = actions.addChild() as string;
+
+    expect(actions.addBarrier(leafId, "missing")).toBeNull();
+    expect(useAppStore.getState().barriers).toEqual([]);
+  });
+
   it("retains the breached state of loaded legacy barriers", () => {
     useAppStore.getState().actions.loadMap(sampleMap);
 
@@ -221,8 +254,8 @@ describe("useAppStore actions", () => {
   it("batches live barrier description changes into one undo entry", () => {
     const { actions } = useAppStore.getState();
     const parentId = actions.addChild() as string;
-    actions.addChild(parentId);
-    const barrierId = actions.addBarrier(parentId) as string;
+    const childId = actions.addChild(parentId) as string;
+    const barrierId = actions.addBarrier(parentId, childId) as string;
     const initialHistoryLength = useAppStore.getState().history.past.length;
 
     actions.updateBarrierData(
