@@ -7,7 +7,11 @@ const TEMP_FILENAME = path.join(os.tmpdir(), "incident-map-smoke.json");
 test("creates, saves, and reopens a simple map", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "New" }).click();
+  await expect(page.getByText("Holding", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("barrier-node")).toHaveCount(0);
+  await expect(page.getByText("Follow-up Event", { exact: true })).toHaveCount(
+    0,
+  );
   const input = page.getByRole("textbox", { name: "Node title" });
   await expect(input).toBeFocused();
   await input.fill("Primary Event");
@@ -132,8 +136,13 @@ test("shows map semantics and highlights only a selected branch", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
+  await page.getByRole("button", { name: "Add ChainNode" }).click();
+  await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await expect(
-    page.getByRole("heading", { name: "Sample Incident Chain" }),
+    page.getByRole("heading", { name: "Untitled Map" }),
   ).toBeVisible();
   await expect(page.getByLabel("Incident map legend")).toContainText(
     "top to bottom",

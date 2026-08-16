@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GRID_SIZE, useAppStore } from "../../src/state/useAppStore";
+import {
+  createNewMapState,
+  GRID_SIZE,
+  useAppStore,
+} from "../../src/state/useAppStore";
 import {
   getNodeSize,
   snapPosition,
@@ -13,6 +17,38 @@ describe("useAppStore actions", () => {
     if (!useAppStore.getState().showDetails) {
       useAppStore.getState().actions.setShowDetails(true);
     }
+  });
+
+  it("uses a fresh, clean root state both initially and after newMap", () => {
+    const initial = createNewMapState();
+    const initialRoot = initial.nodes[0];
+
+    for (const state of [initial]) {
+      expect(state.nodes).toHaveLength(1);
+      expect(state.edges).toEqual([]);
+      expect(state.barriers).toEqual([]);
+      expect(state.selectionId).toBe(state.nodes[0].id);
+      expect(state.editingId).toBe(state.nodes[0].id);
+      expect(state.history).toEqual({ past: [], future: [] });
+      expect(state.canUndo).toBe(false);
+      expect(state.canRedo).toBe(false);
+    }
+
+    useAppStore.getState().actions.newMap();
+    const reset = useAppStore.getState();
+    expect(reset.nodes).toHaveLength(1);
+    expect(reset.edges).toEqual([]);
+    expect(reset.barriers).toEqual([]);
+    expect(reset.selectionId).toBe(reset.nodes[0].id);
+    expect(reset.editingId).toBe(reset.nodes[0].id);
+    expect(reset.history).toEqual({ past: [], future: [] });
+    expect(reset.canUndo).toBe(false);
+    expect(reset.canRedo).toBe(false);
+    expect(reset.nodes[0].id).not.toBe(initialRoot.id);
+    expect(reset.viewportRequest?.id).not.toBe(initial.viewportRequest?.id);
+    expect(reset.editorFocusRequest?.id).not.toBe(
+      initial.editorFocusRequest?.id,
+    );
   });
 
   it("creates a fresh selected root in edit mode without history", () => {
