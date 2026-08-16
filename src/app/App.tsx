@@ -9,6 +9,7 @@ import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
 import { useCallback, useEffect, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
+import { Chronology } from "../components/Presentation/Chronology";
 import { canAddBelowSelection } from "../state/selectors";
 
 export const App = (): JSX.Element => {
@@ -16,6 +17,8 @@ export const App = (): JSX.Element => {
   const [presenting, setPresenting] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
+  const [chronologyOpen, setChronologyOpen] = useState(false);
+  const [chronologyMobile, setChronologyMobile] = useState(false);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
@@ -34,8 +37,21 @@ export const App = (): JSX.Element => {
   const exitPresentation = useCallback(() => {
     select(null);
     setPresentationHintOpen(false);
+    setChronologyOpen(false);
     setPresenting(false);
   }, [select]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setChronologyMobile(window.innerWidth <= 767);
+      return;
+    }
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setChronologyMobile(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
   const canOrganize = useAppStore(
     (state) =>
       state.nodes.length >= 2 &&
@@ -71,6 +87,11 @@ export const App = (): JSX.Element => {
         return;
       }
       if (event.defaultPrevented) return;
+      if (chronologyOpen) {
+        event.preventDefault();
+        setChronologyOpen(false);
+        return;
+      }
       const target = event.target;
       if (
         target instanceof HTMLElement &&
@@ -83,7 +104,7 @@ export const App = (): JSX.Element => {
     };
     window.addEventListener("keydown", exitOnEscape, true);
     return () => window.removeEventListener("keydown", exitOnEscape, true);
-  }, [exitPresentation, presenting]);
+  }, [chronologyOpen, exitPresentation, presenting]);
 
   return (
     <ReactFlowProvider>
@@ -117,6 +138,7 @@ export const App = (): JSX.Element => {
                   useAppStore.getState().actions.select(null);
                   setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
+                  setChronologyOpen(false);
                   setPresenting(true);
                 }}
               />
@@ -158,7 +180,28 @@ export const App = (): JSX.Element => {
                   </aside>
                 ) : null}
                 <Legend />
+                {chronologyOpen ? (
+                  <Chronology
+                    nodes={useAppStore.getState().nodes}
+                    selectedId={selectionId}
+                    mobile={chronologyMobile}
+                    onClose={() => setChronologyOpen(false)}
+                    onSelect={(id) => {
+                      select(id);
+                      setPresentationHintOpen(false);
+                      if (chronologyMobile) setChronologyOpen(false);
+                    }}
+                  />
+                ) : null}
                 <div className="presentation-actions">
+                  <button
+                    type="button"
+                    aria-pressed={chronologyOpen}
+                    aria-haspopup={chronologyMobile ? "dialog" : undefined}
+                    onClick={() => setChronologyOpen((visible) => !visible)}
+                  >
+                    Chronology
+                  </button>
                   <button
                     type="button"
                     aria-pressed={presentationShowDetails}
