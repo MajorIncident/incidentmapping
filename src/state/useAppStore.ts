@@ -61,8 +61,8 @@ type AppState = {
   viewportRequest: { id: number; nodeIds: string[] } | null;
   editorFocusRequest: {
     id: number;
-    nodeId: string;
-    field: "title" | "description";
+    entityId: string;
+    field: "title" | "description" | "barrier-description";
   } | null;
   history: HistoryState;
   canUndo: boolean;
@@ -74,7 +74,7 @@ type AppState = {
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
-    addBarrierForFirstDownstream: (upstreamId?: string) => string | null;
+    addBarrier: (upstreamId?: string) => string | null;
     setMapTitle: (title: string) => void;
     renameNode: (id: string, title: string) => boolean;
     moveNode: (id: string, position: XYPosition) => void;
@@ -97,30 +97,42 @@ type AppState = {
       patch: Partial<
         Pick<Barrier, "breached" | "breachedItems" | "description">
       >,
+      options?: { debounceHistory?: boolean },
     ) => void;
     undo: () => void;
     redo: () => void;
     clearViewportRequest: (id: number) => void;
     requestEditorFocus: (
-      nodeId: string,
-      field: "title" | "description",
+      entityId: string,
+      field: "title" | "description" | "barrier-description",
     ) => void;
     clearEditorFocusRequest: (id: number) => void;
   };
 };
 
 const MOVE_DEBOUNCE_MS = 200;
+const TEXT_EDIT_DEBOUNCE_MS = 500;
 
 let moveDebounceActive = false;
 let nextEditorFocusRequestId = 1;
 let nextNewMapViewportRequestId = 1;
 let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let textEditDebounceKey: string | null = null;
+let textEditDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const resetMoveDebounce = () => {
   moveDebounceActive = false;
   if (moveDebounceTimer) {
     clearTimeout(moveDebounceTimer);
     moveDebounceTimer = null;
+  }
+};
+
+const resetTextEditDebounce = () => {
+  textEditDebounceKey = null;
+  if (textEditDebounceTimer) {
+    clearTimeout(textEditDebounceTimer);
+    textEditDebounceTimer = null;
   }
 };
 
@@ -222,7 +234,7 @@ const updateHistoryState = (
   state: AppState,
   prevSnapshot: HistoryEntry,
   changed: boolean,
-  options?: { debounce?: "move" | null },
+  options?: { debounce?: "move" | "text" | null; debounceKey?: string },
 ): HistoryState => {
   if (!changed) {
     return state.history;
@@ -248,7 +260,23 @@ const updateHistoryState = (
     return state.history;
   }
 
+  if (options?.debounce === "text") {
+    const key = options.debounceKey ?? "text";
+    const history =
+      textEditDebounceKey === key
+        ? state.history
+        : pushHistory(state.history, prevSnapshot);
+    textEditDebounceKey = key;
+    textEditDebounceTimer && clearTimeout(textEditDebounceTimer);
+    textEditDebounceTimer = setTimeout(() => {
+      textEditDebounceKey = null;
+      textEditDebounceTimer = null;
+    }, TEXT_EDIT_DEBOUNCE_MS);
+    return history;
+  }
+
   resetMoveDebounce();
+  resetTextEditDebounce();
   return pushHistory(state.history, prevSnapshot);
 };
 
@@ -297,7 +325,7 @@ export const createNewMapState = () => {
     viewportRequest: { id: nextNewMapViewportRequestId++, nodeIds: [rootId] },
     editorFocusRequest: {
       id: nextEditorFocusRequestId++,
-      nodeId: rootId,
+      entityId: rootId,
       field: "title" as const,
     },
     history: createEmptyHistory(),
@@ -311,6 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   actions: {
     newMap: () => {
       resetMoveDebounce();
+      resetTextEditDebounce();
       set((state) => ({
         ...createNewMapState(),
         showDetails: state.showDetails,
@@ -318,6 +347,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     loadMap: (map) => {
       resetMoveDebounce();
+      resetTextEditDebounce();
       set((state) => ({
         nodes: applyLayout(
           mapNodesToReactNodes(map.nodes),
@@ -350,7 +380,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           fromId: edge.source,
           toId: edge.target,
         })),
-        barriers: barriers.map(cloneBarrier),
+        barriers: barriers.map((barrier) => {
+          const description = barrier.description?.trim();
+          return {
+            ...cloneBarrier(barrier),
+            description: description?.length ? description : undefined,
+          };
+        }),
       };
     },
     addChainNode: (options) => {
@@ -477,7 +513,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             : null,
           editorFocusRequest: {
             id: nextEditorFocusRequestId++,
-            nodeId: newNodeId,
+            entityId: newNodeId,
             field: "title",
           },
           history,
@@ -582,7 +618,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             : null,
           editorFocusRequest: {
             id: nextEditorFocusRequestId++,
-            nodeId: newNodeId,
+            entityId: newNodeId,
             field: "title",
           },
           history,
@@ -592,7 +628,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
-    addBarrierForFirstDownstream: (upstreamId) => {
+    addBarrier: (upstreamId) => {
       const targetUpstreamId = upstreamId ?? get().selectionId ?? undefined;
       if (!targetUpstreamId) {
         return null;
@@ -624,7 +660,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             kind: "Barrier" as const,
             upstreamNodeId: targetUpstreamId,
             downstreamNodeId: downstreamEdge.target,
-            breached: false,
+            breached: true,
             breachedItems: [],
           },
         ];
@@ -633,6 +669,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           barriers: nextBarriers,
           selectionId: barrierId,
           editingId: null,
+          editorFocusRequest: {
+            id: nextEditorFocusRequestId++,
+            entityId: barrierId,
+            field: "barrier-description",
+          },
         } satisfies AppState;
         const nextSnapshot = snapshotFromState(candidate);
         const history = updateHistoryState(
@@ -644,6 +685,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           barriers: nextBarriers,
           selectionId: barrierId,
           editingId: null,
+          editorFocusRequest: candidate.editorFocusRequest,
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,
@@ -998,7 +1040,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
       });
     },
-    updateBarrierData: (id, patch) => {
+    updateBarrierData: (id, patch, options) => {
       const prevSnapshot = snapshotFromState(get());
       let changed = false;
       set((state) => {
@@ -1032,6 +1074,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           state,
           prevSnapshot,
           !snapshotsEqual(prevSnapshot, nextSnapshot),
+          options?.debounceHistory
+            ? { debounce: "text", debounceKey: `barrier:${id}:description` }
+            : undefined,
         );
         return {
           barriers: nextBarriers,
@@ -1046,9 +1091,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         state.viewportRequest?.id === id ? { viewportRequest: null } : {},
       );
     },
-    requestEditorFocus: (nodeId, field) => {
+    requestEditorFocus: (entityId, field) => {
       set({
-        editorFocusRequest: { id: nextEditorFocusRequestId++, nodeId, field },
+        editorFocusRequest: { id: nextEditorFocusRequestId++, entityId, field },
       });
     },
     clearEditorFocusRequest: (id) => {

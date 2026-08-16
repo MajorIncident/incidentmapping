@@ -40,7 +40,7 @@ const ChainNodeComponent = ({
   useEffect(() => {
     if (
       editorFocusRequest?.field === "title" &&
-      editorFocusRequest.nodeId === id &&
+      editorFocusRequest.entityId === id &&
       !viewportRequest
     ) {
       startEditing(id);
@@ -53,7 +53,7 @@ const ChainNodeComponent = ({
       inputRef.current?.select();
       if (
         editorFocusRequest?.field === "title" &&
-        editorFocusRequest.nodeId === id
+        editorFocusRequest.entityId === id
       ) {
         clearEditorFocusRequest(editorFocusRequest.id);
       }

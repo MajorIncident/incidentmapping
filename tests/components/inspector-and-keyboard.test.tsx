@@ -12,7 +12,7 @@ import { ReactFlowProvider } from "reactflow";
 import { Inspector } from "../../src/components/Sidebar/Inspector";
 import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
-import { emptyMap } from "../../src/features/maps/fixtures";
+import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -145,6 +145,37 @@ describe("Inspector and keyboard workflows", () => {
       expect(editor).not.toBeNull();
       expect(editor).toBe(document.activeElement);
     });
+  });
+
+  it("focuses a new barrier description, updates its card live, and undoes it as one edit", async () => {
+    const mapWithoutBarrier = { ...sampleMap, barriers: [] };
+    act(() => {
+      useAppStore.getState().actions.loadMap(mapWithoutBarrier);
+    });
+    render(<App />);
+
+    act(() => {
+      useAppStore.getState().actions.addBarrier("root");
+    });
+
+    const description = await screen.findByRole("textbox", {
+      name: /^Description$/i,
+    });
+    await waitFor(() => expect(description).toHaveFocus());
+    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+
+    const user = userEvent.setup();
+    await user.type(description, "Firewall active");
+    expect(screen.getByTestId("barrier-node")).toHaveTextContent(
+      "Firewall active",
+    );
+
+    act(() => {
+      useAppStore.getState().actions.undo();
+    });
+    expect(screen.getByTestId("barrier-node")).toHaveTextContent(
+      "No barrier description provided.",
+    );
   });
 
   it.each([
