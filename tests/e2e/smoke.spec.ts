@@ -235,3 +235,26 @@ test("shows map semantics and highlights only a selected branch", async ({
     page.locator(".incident-edge--upstream .react-flow__edge-path").first(),
   ).toHaveCSS("stroke-dasharray", "7px, 4px");
 });
+
+test("renames the map title in place instead of in the toolbar", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const titleControl = page.getByRole("button", {
+    name: /Untitled Map.*Edit map title/i,
+  });
+  await titleControl.click();
+  const titleInput = page.getByRole("textbox", { name: "Map title" });
+  await expect(titleInput).toBeFocused();
+  await titleInput.fill("Production incident");
+  await titleInput.press("Enter");
+
+  await expect(
+    page.getByRole("button", { name: /Production incident.*Edit map title/i }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Production incident incident map"),
+  ).toBeVisible();
+  await expect(page.locator("header").getByRole("textbox")).toHaveCount(0);
+});
