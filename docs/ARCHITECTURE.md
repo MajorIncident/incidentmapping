@@ -5,19 +5,33 @@
 The application intentionally separates the saved investigation from rendering
 and view state.
 
-### 1. Persisted V3 state
+### 1. Persisted V4 state and package decision
 
-The canonical save document is strict Version 3 `MapData`: incident metadata,
+The canonical save document is strict Version 4 `MapData`: incident metadata,
 semantic nodes and coordinates, discriminated relationships, Controls (under
 the historical wire key `barriers`), the global Evidence registry, Context,
 and allocation high-water marks. Action accountability lives on Action nodes.
 The [map schema](MAP_SCHEMA.md) is the complete wire contract.
 
 Open sends all untrusted JSON through `parseAndMigrateMapData` before loading the
-store. Save converts the runtime model with `toMap()`, validates V3, and only
-then writes JSON using the browser's available local-file/download mechanism.
-This is JSON persistence, not hosted storage, an upload service, or attachment
-storage.
+store. Save converts the runtime model with `toMap()`, validates V4, and only
+then writes through the browser's available local-file/download mechanism.
+The default persistence format is a `.incidentmap` ZIP containing one canonical,
+formatted root `map.json` and active binaries below `attachments/`. JSON export
+contains metadata and the attachment manifest only; neither Blob URLs, base64,
+nor binary buffers belong in the document or Zustand history.
+
+We selected production dependency **fflate 0.8.x** because its browser ESM build
+exposes synchronous `zipSync`/`unzipSync` and UTF-8 helpers without Node
+polyfills. The upstream project reports roughly an 8 kB minified core (about
+3 kB gzip), substantially smaller than general archive libraries; the app uses
+the simple synchronous API because packages are bounded to 100 MB. The browser
+Web Crypto API supplies SHA-256 rather than adding a crypto dependency.
+
+Attachment bytes, deleted/restorable tombstones, and revocable Blob URLs live
+in a session-only runtime store keyed by attachment ID. Central persistence
+validation limits each file to 25 MB and all attachments to 100 MB, constrains
+normalized bundle paths, and permits only the schema's safe media allowlist.
 
 ### 2. Runtime React Flow state
 
@@ -27,7 +41,7 @@ properties; persisted relationships become React Flow edges. Runtime Controls
 and the Evidence registry remain domain collections rather than independent
 causal nodes. Store mutations, history snapshots, selection, dragging, and
 layout operate here. `toMap()` removes React Flow-specific rendering data and
-reconstructs canonical V3.
+reconstructs canonical V4.
 
 ### 3. Derived Presentation state
 
