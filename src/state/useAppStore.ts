@@ -31,7 +31,6 @@ export type ChainNodeData = {
   negativeConsequenceBulletPoints: string[];
   evidenceItems?: ChainNode["evidenceItems"];
   severity?: ChainNode["severity"];
-  incidentStatus?: ChainNode["incidentStatus"];
   factorCategory?: ChainNode["factorCategory"];
   factorSignificance?: ChainNode["factorSignificance"];
   actionStatus?: ChainNode["actionStatus"];
@@ -208,7 +207,6 @@ const chainNodeToReactNode = (node: ChainNode): Node<ChainNodeData> => ({
     negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
     evidenceItems: node.evidenceItems.map((item) => ({ ...item })),
     severity: node.severity,
-    incidentStatus: node.incidentStatus,
     factorCategory: node.factorCategory,
     factorSignificance: node.factorSignificance,
     actionStatus: node.actionStatus,
@@ -244,7 +242,6 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
     negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({ ...item })),
     severity: node.data.severity,
-    incidentStatus: node.data.incidentStatus,
     factorCategory: node.data.factorCategory,
     factorSignificance: node.data.factorSignificance,
     actionStatus: node.data.actionStatus,

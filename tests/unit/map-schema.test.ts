@@ -63,6 +63,37 @@ describe("mapDataSchema", () => {
     ).toBe(false);
   });
 
+  it("rejects retired node-level incident status", () => {
+    const result = mapDataSchema.safeParse({
+      ...sampleMap,
+      nodes: sampleMap.nodes.map((node, index) =>
+        index === 0 ? { ...node, incidentStatus: "Open" } : node,
+      ),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts non-contiguous canonical evidence IDs and their high-water mark", () => {
+    const parsed = mapDataSchema.parse({
+      ...sampleMap,
+      metadata: { evidenceReferenceHighWaterMark: 3 },
+      nodes: sampleMap.nodes.map((node, index) => ({
+        ...node,
+        evidenceItems: [
+          {
+            id: index === 0 ? "EV-001" : "EV-003",
+            text: `Evidence ${index + 1}`,
+          },
+        ],
+      })),
+    });
+    expect(parsed.nodes.flatMap((node) => node.evidenceItems)).toEqual([
+      { id: "EV-001", text: "Evidence 1" },
+      { id: "EV-003", text: "Evidence 2" },
+    ]);
+    expect(parsed.metadata?.evidenceReferenceHighWaterMark).toBe(3);
+  });
+
   it.each(["Effective", "Degraded", "Failed", "Missing"] as const)(
     "accepts the %s barrier status without retired fields",
     (status) => {
