@@ -73,6 +73,51 @@ describe("presentation relationships", () => {
     );
   });
 
+  it("starts a selected Control's downstream path at its downstream endpoint", () => {
+    const branchNodes = [
+      { id: "impact", nodeType: "Impact" as const },
+      { id: "event", nodeType: "Event" as const },
+      { id: "controlled-factor", nodeType: "Factor" as const },
+      { id: "sibling-factor", nodeType: "Factor" as const },
+      { id: "descendant", nodeType: "Factor" as const },
+      { id: "action", nodeType: "Action" as const },
+    ];
+    const branchEdges = [
+      { source: "impact", target: "event" },
+      { source: "event", target: "controlled-factor" },
+      { source: "event", target: "sibling-factor" },
+      { source: "controlled-factor", target: "descendant" },
+      { source: "descendant", target: "action", kind: "ActionEdge" },
+    ];
+    const branchControls = [
+      {
+        id: "branch-control",
+        upstreamNodeId: "event",
+        downstreamNodeId: "controlled-factor",
+      },
+    ];
+
+    const result = deriveRelationshipPresentation(
+      branchNodes,
+      branchEdges,
+      branchControls,
+      "branch-control",
+    );
+
+    expect([...result.selectedPath]).toEqual(
+      expect.arrayContaining([
+        "impact",
+        "event",
+        "branch-control",
+        "controlled-factor",
+        "descendant",
+        "action",
+      ]),
+    );
+    expect(result.selectedPath.has("sibling-factor")).toBe(false);
+    expect(result.unrelated.has("sibling-factor")).toBe(true);
+  });
+
   it("disables fitting animation when reduced motion is requested", () => {
     vi.spyOn(window, "matchMedia").mockReturnValue({
       matches: true,

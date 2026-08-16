@@ -133,17 +133,37 @@ export const deriveRelationshipPresentation = (
         (edge) => edge.kind === "ActionEdge" && edge.target === action.id,
       )
     : undefined;
-  const anchors = control
-    ? [control.upstreamNodeId, control.downstreamNodeId]
-    : actionEdge
-      ? [actionEdge.source]
-      : selectedId
-        ? [selectedId]
-        : [];
-  const roles = anchors.map((anchor) =>
-    deriveGraphPresentation(causalIds, causalEdges, anchor),
-  );
+  const anchors = actionEdge
+    ? [actionEdge.source]
+    : selectedId
+      ? [selectedId]
+      : [];
+  const roles = control
+    ? []
+    : anchors.map((anchor) =>
+        deriveGraphPresentation(causalIds, causalEdges, anchor),
+      );
   const selectedPath = new Set(roles.flatMap((role) => [...role.selectedPath]));
+  let controlUpstream = new Set<string>();
+  let controlDownstream = new Set<string>();
+  if (control) {
+    const upstreamRole = deriveGraphPresentation(
+      causalIds,
+      causalEdges,
+      control.upstreamNodeId,
+    );
+    const downstreamRole = deriveGraphPresentation(
+      causalIds,
+      causalEdges,
+      control.downstreamNodeId,
+    );
+    controlUpstream = upstreamRole.upstream;
+    controlDownstream = downstreamRole.downstream;
+    controlUpstream.forEach((id) => selectedPath.add(id));
+    selectedPath.add(control.upstreamNodeId);
+    selectedPath.add(control.downstreamNodeId);
+    controlDownstream.forEach((id) => selectedPath.add(id));
+  }
   if (action) selectedPath.add(action.id);
   if (control) selectedPath.add(control.id);
   // Actions attached to the selected relationship remain part of its context.
@@ -163,16 +183,17 @@ export const deriveRelationshipPresentation = (
     ...nodes.map((node) => node.id),
     ...barriers.map((b) => b.id),
   ];
-  const hasSelection = anchors.length > 0;
+  const defaultRole = deriveGraphPresentation(causalIds, causalEdges, null);
+  const hasSelection = Boolean(control || anchors.length > 0);
   return {
-    roots:
-      roles[0]?.roots ??
-      deriveGraphPresentation(causalIds, causalEdges, null).roots,
-    leaves:
-      roles[0]?.leaves ??
-      deriveGraphPresentation(causalIds, causalEdges, null).leaves,
-    upstream: new Set(roles.flatMap((role) => [...role.upstream])),
-    downstream: new Set(roles.flatMap((role) => [...role.downstream])),
+    roots: roles[0]?.roots ?? defaultRole.roots,
+    leaves: roles[0]?.leaves ?? defaultRole.leaves,
+    upstream: control
+      ? controlUpstream
+      : new Set(roles.flatMap((role) => [...role.upstream])),
+    downstream: control
+      ? controlDownstream
+      : new Set(roles.flatMap((role) => [...role.downstream])),
     selectedPath,
     unrelated: new Set(
       hasSelection ? allIds.filter((id) => !selectedPath.has(id)) : [],
@@ -240,18 +261,11 @@ export const Canvas = ({
     const barrierNodes: Node<BarrierNodeData>[] = [];
     const flowEdges = edges.flatMap((edge) => {
       const presentationRole =
-        presentation.upstream.has(edge.source) &&
-        (presentation.upstream.has(edge.target) || edge.target === selectionId)
-          ? "upstream"
-          : (edge.source === selectionId ||
-                presentation.downstream.has(edge.source)) &&
-              presentation.downstream.has(edge.target)
-            ? "downstream"
-            : edge.data?.kind !== "ActionEdge" &&
-                presentation.selectedPath.has(edge.source) &&
-                presentation.selectedPath.has(edge.target)
-              ? "upstream"
-              : undefined;
+        edge.data?.kind !== "ActionEdge" &&
+        presentation.selectedPath.has(edge.source) &&
+        presentation.selectedPath.has(edge.target)
+          ? "related"
+          : undefined;
       const presentedEdge = {
         ...edge,
         data: { ...edge.data, presentationRole },
@@ -320,11 +334,9 @@ export const Canvas = ({
 
     const styledEdges = flowEdges.map((edge) => {
       const isAction = edge.data?.kind === "ActionEdge";
-      const upstream = edge.data?.presentationRole === "upstream";
-      const downstream = edge.data?.presentationRole === "downstream";
+      const related = edge.data?.presentationRole === "related";
       const highlighted =
-        upstream ||
-        downstream ||
+        related ||
         (isAction &&
           presentation.selectedPath.has(edge.source) &&
           presentation.selectedPath.has(edge.target));
@@ -335,16 +347,10 @@ export const Canvas = ({
         className: isAction
           ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${highlighted ? " incident-edge--related" : ""}`
           : highlighted
-            ? `incident-edge incident-edge--${upstream ? "upstream" : "downstream"}`
+            ? "incident-edge incident-edge--related"
             : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
         style: {
-          stroke: isAction
-            ? "#94a3b8"
-            : upstream
-              ? "#7c3aed"
-              : downstream
-                ? "#0369a1"
-                : "#475569",
+          stroke: isAction ? "#94a3b8" : "#475569",
           strokeWidth: isAction
             ? 1.5
             : highlighted

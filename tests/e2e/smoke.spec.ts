@@ -234,9 +234,14 @@ test("shows map semantics and highlights only a selected branch", async ({
     "true",
   );
   await expect(eventNodes.last()).toHaveAttribute("data-selected-path", "true");
-  await expect(page.locator(".incident-edge--upstream")).toHaveCount(2);
+  await expect(page.locator(".incident-edge--related")).toHaveCount(2);
+  const relatedEdges = page.locator(
+    ".incident-edge--related .react-flow__edge-path",
+  );
+  await expect(relatedEdges.nth(0)).toHaveCSS("stroke", "rgb(71, 85, 105)");
+  await expect(relatedEdges.nth(1)).toHaveCSS("stroke", "rgb(71, 85, 105)");
   await expect(
-    page.locator(".incident-edge--upstream .react-flow__edge-path").first(),
+    page.locator(".incident-edge--related .react-flow__edge-path").first(),
   ).toHaveCSS("stroke-dasharray", "none");
   await expect(page.locator("marker")).toHaveCount(0);
   await expect(page.locator(".react-flow__handle:visible")).toHaveCount(0);
