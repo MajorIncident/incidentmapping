@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
+import path from "node:path";
+import os from "node:os";
 
 const modifier = process.platform === "darwin" ? "Meta" : "Control";
+const reloadedMap = path.join(os.tmpdir(), "keyboard-sidebar-reloaded.json");
 
 const parseTransform = (transform: string | null): { x: number; y: number } => {
   if (!transform) {
@@ -78,19 +81,57 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
 
   const ownerInput = page.getByLabel("Owner");
   await ownerInput.fill("Ops Team");
-  const timestampInput = page.getByLabel("Timestamp");
-  await timestampInput.fill("2024-07-01T08:30:00Z");
+  const timestampInput = page.getByLabel("Occurred at");
+  await expect(timestampInput).toHaveAttribute("type", "datetime-local");
+  await timestampInput.fill("2024-07-01T08:30");
+  const canonicalTimestamp = await page.evaluate(() =>
+    new Date(2024, 6, 1, 8, 30).toISOString(),
+  );
 
   await page.locator(".react-flow__pane").click();
   await effectNode.click();
   await expect(page.getByLabel("Owner")).toHaveValue("Ops Team");
-  await expect(page.getByLabel("Timestamp")).toHaveValue(
-    "2024-07-01T08:30:00Z",
+  await expect(page.getByLabel("Occurred at")).toHaveValue(
+    "2024-07-01T08:30:00",
+  );
+  await expect(effectNode.locator("time")).toHaveAttribute(
+    "datetime",
+    canonicalTimestamp,
+  );
+  const readableTimestamp = await page.evaluate((timestamp) => {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(timestamp));
+  }, canonicalTimestamp);
+  await expect(effectNode.locator("time")).toHaveText(readableTimestamp);
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save" }).click();
+  await (await downloadPromise).saveAs(reloadedMap);
+  await page.reload();
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: /^Open/ }).click();
+  await (await fileChooserPromise).setFiles(reloadedMap);
+  await expect(effectNode.locator("time")).toHaveAttribute(
+    "datetime",
+    canonicalTimestamp,
+  );
+  await expect(effectNode.locator("time")).toHaveText(readableTimestamp);
+  await effectNode.click();
+  await expect(page.getByLabel("Occurred at")).toHaveValue(
+    "2024-07-01T08:30:00",
   );
 
   // Add Below exposes the same causal-node rules to mouse and keyboard users.
   for (const nodeType of ["Impact", "Event", "Factor"]) {
     await page.getByLabel("Type").selectOption(nodeType);
+    const consequences = page.getByRole("heading", { name: "Consequences" });
+    if (nodeType === "Factor") {
+      await expect(consequences).toHaveCount(0);
+    } else {
+      await expect(consequences).toBeVisible();
+    }
     const addBelow = page.getByRole("button", { name: "Add Below" });
     await expect(addBelow).toBeEnabled();
     const countBeforeMouse = await page.getByTestId("chain-node").count();
@@ -111,6 +152,9 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   }
 
   await page.getByRole("button", { name: "+ Action" }).click();
+  await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
   let unavailableCount = await page.getByTestId("chain-node").count();
   await page.keyboard.press("Enter");
@@ -126,6 +170,9 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
     .getByRole("button", { name: /^Add Control:/ })
     .first()
     .click();
+  await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
   unavailableCount = await page.getByTestId("chain-node").count();
   await page.keyboard.press("Enter");
