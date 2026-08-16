@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 import { useAppStore } from "../../state/useAppStore";
+import { resolveEvidence } from "../../state/selectors";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 
@@ -214,9 +215,17 @@ const ChainNodeComponent = ({
   );
   const hasPositivePoints = positivePoints.length > 0;
   const hasNegativePoints = negativePoints.length > 0;
-  const evidenceItems = (data.evidenceItems ?? []).filter(
-    (item) => item.text.trim().length > 0,
+  const evidenceRegistry = useAppStore((state) => state.evidence);
+  const registryEvidence = resolveEvidence(
+    data.evidenceIds ?? [],
+    evidenceRegistry,
   );
+  const evidenceItems = registryEvidence.length
+    ? registryEvidence.map((item) => ({
+        id: item.id,
+        text: `${item.type === "SystemLog" ? "System Log" : item.type} · ${item.title}`,
+      }))
+    : (data.evidenceItems ?? []).filter((item) => item.text.trim().length > 0);
   const visibleEvidence = evidenceItems.slice(0, 3);
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
@@ -541,6 +550,13 @@ const BarrierNodeComponent = ({
     ? (data.viewShowDetails ?? false)
     : editorShowDetails;
   const failureReason = data.failureReason?.replace(/([a-z])([A-Z])/g, "$1 $2");
+  const evidenceRegistry = useAppStore((state) => state.evidence);
+  const evidenceItems = resolveEvidence(
+    data.evidenceIds ?? [],
+    evidenceRegistry,
+  );
+  const visibleEvidence = evidenceItems.slice(0, 3);
+  const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
 
   return (
     <div
@@ -600,6 +616,36 @@ const BarrierNodeComponent = ({
         <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
           {failureDetails}
         </p>
+      ) : null}
+      {evidenceItems.length > 0 ? (
+        showDetails ? (
+          <div
+            className="mt-2 space-y-1 text-xs"
+            data-testid="control-evidence-summary"
+          >
+            <div className="font-semibold uppercase tracking-wide text-sky-800">
+              Evidence
+            </div>
+            <ul>
+              {visibleEvidence.map((item) => (
+                <li key={item.id}>
+                  {item.type === "SystemLog" ? "System Log" : item.type} ·{" "}
+                  {item.title}
+                </li>
+              ))}
+              {evidenceOverflow > 0 ? <li>+{evidenceOverflow} more</li> : null}
+            </ul>
+          </div>
+        ) : (
+          <div
+            className="mt-2"
+            aria-label={`${evidenceItems.length} evidence items`}
+          >
+            <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+              Evidence {evidenceItems.length}
+            </span>
+          </div>
+        )
       ) : null}
     </div>
   );
