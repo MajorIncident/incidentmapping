@@ -9,12 +9,12 @@ import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
 import { useCallback, useEffect, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
+import { canAddBelowSelection } from "../state/selectors";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [presenting, setPresenting] = useState(false);
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
-  const addChild = useAppStore((state) => state.actions.addChild);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
@@ -23,6 +23,9 @@ export const App = (): JSX.Element => {
     (state) => state.actions.toggleShowDetails,
   );
   const selectionId = useAppStore((state) => state.selectionId);
+  const canAddBelow = useAppStore((state) =>
+    canAddBelowSelection(state.selectionId, state.nodes),
+  );
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
   const showDetails = useAppStore((state) => state.showDetails);
@@ -90,8 +93,12 @@ export const App = (): JSX.Element => {
               <Toolbar
                 {...menu}
                 onAddChainNode={() => {
-                  addChild(selectionId ?? undefined);
+                  const state = useAppStore.getState();
+                  if (!canAddBelowSelection(state.selectionId, state.nodes))
+                    return;
+                  state.actions.addChild(state.selectionId ?? undefined);
                 }}
+                canAddBelow={canAddBelow}
                 onDeleteSelection={() => {
                   deleteSelection();
                 }}

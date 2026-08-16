@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { GRID_SIZE, useAppStore } from "../state/useAppStore";
+import { canAddBelowSelection } from "../state/selectors";
 
 type ShortcutHandlers = {
   onSave: () => void;
@@ -88,14 +89,14 @@ export const useKeyboardShortcuts = ({
           return;
         }
         case "Enter": {
-          if (!selectionId) {
+          if (!canAddBelowSelection(selectionId, state.nodes)) {
             return;
           }
           event.preventDefault();
           if (event.shiftKey) {
-            actions.addSibling(selectionId);
+            actions.addSibling(selectionId ?? undefined);
           } else {
-            actions.addChild(selectionId);
+            actions.addChild(selectionId ?? undefined);
           }
           return;
         }

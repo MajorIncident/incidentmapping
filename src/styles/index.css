@@ -146,6 +146,10 @@ input[type="checkbox"] {
   @apply border-sky-700 bg-sky-600 font-semibold text-white hover:border-sky-800 hover:bg-sky-700 active:bg-sky-800;
 }
 
+.command-button--primary:disabled {
+  @apply border-slate-300 bg-slate-200 text-slate-600 opacity-100;
+}
+
 .command-button--danger {
   @apply text-rose-700 hover:border-rose-200 hover:bg-rose-50 active:bg-rose-100;
 }
