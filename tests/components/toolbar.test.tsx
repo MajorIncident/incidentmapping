@@ -1,5 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider, type NodeProps } from "reactflow";
 import { App } from "../../src/app/App";
@@ -32,22 +38,96 @@ describe("Toolbar map title", () => {
     });
   });
 
-  it("lets users edit the map title", async () => {
-    await act(async () => {
-      render(<App />);
-    });
+  const titleControl = () =>
+    screen.getByRole("button", { name: /untitled map.*edit map title/i });
 
-    const titleInput = await screen.findByRole("textbox", {
-      name: /map title/i,
-    });
-    expect(titleInput).toHaveValue("Untitled Map");
+  it("edits the canvas title with a double-click and commits on Enter", async () => {
+    const user = userEvent.setup();
+    render(<App />);
 
-    await act(async () => {
-      await userEvent.clear(titleInput);
-      await userEvent.type(titleInput, "Postmortem Draft{enter}");
-    });
+    fireEvent.doubleClick(titleControl());
+    const input = screen.getByRole("textbox", { name: /map title/i });
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveValue("Untitled Map");
+    expect(input).toHaveProperty("selectionStart", 0);
+    expect(input).toHaveProperty("selectionEnd", "Untitled Map".length);
+
+    await user.clear(input);
+    await user.type(input, "  Postmortem Draft  {enter}");
 
     expect(useAppStore.getState().metadata?.title).toBe("Postmortem Draft");
+    expect(
+      screen.getByLabelText("Postmortem Draft incident map"),
+    ).toBeVisible();
+  });
+
+  it.each(["Enter", " "])(
+    "activates title editing from the keyboard with %s",
+    async (key) => {
+      render(<App />);
+      fireEvent.keyDown(titleControl(), { key });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("textbox", { name: /map title/i }),
+        ).toHaveFocus(),
+      );
+    },
+  );
+
+  it("offers a single-click editing action and commits on blur", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(titleControl());
+    const input = screen.getByRole("textbox", { name: /map title/i });
+    await user.clear(input);
+    await user.type(input, "Touch-friendly title");
+    await user.click(
+      screen.getByRole("button", { name: /save .*current map/i }),
+    );
+
+    expect(useAppStore.getState().metadata?.title).toBe("Touch-friendly title");
+  });
+
+  it("cancels with Escape and restores the previous title", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(titleControl());
+    const input = screen.getByRole("textbox", { name: /map title/i });
+    await user.clear(input);
+    await user.type(input, "Discard me{Escape}");
+
+    expect(useAppStore.getState().metadata?.title).toBe("Untitled Map");
+    expect(titleControl()).toBeVisible();
+  });
+
+  it("keeps an empty invalid title selected and exposes an inline error", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(titleControl());
+    const input = screen.getByRole("textbox", { name: /map title/i });
+    await user.clear(input);
+    await user.type(input, "   {enter}");
+
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a map title.");
+    expect(useAppStore.getState().metadata?.title).toBe("Untitled Map");
+  });
+
+  it("makes a canvas title edit undoable", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(titleControl());
+    const input = screen.getByRole("textbox", { name: /map title/i });
+    await user.clear(input);
+    await user.type(input, "Renamed map{enter}");
+    await user.click(
+      screen.getByRole("button", { name: /undo .*last action/i }),
+    );
+
+    expect(useAppStore.getState().metadata?.title).toBe("Untitled Map");
+    expect(titleControl()).toBeVisible();
   });
 
   it("focuses the new root title so its incident name can be typed immediately", async () => {

@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
 
 type ToolbarProps = FileMenuRenderProps & {
@@ -11,8 +10,6 @@ type ToolbarProps = FileMenuRenderProps & {
   canRedo: boolean;
   onOrganize: () => void;
   canOrganize: boolean;
-  mapTitle: string;
-  onMapTitleChange: (title: string) => void;
   showDetails: boolean;
   onToggleDetails: () => void;
 };
@@ -25,8 +22,6 @@ export const Toolbar = ({
   onOpen,
   onSave,
   onExportPng,
-  mapTitle,
-  onMapTitleChange,
   onAddChainNode,
   onDeleteSelection,
   canDelete,
@@ -39,16 +34,6 @@ export const Toolbar = ({
   showDetails,
   onToggleDetails,
 }: ToolbarProps): JSX.Element => {
-  const [draftTitle, setDraftTitle] = useState(mapTitle);
-
-  useEffect(() => {
-    setDraftTitle(mapTitle);
-  }, [mapTitle]);
-
-  const handleCommit = useCallback(() => {
-    onMapTitleChange(draftTitle);
-  }, [draftTitle, onMapTitleChange]);
-
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center gap-3">
@@ -93,24 +78,6 @@ export const Toolbar = ({
         >
           Export PNG
         </button>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <span className="sr-only">Map title</span>
-          <input
-            type="text"
-            value={draftTitle}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            onBlur={handleCommit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                handleCommit();
-              }
-            }}
-            placeholder="Untitled Map"
-            aria-label="Map title"
-            className="w-48 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-canvas-accent focus:outline-none focus:ring-2 focus:ring-canvas-accent"
-          />
-        </label>
       </div>
       <div className="flex items-center gap-2">
         <button

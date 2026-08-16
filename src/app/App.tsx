@@ -16,11 +16,9 @@ export const App = (): JSX.Element => {
   const toggleShowDetails = useAppStore(
     (state) => state.actions.toggleShowDetails,
   );
-  const setMapTitle = useAppStore((state) => state.actions.setMapTitle);
   const selectionId = useAppStore((state) => state.selectionId);
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
-  const mapTitle = useAppStore((state) => state.metadata?.title ?? "");
   const showDetails = useAppStore((state) => state.showDetails);
   const canOrganize = useAppStore(
     (state) =>
@@ -38,8 +36,6 @@ export const App = (): JSX.Element => {
           <div className="flex h-screen flex-col">
             <Toolbar
               {...menu}
-              mapTitle={mapTitle}
-              onMapTitleChange={setMapTitle}
               onAddChainNode={() => {
                 addChild(selectionId ?? undefined);
               }}
