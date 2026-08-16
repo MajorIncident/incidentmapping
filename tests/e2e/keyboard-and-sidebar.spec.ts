@@ -21,7 +21,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await page.getByRole("button", { name: "New" }).click();
   await page.getByRole("button", { name: "Add ChainNode" }).click();
 
-  const rootTitle = page.getByText("New ChainNode").first();
+  const rootTitle = page.getByText("New Event").first();
   await rootTitle.dblclick();
   const titleInput = page.getByRole("textbox", { name: "Node title" });
   await titleInput.fill("Primary Event");

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode, ChangeEvent } from "react";
 import { mapDataSchema } from "../../features/maps/schema";
 import {
@@ -18,6 +18,7 @@ export type FileMenuRenderProps = {
   onOpen: () => Promise<void>;
   onSave: () => Promise<void>;
   onExportPng: () => void;
+  isSaved: boolean;
 };
 
 type FileMenuProps = {
@@ -26,6 +27,15 @@ type FileMenuProps = {
 
 export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
   const { newMap, loadMap, toMap } = useAppStore((state) => state.actions);
+  const currentSignature = useAppStore((state) =>
+    JSON.stringify({
+      nodes: state.nodes,
+      edges: state.edges,
+      metadata: state.metadata,
+      barriers: state.barriers,
+    }),
+  );
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pendingResolver = useRef<((value: string | null) => void) | null>(null);
@@ -47,6 +57,14 @@ export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
           return;
         }
         loadMap(result.data);
+        setSavedSignature(
+          JSON.stringify({
+            nodes: useAppStore.getState().nodes,
+            edges: useAppStore.getState().edges,
+            metadata: useAppStore.getState().metadata,
+            barriers: useAppStore.getState().barriers,
+          }),
+        );
       } catch (error) {
         window.alert(`Unable to open map.\n${(error as Error).message}`);
       }
@@ -79,6 +97,7 @@ export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
   const handleNew = useCallback(() => {
     newMap();
     resetHandle();
+    setSavedSignature(null);
   }, [newMap, resetHandle]);
 
   const handleOpen = useCallback(async () => {
@@ -110,16 +129,18 @@ export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
         });
         if (updatedHandle) {
           fileHandleRef.current = updatedHandle;
+          setSavedSignature(currentSignature);
           return;
         }
       }
 
       const filename = `${validated.metadata?.title ?? "incident-map"}.json`;
       triggerJsonDownload(filename, serialized);
+      setSavedSignature(currentSignature);
     } catch (error) {
       window.alert(`Unable to save map.\n${(error as Error).message}`);
     }
-  }, [toMap]);
+  }, [currentSignature, toMap]);
 
   const handleExportPng = useCallback(() => {
     window.alert("PNG export will arrive in a future milestone.");
@@ -131,8 +152,16 @@ export const FileMenu = ({ children }: FileMenuProps): JSX.Element => {
       onOpen: handleOpen,
       onSave: handleSave,
       onExportPng: handleExportPng,
+      isSaved: savedSignature !== null && savedSignature === currentSignature,
     }),
-    [handleExportPng, handleNew, handleOpen, handleSave],
+    [
+      currentSignature,
+      handleExportPng,
+      handleNew,
+      handleOpen,
+      handleSave,
+      savedSignature,
+    ],
   );
 
   useKeyboardShortcuts({

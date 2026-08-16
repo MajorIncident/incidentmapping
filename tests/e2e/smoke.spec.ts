@@ -181,9 +181,9 @@ test("organizes moved nodes and frames the complete graph", async ({
   await page.getByRole("button", { name: "Create a new map" }).click();
   const organize = page.getByRole("button", { name: "Organize all nodes" });
   await expect(organize).toBeDisabled();
-  await page.getByRole("button", { name: "Add a new chain node" }).click();
+  await page.getByRole("button", { name: "Add Event" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
-  await page.getByRole("button", { name: "Add a new chain node" }).click();
+  await page.getByRole("button", { name: "Add Event" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page
     .locator(".react-flow__node")

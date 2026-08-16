@@ -439,7 +439,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           type: "ChainNode",
           position: { x: 0, y: 0 },
           data: {
-            title: "New ChainNode",
+            title: "New Event",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
           },
@@ -560,7 +560,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           type: "ChainNode",
           position,
           data: {
-            title: "New ChainNode",
+            title: "New Event",
             positiveConsequenceBulletPoints: [],
             negativeConsequenceBulletPoints: [],
           },
@@ -881,13 +881,35 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     },
     deleteSelection: () => {
-      const { selectionId } = get();
+      const { selectionId, edges } = get();
       if (!selectionId) {
         return;
       }
       const barrier = get().barriers.find((item) => item.id === selectionId);
       if (barrier) {
         get().actions.removeBarrier(selectionId);
+        return;
+      }
+      const descendants = new Set<string>();
+      const pending = edges
+        .filter((edge) => edge.source === selectionId)
+        .map((edge) => edge.target);
+      while (pending.length) {
+        const id = pending.pop()!;
+        if (descendants.has(id)) continue;
+        descendants.add(id);
+        pending.push(
+          ...edges
+            .filter((edge) => edge.source === id)
+            .map((edge) => edge.target),
+        );
+      }
+      if (
+        descendants.size > 0 &&
+        !window.confirm(
+          `Delete this event and its ${descendants.size} descendant${descendants.size === 1 ? "" : "s"}? This will remove the entire branch.`,
+        )
+      ) {
         return;
       }
       get().actions.deleteNode(selectionId);
