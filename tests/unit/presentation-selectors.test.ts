@@ -15,8 +15,6 @@ const nodes = [
     data: {
       title: "Injury",
       nodeType: "Impact" as const,
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
   {
@@ -28,8 +26,6 @@ const nodes = [
       factorSignificance: "RootCause" as const,
       assertionState: "Confirmed" as const,
       evidenceIds: ["ev"],
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
   {
@@ -39,8 +35,6 @@ const nodes = [
       title: "Call",
       nodeType: "Event" as const,
       eventDisplay: "ChronologyOnly" as const,
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
   {
@@ -51,8 +45,6 @@ const nodes = [
       nodeType: "Action" as const,
       actionStatus: "Planned" as const,
       actionType: "Corrective" as const,
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
 ];

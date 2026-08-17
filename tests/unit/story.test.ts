@@ -17,8 +17,6 @@ const node = (
     referenceId,
     nodeType,
     factorSignificance: significance,
-    positiveConsequenceBulletPoints: [],
-    negativeConsequenceBulletPoints: [],
     evidenceIds: [],
   },
 });

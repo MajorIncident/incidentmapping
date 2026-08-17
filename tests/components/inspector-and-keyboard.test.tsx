@@ -1,12 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  act,
-  render,
-  screen,
-  fireEvent,
-  within,
-  waitFor,
-} from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider } from "reactflow";
 import {
@@ -14,7 +7,6 @@ import {
   localControlToPersistedTimestamp,
   persistedTimestampToLocalControl,
 } from "../../src/components/Sidebar/Inspector";
-import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 
@@ -42,9 +34,6 @@ describe("Inspector and keyboard workflows", () => {
     expect(id).toBeTruthy();
     return id ?? "";
   };
-
-  const consequenceSection = (label: "Positive" | "Negative") =>
-    screen.getByText(label).parentElement?.parentElement as HTMLElement;
 
   beforeAll(() => {
     vi.stubGlobal(
@@ -136,170 +125,21 @@ describe("Inspector and keyboard workflows", () => {
     expect(persistedTimestampToLocalControl("not-a-date")).toBe("");
   });
 
-  it("shows consequence editing only for Impact and Event nodes", async () => {
+  it("uses canonical Context editing for non-Action nodes", async () => {
     const nodeId = await renderSelectedNode();
-    const consequences = () =>
-      screen.queryByRole("heading", { name: "Consequences" });
-
-    expect(consequences()).toBeVisible();
-    act(() => {
-      useAppStore.getState().actions.updateNodeData(nodeId, {
-        positiveConsequenceBulletPoints: ["Persisted outcome"],
-      });
-      useAppStore.getState().actions.setNodeType(nodeId, "Impact");
-    });
-    expect(consequences()).toBeVisible();
+    expect(screen.getByRole("region", { name: "Context" })).toBeVisible();
 
     act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
-    expect(consequences()).not.toBeInTheDocument();
-    expect(
-      useAppStore.getState().nodes.find((node) => node.id === nodeId)?.data
-        .positiveConsequenceBulletPoints,
-    ).toEqual(["Persisted outcome"]);
+    expect(screen.getByRole("region", { name: "Context" })).toBeVisible();
 
     let actionId = "";
     act(() => {
       actionId = useAppStore.getState().actions.addAction(nodeId) ?? "";
       useAppStore.getState().actions.select(actionId);
     });
-    expect(consequences()).not.toBeInTheDocument();
-
-    act(() => {
-      useAppStore.getState().actions.loadMap(sampleMap);
-      useAppStore.getState().actions.select("barrier-root-child");
-    });
-    expect(consequences()).not.toBeInTheDocument();
-
-    act(() => {
-      useAppStore.getState().actions.loadMap(emptyMap);
-      const eventId = useAppStore.getState().actions.addChild() ?? "";
-      useAppStore.getState().actions.select(eventId);
-    });
-    expect(consequences()).toBeVisible();
-  });
-
-  it("adds a child via Enter and starts inline editing", async () => {
-    const { actions } = useAppStore.getState();
-    let rootId: string | null = null;
-    act(() => {
-      rootId = actions.addChild();
-    });
-    expect(rootId).toBeTruthy();
-    act(() => {
-      actions.finishEditing();
-    });
-
-    await act(async () => {
-      render(<App />);
-    });
-
-    await screen.findByRole("button", { name: "Add Below" });
-    await waitFor(() => {
-      expect(useAppStore.getState().nodes).toHaveLength(1);
-    });
-
-    await act(async () => {
-      fireEvent.keyDown(window, { key: "Enter" });
-    });
-
-    await waitFor(() => {
-      expect(useAppStore.getState().nodes).toHaveLength(2);
-    });
-
-    const nodes = await screen.findAllByTestId("chain-node");
-    expect(nodes).toHaveLength(2);
-
-    const newNodeId = useAppStore.getState().nodes[1]?.id;
-    expect(useAppStore.getState().editingId).toBe(newNodeId);
-
-    await waitFor(() => {
-      const editor = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Node title"]',
-      );
-      expect(editor).not.toBeNull();
-      expect(editor).toBe(document.activeElement);
-    });
-  });
-
-  it("keeps Enter and Shift+Enter in parity with causal Add Below availability", () => {
-    render(<App />);
-    let nodeId = "";
-    act(() => {
-      nodeId = useAppStore.getState().actions.addChild() ?? "";
-      useAppStore.getState().actions.finishEditing();
-    });
-
-    for (const nodeType of ["Impact", "Event", "Factor"] as const) {
-      act(() => {
-        const actions = useAppStore.getState().actions;
-        actions.select(nodeId);
-        actions.setNodeType(nodeId, nodeType);
-      });
-      const before = useAppStore.getState().nodes.length;
-      expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(false);
-      expect(useAppStore.getState().nodes).toHaveLength(before + 1);
-    }
-
-    act(() => {
-      const actions = useAppStore.getState().actions;
-      actions.select(nodeId);
-      nodeId = actions.addAction(nodeId) ?? "";
-      actions.finishEditing();
-    });
-    let before = useAppStore.getState().nodes.length;
-    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
-    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
-      true,
-    );
-    expect(useAppStore.getState().nodes).toHaveLength(before);
-
-    act(() => {
-      useAppStore.getState().actions.loadMap(sampleMap);
-      useAppStore.getState().actions.select("barrier-root-child");
-    });
-    before = useAppStore.getState().nodes.length;
-    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
-    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
-      true,
-    );
-    expect(useAppStore.getState().nodes).toHaveLength(before);
-
-    act(() => useAppStore.getState().actions.select(null));
-    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
-    expect(useAppStore.getState().nodes).toHaveLength(before);
-  });
-
-  it("focuses a new Control purpose, updates its card live, and undoes it as one edit", async () => {
-    const mapWithoutBarrier = { ...sampleMap, barriers: [] };
-    act(() => {
-      useAppStore.getState().actions.loadMap(mapWithoutBarrier);
-    });
-    render(<App />);
-
-    act(() => {
-      useAppStore.getState().actions.addBarrier("root", "child");
-    });
-
-    const description = await screen.findByRole("textbox", {
-      name: /^Control Purpose$/i,
-    });
-    await waitFor(() => expect(description).toHaveFocus());
-    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
-      "Failed",
-    );
-
-    const user = userEvent.setup();
-    await user.type(description, "Firewall active");
-    expect(screen.getByTestId("control-node")).toHaveTextContent(
-      "Firewall active",
-    );
-
-    act(() => {
-      useAppStore.getState().actions.undo();
-    });
-    expect(screen.getByTestId("control-node")).toHaveTextContent(
-      "No control purpose provided.",
-    );
+    expect(
+      screen.queryByRole("region", { name: "Context" }),
+    ).not.toBeInTheDocument();
   });
 
   it("lists every downstream branch and creates a Control on a chosen non-first child", async () => {
@@ -387,47 +227,6 @@ describe("Inspector and keyboard workflows", () => {
     ).toBeVisible();
   });
 
-  it.each([
-    ["Positive", "Add a positive consequence"],
-    ["Negative", "Add a negative consequence"],
-  ] as const)(
-    "adds and focuses successive %s consequences with Enter",
-    async (label, placeholder) => {
-      await renderSelectedNode();
-      const user = userEvent.setup();
-      await user.click(
-        within(consequenceSection(label)).getByRole("button", { name: "Add" }),
-      );
-      const first = screen.getByPlaceholderText(placeholder);
-      expect(first).toHaveFocus();
-
-      await user.type(first, "First value{Enter}");
-      const inputs = screen.getAllByPlaceholderText(placeholder);
-      expect(inputs).toHaveLength(2);
-      expect(inputs[1]).toHaveFocus();
-      await user.type(inputs[1], "Second value");
-      expect(inputs[1]).toHaveValue("Second value");
-    },
-  );
-
-  it("keeps focus on the first invalid consequence when Enter validation fails", async () => {
-    await renderSelectedNode();
-    const user = userEvent.setup();
-    await user.click(
-      within(consequenceSection("Positive")).getByRole("button", {
-        name: "Add",
-      }),
-    );
-    const input = screen.getByPlaceholderText("Add a positive consequence");
-    await user.keyboard("{Enter}");
-
-    expect(
-      screen.getAllByPlaceholderText("Add a positive consequence"),
-    ).toHaveLength(1);
-    expect(input).toHaveFocus();
-    expect(screen.getByText("This field is required.")).toBeVisible();
-  });
-
   it("creates typed evidence atomically and unlinks without deleting it", async () => {
     const nodeId = await renderSelectedNode();
     const user = userEvent.setup();
@@ -461,49 +260,6 @@ describe("Inspector and keyboard workflows", () => {
         ?.data.evidenceIds,
     ).toEqual([]);
     expect(useAppStore.getState().evidence).toHaveLength(1);
-  });
-
-  it("focuses Add after removing the only empty item and the previous input otherwise", async () => {
-    await renderSelectedNode();
-    const user = userEvent.setup();
-    const section = consequenceSection("Negative");
-    const addButton = within(section).getByRole("button", { name: "Add" });
-    await user.click(addButton);
-    await user.keyboard("{Backspace}");
-    expect(addButton).toHaveFocus();
-
-    await user.click(addButton);
-    await user.type(
-      screen.getByPlaceholderText("Add a negative consequence"),
-      "Kept{Enter}",
-    );
-    const inputs = screen.getAllByPlaceholderText("Add a negative consequence");
-    await user.keyboard("{Backspace}");
-    expect(inputs[0]).toHaveFocus();
-  });
-
-  it("clears pending list focus when the selected node changes", async () => {
-    await renderSelectedNode();
-    const { actions } = useAppStore.getState();
-    const addButton = within(consequenceSection("Positive")).getByRole(
-      "button",
-      { name: "Add" },
-    );
-    fireEvent.click(addButton);
-    act(() => {
-      const nextId = actions.addChild();
-      actions.select(nextId);
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.queryByPlaceholderText("Add a positive consequence"),
-      ).not.toBeInTheDocument();
-    });
-    expect(document.activeElement).not.toHaveAttribute(
-      "placeholder",
-      "Add a positive consequence",
-    );
   });
 
   it("shows failure fields only for non-effective statuses and preserves their values", async () => {

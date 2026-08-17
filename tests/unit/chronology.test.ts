@@ -18,8 +18,6 @@ const event = (
     title: `Event ${referenceId}`,
     timestamp,
     eventPhase,
-    positiveConsequenceBulletPoints: [],
-    negativeConsequenceBulletPoints: [],
   },
 });
 
