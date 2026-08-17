@@ -1,35 +1,69 @@
-import { useId, useState } from "react";
-import type {
-  ContextDisplayMode,
-  ContextItem,
+import { useId, useRef, useState } from "react";
+import {
+  contextEffectDefinitions,
+  type ContextDisplayMode,
+  type ContextEffect,
+  type ContextItem,
 } from "../../features/maps/schema";
 import { useAppStore } from "../../state/useAppStore";
 
-export const contextHelpText =
-  "Context records facts relevant to understanding the incident. A Context item does not mean the fact caused the incident.";
+export const contextHelpText = contextEffectDefinitions.Neutral.help;
 
-type Props = { target: "incident" | string; items: ContextItem[] };
+type Props = {
+  target: "incident" | string;
+  items: ContextItem[];
+  effect?: ContextEffect;
+  lockedEffect?: ContextEffect;
+  preselectedEffect?: ContextEffect;
+};
 const fieldClasses =
   "mt-1 min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-canvas-accent focus:outline-none focus:ring-2 focus:ring-canvas-accent";
 
-export const ContextEditor = ({ target, items }: Props): JSX.Element => {
+export const ContextEditor = ({
+  target,
+  items,
+  effect,
+  lockedEffect,
+  preselectedEffect,
+}: Props): JSX.Element => {
   const uid = useId().replace(/:/g, "");
   const actions = useAppStore((state) => state.actions);
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [displayMode, setDisplayMode] = useState<ContextDisplayMode>("Text");
   const [unit, setUnit] = useState("");
+  const [selectedEffect, setSelectedEffect] = useState<ContextEffect>(
+    lockedEffect ?? preselectedEffect ?? effect ?? "Neutral",
+  );
   const [error, setError] = useState(false);
+  const newLabelRef = useRef<HTMLInputElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const visibleItems = effect
+    ? items.filter((item) => (item.effect ?? "Neutral") === effect)
+    : items;
+  const creationEffect = lockedEffect ?? selectedEffect;
+  const definition =
+    contextEffectDefinitions[effect ?? lockedEffect ?? "Neutral"];
+
   const addItem = () => {
     if (!label.trim() || !value.trim()) return setError(true);
     if (
-      actions.addContext(target, label, value, undefined, displayMode, unit)
+      actions.addContext(
+        target,
+        label,
+        value,
+        undefined,
+        displayMode,
+        unit,
+        creationEffect,
+      )
     ) {
       setLabel("");
       setValue("");
       setDisplayMode("Text");
       setUnit("");
       setError(false);
+      newLabelRef.current?.focus();
     }
   };
   const enterAdds = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -38,20 +72,34 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
       addItem();
     }
   };
+  const deleteItem = (item: ContextItem, index: number) => {
+    actions.deleteContext(target, item.id);
+    requestAnimationFrame(() => {
+      const rows = document.querySelectorAll<HTMLElement>(
+        `[data-context-editor="${uid}"] [data-testid="context-row"]`,
+      );
+      const row = rows[Math.min(index, rows.length - 1)];
+      row?.querySelector<HTMLElement>("button")?.focus() ??
+        addButtonRef.current?.focus();
+    });
+  };
 
   return (
     <section
       className="min-w-0 space-y-3 [grid-column:1/-1]"
-      aria-label="Context"
+      aria-label={definition.heading}
+      data-context-editor={uid}
     >
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">Context</h3>
+        <h3 className="text-sm font-semibold text-slate-900">
+          {definition.heading}
+        </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          {contextHelpText}
+          {definition.help}
         </p>
       </div>
       <div className="space-y-2" data-testid="context-rows">
-        {items.map((item, index) => {
+        {visibleItems.map((item, index) => {
           const name = item.label || `item ${index + 1}`;
           return (
             <div
@@ -60,16 +108,12 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
               data-testid="context-row"
             >
               <div className="grid min-w-0 grid-cols-1 gap-2">
-                <label
-                  className="min-w-0 text-xs font-medium text-slate-600"
-                  htmlFor={`${uid}-${item.id}-label`}
-                >
+                <label className="min-w-0 text-xs font-medium text-slate-600">
                   Label {index + 1}
                   <input
-                    id={`${uid}-${item.id}-label`}
                     className={fieldClasses}
                     defaultValue={item.label}
-                    aria-label={`Context item ${index + 1} label`}
+                    aria-label={`${definition.heading} item ${index + 1} label`}
                     onBlur={(event) => {
                       const next = event.currentTarget.value.trim();
                       if (!next) event.currentTarget.value = item.label;
@@ -78,16 +122,12 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
                     }}
                   />
                 </label>
-                <label
-                  className="min-w-0 text-xs font-medium text-slate-600"
-                  htmlFor={`${uid}-${item.id}-value`}
-                >
+                <label className="min-w-0 text-xs font-medium text-slate-600">
                   Value {index + 1}
                   <input
-                    id={`${uid}-${item.id}-value`}
                     className={fieldClasses}
                     defaultValue={item.value}
-                    aria-label={`Context item ${index + 1} value`}
+                    aria-label={`${definition.heading} item ${index + 1} value`}
                     onBlur={(event) => {
                       const next = event.currentTarget.value.trim();
                       if (!next) event.currentTarget.value = item.value;
@@ -96,6 +136,25 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
                     }}
                   />
                 </label>
+                {!lockedEffect ? (
+                  <label className="min-w-0 text-xs font-medium text-slate-600">
+                    Effect {index + 1}
+                    <select
+                      className={fieldClasses}
+                      aria-label={`Context item ${index + 1} effect`}
+                      value={item.effect ?? "Neutral"}
+                      onChange={(event) =>
+                        actions.updateContext(target, item.id, {
+                          effect: event.target.value as ContextEffect,
+                        })
+                      }
+                    >
+                      {Object.keys(contextEffectDefinitions).map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <label className="min-w-0 text-xs font-medium text-slate-600">
                   Display mode {index + 1}
                   <select
@@ -146,8 +205,8 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
                 <button
                   type="button"
                   className="min-h-11 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  aria-label={`Delete context item ${name}`}
-                  onClick={() => actions.deleteContext(target, item.id)}
+                  aria-label={`Delete ${definition.heading.toLowerCase()} item ${name}`}
+                  onClick={() => deleteItem(item, index)}
                 >
                   Delete
                 </button>
@@ -163,6 +222,7 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
         >
           New label
           <input
+            ref={newLabelRef}
             id={`${uid}-new-label`}
             className={fieldClasses}
             value={label}
@@ -173,10 +233,28 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
             onKeyDown={enterAdds}
           />
         </label>
+        {!lockedEffect ? (
+          <label className="text-xs font-medium text-slate-600">
+            Effect
+            <select
+              className={fieldClasses}
+              aria-label="Effect"
+              value={selectedEffect}
+              onChange={(event) =>
+                setSelectedEffect(event.target.value as ContextEffect)
+              }
+            >
+              {Object.keys(contextEffectDefinitions).map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="text-xs font-medium text-slate-600">
           Display mode
           <select
             className={fieldClasses}
+            aria-label="Display mode"
             value={displayMode}
             onChange={(event) => {
               const next = event.target.value as ContextDisplayMode;
@@ -222,11 +300,13 @@ export const ContextEditor = ({ target, items }: Props): JSX.Element => {
           </p>
         ) : null}
         <button
+          ref={addButtonRef}
           type="button"
           className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-canvas-accent"
+          aria-label={contextEffectDefinitions[creationEffect].addLabel}
           onClick={addItem}
         >
-          Add Context
+          {contextEffectDefinitions[creationEffect].addLabel}
         </button>
       </div>
     </section>

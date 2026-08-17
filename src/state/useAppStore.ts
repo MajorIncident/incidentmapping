@@ -182,6 +182,7 @@ type AppState = {
       showOnCard?: boolean,
       displayMode?: ContextItem["displayMode"],
       unit?: string,
+      effect?: ContextItem["effect"],
     ) => string | null;
     updateContext: (
       target: "incident" | string,
@@ -886,6 +887,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       showOnCard,
       displayMode = "Text",
       rawUnit,
+      effect = "Neutral",
     ) => {
       const label = rawLabel.trim();
       const value = rawValue.trim();
@@ -907,12 +909,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         label,
         value,
         displayMode,
-        effect: "Neutral",
+        effect,
         ...(displayMode === "Metric" && rawUnit?.trim()
           ? { unit: rawUnit.trim() }
           : {}),
         ...(showOnCard === undefined ? {} : { showOnCard }),
       };
+      if (
+        target !== "incident" &&
+        validateNodeContextEffect(node!.data.nodeType ?? "Event", item)
+      )
+        return null;
       if (target === "incident")
         get().actions.updateMetadata({
           contextItems: [...(state.metadata?.contextItems ?? []), item],

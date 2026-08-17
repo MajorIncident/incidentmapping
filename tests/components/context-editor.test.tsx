@@ -16,7 +16,7 @@ describe("ContextEditor", () => {
     const user = userEvent.setup();
     render(<IncidentEditor />);
 
-    await user.click(screen.getByRole("button", { name: "Add Context" }));
+    await user.click(screen.getByRole("button", { name: "Add context" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Enter both a label and a value.",
     );
@@ -45,6 +45,7 @@ describe("ContextEditor", () => {
     await user.tab();
     await user.tab();
     await user.tab();
+    await user.tab();
     expect(toggle).toHaveFocus();
     await user.keyboard(" ");
     expect(toggle).toHaveAttribute("aria-pressed", "true");
@@ -61,7 +62,7 @@ describe("ContextEditor", () => {
     await user.selectOptions(screen.getByLabelText("Display mode"), "Metric");
     await user.type(screen.getByLabelText("Unit (optional)"), "ms");
     await user.type(screen.getByLabelText("New value"), "42");
-    await user.click(screen.getByRole("button", { name: "Add Context" }));
+    await user.click(screen.getByRole("button", { name: "Add context" }));
     expect(useAppStore.getState().metadata?.contextItems).toEqual([
       expect.objectContaining({ displayMode: "Metric", unit: "ms" }),
     ]);
