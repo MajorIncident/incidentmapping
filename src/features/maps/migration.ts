@@ -4,11 +4,13 @@ import {
   barrierStatusSchema,
   incidentStatusSchema,
   mapDataSchema,
+  mapDataV4Schema,
   mapDataV3Schema,
   mapDataV2Schema,
   mapDataV1Schema,
   severitySchema,
   type MapData,
+  type MapDataV4,
   type MapDataV3,
   type MapDataV2,
 } from "./schema";
@@ -285,13 +287,13 @@ const referenceNumber = (id: string, prefix: string): number => {
   return match ? Number(match[1]) : 0;
 };
 
-export const migrateMapDataV3 = (input: unknown): MapData => {
+const migrateMapDataV3ToV4 = (input: unknown): MapDataV4 => {
   const legacy = mapDataV3Schema.parse(input);
   const barriers = legacy.barriers.map((control, index) => ({
     ...control,
     referenceId: `C-${String(index + 1).padStart(3, "0")}`,
   }));
-  return validate({
+  return mapDataV4Schema.parse({
     schemaVersion: 4,
     metadata: {
       ...(legacy.metadata ?? {}),
@@ -320,6 +322,86 @@ export const migrateMapDataV3 = (input: unknown): MapData => {
   });
 };
 
+const migratedContextId = (
+  nodeId: string,
+  effect: "Mitigating" | "Aggravating",
+  sourceIndex: number,
+  used: Set<string>,
+): string => {
+  const safeNode = encodeURIComponent(nodeId);
+  const base = `context-${safeNode}-${effect.toLowerCase()}-${sourceIndex}`;
+  let id = base;
+  let collision = 2;
+  while (used.has(id)) id = `${base}-${collision++}`;
+  used.add(id);
+  return id;
+};
+
+export const migrateMapDataV4 = (input: unknown): MapData => {
+  const legacy = mapDataV4Schema.parse(input);
+  const usedContextIds = new Set([
+    ...(legacy.metadata?.contextItems ?? []).map((item) => item.id),
+    ...legacy.nodes.flatMap((node) => node.contextItems.map((item) => item.id)),
+  ]);
+  return validate({
+    ...legacy,
+    schemaVersion: 5,
+    metadata: legacy.metadata && {
+      ...legacy.metadata,
+      contextItems: legacy.metadata.contextItems.map((item) => ({
+        ...item,
+        effect: "Neutral" as const,
+      })),
+    },
+    nodes: legacy.nodes.map(
+      ({
+        positiveConsequenceBulletPoints: positive,
+        negativeConsequenceBulletPoints: negative,
+        ...node
+      }) => {
+        const migrate = (
+          values: string[],
+          effect: "Mitigating" | "Aggravating",
+          label: string,
+        ) =>
+          values.flatMap((value, sourceIndex) =>
+            value.trim()
+              ? [
+                  {
+                    id: migratedContextId(
+                      node.id,
+                      effect,
+                      sourceIndex,
+                      usedContextIds,
+                    ),
+                    label,
+                    value,
+                    effect,
+                    displayMode: "Text" as const,
+                    showOnCard: true,
+                  },
+                ]
+              : [],
+          );
+        return {
+          ...node,
+          contextItems: [
+            ...node.contextItems.map((item) => ({
+              ...item,
+              effect: "Neutral" as const,
+            })),
+            ...migrate(positive, "Mitigating", "Mitigating context"),
+            ...migrate(negative, "Aggravating", "Aggravating context"),
+          ],
+        };
+      },
+    ),
+  });
+};
+
+export const migrateMapDataV3 = (input: unknown): MapData =>
+  migrateMapDataV4(migrateMapDataV3ToV4(input));
+
 export const migrateMapDataV1 = (input: unknown): MapData =>
   migrateMapDataV3(migrateMapDataV1ToV3(input));
 
@@ -334,6 +416,7 @@ export const parseAndMigrateMapData = (input: unknown): MapData => {
     );
   }
   if (schemaVersion === 3) return migrateMapDataV3(input);
-  if (schemaVersion === 4) return validate(input);
+  if (schemaVersion === 4) return migrateMapDataV4(input);
+  if (schemaVersion === 5) return validate(input);
   throw new Error(`Unsupported map schema version: ${schemaVersion}`);
 };

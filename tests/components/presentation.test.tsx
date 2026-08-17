@@ -24,8 +24,6 @@ const actionMap: MapData = {
       nodeType: "Action",
       title: "Prevent recurrence",
       actionStatus: "Planned",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
       evidenceIds: [],
       contextItems: [],
       position: { x: 260, y: 160 },
@@ -52,7 +50,17 @@ const detailedMap: MapData = {
           description: "A detailed event description",
           timestamp: "2024-01-02T12:30",
           evidenceIds: ["EV-1"],
-          negativeConsequenceBulletPoints: ["Detailed consequence"],
+          contextItems: [
+            ...node.contextItems,
+            {
+              id: "context-detailed-consequence",
+              label: "Aggravating context",
+              value: "Detailed consequence",
+              effect: "Aggravating" as const,
+              displayMode: "Text" as const,
+              showOnCard: false,
+            },
+          ],
         }
       : node.id === "action"
         ? {

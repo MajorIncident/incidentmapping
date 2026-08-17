@@ -66,8 +66,6 @@ describe("useAppStore actions", () => {
       nodeType: "Impact",
       referenceId: "N-001",
       description: "",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     });
     expect(root.position).toEqual(snapPosition({ x: 0, y: 0 }));
     expect(first.edges).toEqual([]);
@@ -410,14 +408,12 @@ describe("useAppStore actions", () => {
       nodeType: "Event",
       eventDisplay: "Map",
       title: id,
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
       evidenceIds: [],
       contextItems: [],
       position: { x: 0, y: 0 },
     });
     const map = {
-      schemaVersion: 4 as const,
+      schemaVersion: 5 as const,
       nodes: [
         node("root", "N-001"),
         node("left", "N-002"),
