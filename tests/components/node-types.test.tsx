@@ -142,10 +142,37 @@ describe("ChainNode details", () => {
       ],
     });
 
-    expect(screen.getByTestId("context-details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mitigating Context")).toBeInTheDocument();
+    expect(screen.getByLabelText("Aggravating Context")).toBeInTheDocument();
     expect(screen.getByText("Faster recovery")).toBeInTheDocument();
     expect(screen.getByText("Customer disruption")).toBeInTheDocument();
     expect(screen.queryByTestId("consequence-grid")).not.toBeInTheDocument();
+    const headings = screen.getAllByText(/Context$/);
+    expect(headings.map((item) => item.textContent)).toEqual([
+      "Aggravating Context",
+      "Mitigating Context",
+    ]);
+    expect(screen.getByText("Customer disruption").closest("dl")).toHaveClass(
+      "text-slate-700",
+    );
+  });
+
+  it("does not render directional Context groups on Factors", () => {
+    renderChainNode({
+      nodeType: "Factor",
+      contextItems: [
+        {
+          id: "legacy-directional",
+          label: "Weather",
+          value: "Rain",
+          displayMode: "Text",
+          effect: "Aggravating",
+          showOnCard: true,
+        },
+      ],
+    });
+    expect(screen.queryByText("Aggravating Context")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rain")).not.toBeInTheDocument();
   });
 
   it("hides populated details when the global setting is disabled", () => {
@@ -177,7 +204,7 @@ describe("ChainNode details", () => {
     expect(screen.queryByText("Root cause details")).not.toBeInTheDocument();
   });
 
-  it("shows compact accessible consequence counts in summary mode", () => {
+  it("shows one item per directional group and a single accurate overflow", () => {
     act(() => useAppStore.getState().actions.setShowDetails(false));
     renderChainNode({
       contextItems: [
@@ -187,6 +214,7 @@ describe("ChainNode details", () => {
           value: "Improved",
           displayMode: "Text",
           effect: "Mitigating",
+          showOnCard: true,
         },
         {
           id: "context-2",
@@ -194,6 +222,7 @@ describe("ChainNode details", () => {
           value: "High",
           displayMode: "Text",
           effect: "Aggravating",
+          showOnCard: true,
         },
         {
           id: "context-3",
@@ -201,16 +230,15 @@ describe("ChainNode details", () => {
           value: "High",
           displayMode: "Text",
           effect: "Aggravating",
+          showOnCard: true,
         },
       ],
     });
-    expect(
-      screen.getByLabelText("1 mitigating context items"),
-    ).toHaveTextContent("+1");
-    expect(
-      screen.getByLabelText("2 aggravating context items"),
-    ).toHaveTextContent("−2");
-    expect(screen.queryByText("Recovery")).not.toBeInTheDocument();
+    const compact = screen.getByTestId("compact-context");
+    expect(within(compact).getByText("Aggravating Context")).toBeVisible();
+    expect(within(compact).getByText("Mitigating Context")).toBeVisible();
+    expect(within(compact).getByText("+1 more")).toBeVisible();
+    expect(within(compact).queryByText("Cost:")).not.toBeInTheDocument();
   });
 
   it("caps detailed evidence at three rows and reports overflow", () => {

@@ -15,7 +15,7 @@ import {
   type BarrierNodeData,
   type ChainNodeData,
 } from "../../state/useAppStore";
-import { selectContextByEffect } from "../../state/selectors";
+import { selectContextGroups } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
 import { BRANCH_LANE_GAP, edgeTypes } from "./IncidentEdge";
 import {
@@ -834,16 +834,14 @@ export const Canvas = ({
             if (node.type === "Barrier")
               return node.data.status === "Effective" ? "#059669" : "#e11d48";
             if (node.data.graphRole?.isRoot) return "#7c3aed";
-            if (
-              selectContextByEffect(node.data.contextItems ?? [], "Mitigating")
-                .length > 0
-            )
-              return "#059669";
-            if (
-              selectContextByEffect(node.data.contextItems ?? [], "Aggravating")
-                .length > 0
-            )
-              return "#e11d48";
+            if (["Impact", "Event"].includes(node.data.nodeType)) {
+              const groups = selectContextGroups(node.data.contextItems ?? []);
+              // A distinct combined treatment prevents one effect masking the other.
+              if (groups.Aggravating.length && groups.Mitigating.length)
+                return "#7c3aed";
+              if (groups.Aggravating.length) return "#e11d48";
+              if (groups.Mitigating.length) return "#059669";
+            }
             return "#64748b";
           }}
           maskColor="rgba(241, 245, 249, 0.72)"
