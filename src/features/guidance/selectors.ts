@@ -223,6 +223,13 @@ export const selectInvestigationGuidance = (
         item.reason,
       ),
     );
+  const maturityContext = `maturity-${deriveInvestigationStage(input)
+    .toLowerCase()
+    .replaceAll(" ", "-")}` as GuideContext;
+  add(
+    maturityContext,
+    `The investigation is in the ${deriveInvestigationStage(input)} stage.`,
+  );
   const matches = investigationGuide
     .flatMap((entry, order) =>
       entry.contexts
