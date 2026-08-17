@@ -170,7 +170,10 @@ describe("presentation mode", () => {
     expect(screen.getByLabelText("Incident header")).toBeVisible();
     const legend = screen.getByLabelText("Presentation legend");
     expect(legend).toBeVisible();
-    expect(legend.querySelectorAll("button")).toHaveLength(1);
+    expect(legend.querySelectorAll("button")).toHaveLength(2);
+    expect(
+      within(legend).getByRole("button", { name: "How to read the map" }),
+    ).toBeVisible();
     expect(legend.querySelectorAll("a, [role], [tabindex]")).toHaveLength(0);
     expect(screen.getByRole("heading", { name: "Nodes" })).toBeInTheDocument();
     expect(legend).toHaveTextContent("Event");

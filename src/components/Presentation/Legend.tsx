@@ -35,7 +35,11 @@ const Items = ({ items }: { items: LegendItem[] }): JSX.Element => (
   </ul>
 );
 
-export const Legend = (): JSX.Element => {
+export const Legend = ({
+  onLearnMap,
+}: {
+  onLearnMap?: () => void;
+}): JSX.Element => {
   const nodes = useAppStore((state) => state.nodes);
   const barriers = useAppStore((state) => state.barriers);
   const selectionId = useAppStore((state) => state.selectionId);
@@ -104,7 +108,14 @@ export const Legend = (): JSX.Element => {
 
   return (
     <aside className="presentation-legend" aria-label="Presentation legend">
-      <h2>Map legend</h2>
+      <div className="presentation-legend__heading">
+        <h2>Map legend</h2>
+        {onLearnMap ? (
+          <button type="button" onClick={onLearnMap}>
+            How to read the map
+          </button>
+        ) : null}
+      </div>
       <section
         className="presentation-legend__primary"
         aria-labelledby={`${panelId}-nodes`}
