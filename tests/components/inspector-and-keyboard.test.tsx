@@ -1,5 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider } from "reactflow";
 import {
@@ -7,6 +14,7 @@ import {
   localControlToPersistedTimestamp,
   persistedTimestampToLocalControl,
 } from "../../src/components/Sidebar/Inspector";
+import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 
