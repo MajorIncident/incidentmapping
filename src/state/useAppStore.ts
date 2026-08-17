@@ -10,6 +10,11 @@ import type {
 } from "../features/maps/schema";
 import { parseAndMigrateMapData } from "../features/maps/migration";
 import { createId } from "../lib/id";
+import { attachmentRuntimeStore } from "../features/persistence/attachmentRuntimeStore";
+import {
+  sanitizeAttachmentFilename,
+  validateAttachmentFile,
+} from "../features/persistence/attachments";
 import {
   applyHierarchyLayout,
   ACTION_HORIZONTAL_GAP,
@@ -201,6 +206,12 @@ type AppState = {
     linkEvidenceToControl: (controlId: string, evidenceId: string) => boolean;
     unlinkEvidenceFromControl: (controlId: string, evidenceId: string) => void;
     deleteEvidence: (evidenceId: string) => void;
+    addAttachment: (
+      evidenceId: string,
+      file: Pick<File, "name" | "type" | "size">,
+      bytes: Uint8Array,
+    ) => string | null;
+    removeAttachment: (evidenceId: string, attachmentId: string) => void;
     addEvidence: (nodeId: string, text: string) => string | null;
     updateEvidence: (
       nodeId: string,
@@ -1145,6 +1156,84 @@ export const useAppStore = create<AppState>((set, get) => ({
           canRedo: false,
         };
       });
+    },
+    addAttachment: (evidenceId, file, bytes) => {
+      const state = get();
+      if (!state.evidence.some((item) => item.id === evidenceId)) return null;
+      if (bytes.byteLength !== file.size) return null;
+      try {
+        validateAttachmentFile(
+          file,
+          state.attachments.reduce((sum, item) => sum + item.size, 0),
+        );
+      } catch {
+        return null;
+      }
+      const used = new Set(state.attachments.map((item) => item.id));
+      let mark = Math.max(
+        state.metadata?.attachmentReferenceHighWaterMark ?? 0,
+        ...state.attachments.map((item) =>
+          Number(item.id.match(/^A-(\d+)$/)?.[1] ?? 0),
+        ),
+      );
+      let id: string;
+      do id = `A-${String(++mark).padStart(3, "0")}`;
+      while (used.has(id));
+      const safeName = sanitizeAttachmentFilename(file.name);
+      const attachment: Attachment = {
+        id,
+        filename: file.name,
+        mimeType: file.type as Attachment["mimeType"],
+        size: file.size,
+        bundlePath: `attachments/${id}-${safeName}`,
+      };
+      const prev = snapshotFromState(state);
+      attachmentRuntimeStore.setBytes(id, bytes);
+      set((current) => ({
+        attachments: [...current.attachments, attachment],
+        evidence: current.evidence.map((item) =>
+          item.id === evidenceId
+            ? { ...item, attachmentIds: [...item.attachmentIds, id] }
+            : item,
+        ),
+        metadata: {
+          ...(current.metadata ?? {}),
+          attachmentReferenceHighWaterMark: mark,
+        },
+        history: updateHistoryState(current, prev, true),
+        canUndo: true,
+        canRedo: false,
+      }));
+      return id;
+    },
+    removeAttachment: (evidenceId, attachmentId) => {
+      const state = get();
+      const owner = state.evidence.find((item) => item.id === evidenceId);
+      if (!owner?.attachmentIds.includes(attachmentId)) return;
+      const remainingReferences = state.evidence.some(
+        (item) =>
+          item.id !== evidenceId && item.attachmentIds.includes(attachmentId),
+      );
+      const prev = snapshotFromState(state);
+      set((current) => ({
+        evidence: current.evidence.map((item) =>
+          item.id === evidenceId
+            ? {
+                ...item,
+                attachmentIds: item.attachmentIds.filter(
+                  (id) => id !== attachmentId,
+                ),
+              }
+            : item,
+        ),
+        attachments: remainingReferences
+          ? current.attachments
+          : current.attachments.filter((item) => item.id !== attachmentId),
+        history: updateHistoryState(current, prev, true),
+        canUndo: true,
+        canRedo: false,
+      }));
+      if (!remainingReferences) attachmentRuntimeStore.remove(attachmentId);
     },
     addEvidence: (nodeId, value) => {
       const title = value.trim();
@@ -2179,6 +2268,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         resetMoveDebounce();
         const applied = applyHistorySnapshot(previous);
+        const previousIds = new Set(
+          previous.attachments.map((item) => item.id),
+        );
+        state.attachments.forEach((item) => {
+          if (!previousIds.has(item.id)) attachmentRuntimeStore.remove(item.id);
+        });
+        previousIds.forEach((id) => attachmentRuntimeStore.restore(id));
         applied.metadata = {
           ...(applied.metadata ?? {}),
           contextItems: applied.metadata?.contextItems ?? [],
@@ -2209,6 +2305,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         resetMoveDebounce();
         const applied = applyHistorySnapshot(next);
+        const nextIds = new Set(next.attachments.map((item) => item.id));
+        state.attachments.forEach((item) => {
+          if (!nextIds.has(item.id)) attachmentRuntimeStore.remove(item.id);
+        });
+        nextIds.forEach((id) => attachmentRuntimeStore.restore(id));
         applied.metadata = {
           ...(applied.metadata ?? {}),
           contextItems: applied.metadata?.contextItems ?? [],

@@ -59,6 +59,30 @@ export const selectEvidenceLinkedEntityLabels = (
     .map((control) => control.referenceId ?? "Unassigned control"),
 ];
 
+/** Every graph entity linked to Evidence, with stable human-facing references. */
+export const selectEvidenceLinkedEntities = (
+  evidenceId: string,
+  nodes: Node<ChainNodeData>[],
+  controls: Array<
+    Pick<BarrierNodeData, "referenceId" | "evidenceIds"> & { id: string }
+  >,
+) => [
+  ...nodes
+    .filter((node) => node.data.evidenceIds?.includes(evidenceId))
+    .map((node) => ({
+      kind: "node" as const,
+      id: node.id,
+      referenceId: node.data.referenceId ?? "N-???",
+    })),
+  ...controls
+    .filter((control) => control.evidenceIds?.includes(evidenceId))
+    .map((control) => ({
+      kind: "control" as const,
+      id: control.id,
+      referenceId: control.referenceId ?? "C-???",
+    })),
+];
+
 export const selectPinnedContext = (items: ContextItem[]) =>
   items.filter((item) => item.showOnCard).map((item) => ({ ...item }));
 

@@ -445,6 +445,8 @@ export const attachmentMimeTypeSchema = z.enum([
   "image/png",
   "image/webp",
   "application/pdf",
+  "video/mp4",
+  "video/webm",
   "text/plain",
   "text/csv",
   "application/json",
@@ -466,7 +468,14 @@ export const evidenceItemSchema = strictObject({
   source: z.string().optional(),
   reference: z.string().optional(),
   attachmentIds: z.array(z.string().min(1)),
-  externalUrl: z.string().url().optional(),
+  externalUrl: z
+    .string()
+    .url()
+    .refine(
+      (value) => /^https?:\/\//i.test(value),
+      "URL must use HTTP or HTTPS",
+    )
+    .optional(),
 });
 export const attachmentSchema = strictObject({
   id: z.string().min(1),

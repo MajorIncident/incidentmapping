@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { validateAttachmentFile } from "../../features/persistence/attachments";
+import { EvidenceViewer } from "./EvidenceViewer";
 import type { EvidenceType } from "../../features/maps/schema";
 import {
   selectEvidenceLinkedEntityLabels,
@@ -29,6 +31,9 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
   const nodes = useAppStore((state) => state.nodes);
   const controls = useAppStore((state) => state.barriers);
   const actions = useAppStore((state) => state.actions);
+  const attachments = useAppStore((state) => state.attachments);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [fileError, setFileError] = useState("");
   const linkedIds = useMemo(
     () =>
       target.kind === "node"
@@ -54,6 +59,8 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
     description: "",
     source: "",
     reference: "",
+    externalUrl: "",
+    attachmentIds: [] as string[],
   });
 
   useEffect(() => {
@@ -81,13 +88,20 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    if (actions.createAndLinkEvidence(target, draft)) {
+    if (
+      actions.createAndLinkEvidence(target, {
+        ...draft,
+        externalUrl: draft.externalUrl || undefined,
+      })
+    ) {
       setDraft({
         type: "Note",
         title: "",
         description: "",
         source: "",
         reference: "",
+        externalUrl: "",
+        attachmentIds: [],
       });
       setAdding(false);
       requestAnimationFrame(() => addButton.current?.focus());
@@ -149,6 +163,85 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
             ) : null}
             {item.description ? (
               <p className="mt-1 text-slate-600">{item.description}</p>
+            ) : null}
+            {item.externalUrl ? (
+              <a
+                className="mt-2 block text-blue-700 underline"
+                href={item.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open external source
+              </a>
+            ) : null}
+            {item.attachmentIds.map((attachmentId) => {
+              const attachment = attachments.find(
+                (entry) => entry.id === attachmentId,
+              );
+              return attachment ? (
+                <div
+                  key={attachmentId}
+                  className="mt-2 flex flex-wrap items-center gap-2 rounded border p-2"
+                >
+                  <span>{attachment.filename}</span>
+                  <button
+                    className={button}
+                    type="button"
+                    onClick={() => setPreviewId(attachmentId)}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    className={button}
+                    type="button"
+                    onClick={() =>
+                      actions.removeAttachment(item.id, attachmentId)
+                    }
+                  >
+                    Remove file
+                  </button>
+                </div>
+              ) : (
+                <p key={attachmentId} role="alert" className="text-amber-700">
+                  Attachment metadata is missing.
+                </p>
+              );
+            })}
+            <label className={`${button} mt-2 inline-block cursor-pointer`}>
+              Add File
+              <input
+                className="sr-only"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/webm"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    validateAttachmentFile(
+                      file,
+                      attachments.reduce((sum, entry) => sum + entry.size, 0),
+                    );
+                    actions.addAttachment(
+                      item.id,
+                      file,
+                      new Uint8Array(await file.arrayBuffer()),
+                    );
+                    setFileError("");
+                  } catch (error) {
+                    setFileError(
+                      error instanceof Error
+                        ? error.message
+                        : "Unable to add file",
+                    );
+                  }
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            {fileError ? (
+              <p role="alert" className="mt-1 text-sm text-rose-700">
+                {fileError}
+              </p>
             ) : null}
             <p className="mt-1 text-xs text-slate-500">
               Linked to:{" "}
@@ -251,6 +344,19 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
               }
             />
           </label>
+          <label className="block text-xs font-semibold">
+            External URL
+            <input
+              className={input}
+              type="url"
+              pattern="https?://.*"
+              placeholder="https://example.com"
+              value={draft.externalUrl}
+              onChange={(e) =>
+                setDraft({ ...draft, externalUrl: e.target.value })
+              }
+            />
+          </label>
           <div className="flex gap-2">
             <button className={button} type="submit">
               Add Evidence
@@ -328,6 +434,23 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
           </div>
         </div>
       ) : null}
+      {previewId
+        ? (() => {
+            const attachment = attachments.find(
+              (item) => item.id === previewId,
+            );
+            const owner = evidence.find((item) =>
+              item.attachmentIds.includes(previewId),
+            );
+            return attachment && owner ? (
+              <EvidenceViewer
+                attachment={attachment}
+                evidenceTitle={owner.title}
+                onClose={() => setPreviewId(null)}
+              />
+            ) : null;
+          })()
+        : null}
     </section>
   );
 };

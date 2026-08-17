@@ -62,6 +62,12 @@ export const attachmentRuntimeStore = {
       );
     return value.blobUrl;
   },
+  releaseBlobUrl(id: string): void {
+    const value = active.get(id);
+    if (!value?.blobUrl) return;
+    URL.revokeObjectURL(value.blobUrl);
+    delete value.blobUrl;
+  },
   clear(): void {
     active.forEach(revoke);
     tombstones.forEach(revoke);
