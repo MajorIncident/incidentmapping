@@ -16,6 +16,9 @@ type ToolbarProps = FileMenuRenderProps & {
   showDetails: boolean;
   onToggleDetails: () => void;
   onPresent: () => void;
+  learningGuideEnabled: boolean;
+  onLearningGuideChange: (enabled: boolean) => void;
+  onHelpTopic: (topic: "map" | "basics" | "shortcuts" | "about") => void;
 };
 
 const buttonBase =
@@ -229,6 +232,29 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
           title="Delete selected item (Delete)"
         >
           Delete selected item
+        </Item>
+      </Menu>
+      <Menu label="Help" icon="more" align="right">
+        <Item
+          icon="details"
+          aria-pressed={props.learningGuideEnabled}
+          onClick={() =>
+            props.onLearningGuideChange(!props.learningGuideEnabled)
+          }
+        >
+          Learning Guide: {props.learningGuideEnabled ? "On" : "Off"}
+        </Item>
+        <Item icon="details" onClick={() => props.onHelpTopic("map")}>
+          Learn the Map
+        </Item>
+        <Item icon="details" onClick={() => props.onHelpTopic("basics")}>
+          Investigation Basics
+        </Item>
+        <Item icon="details" onClick={() => props.onHelpTopic("shortcuts")}>
+          Keyboard Shortcuts
+        </Item>
+        <Item icon="details" onClick={() => props.onHelpTopic("about")}>
+          About IncidentMapping
         </Item>
       </Menu>
     </nav>

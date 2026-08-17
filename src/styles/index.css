@@ -126,8 +126,7 @@ input[type="checkbox"] {
   @apply min-h-10 rounded-lg border border-slate-300 bg-white px-2 text-sm font-normal text-slate-900;
 }
 
-.map-mobile-actions,
-.mobile-map-guide {
+.map-mobile-actions {
   display: none;
 }
 
@@ -431,39 +430,76 @@ select:focus-visible {
   stroke-linecap: round;
 }
 
-.map-guide__intro {
-  @apply leading-relaxed;
+.learning-guide-root {
+  @apply absolute z-20;
+  bottom: max(4rem, calc(env(safe-area-inset-bottom) + 3rem));
+  left: max(4.75rem, env(safe-area-inset-left));
 }
-
-.map-guide__key {
-  @apply mt-2 flex flex-wrap gap-1.5;
+.learning-guide {
+  @apply w-[min(22rem,calc(100vw-6rem))] max-h-[60vh] overflow-y-auto rounded-xl border border-slate-300 bg-white/95 p-4 text-sm leading-relaxed text-slate-700 shadow-xl backdrop-blur;
 }
-
-.map-guide__key-item {
-  @apply inline-flex cursor-default items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium;
+.learning-guide__header {
+  @apply mb-2 flex items-start justify-between gap-3;
 }
-
-.map-guide__key-item i {
-  @apply h-2 w-2 rounded-full bg-slate-400;
+.learning-guide h2 {
+  @apply text-base font-bold text-slate-950;
 }
-.map-guide__key-item--impact i {
-  @apply bg-violet-500;
+.learning-guide h3 {
+  @apply mt-3 font-semibold text-slate-900;
 }
-.map-guide__key-item--event i {
-  @apply bg-sky-500;
+.learning-guide__context {
+  @apply text-xs font-semibold uppercase tracking-wide text-slate-600;
 }
-.map-guide__key-item--factor i,
-.map-guide__key-item--key-factor i {
-  @apply bg-amber-400;
+.learning-guide__blocks {
+  @apply space-y-2;
 }
-.map-guide__key-item--action i {
-  @apply bg-emerald-500;
+.learning-guide__actions {
+  @apply my-3 flex flex-wrap gap-2;
 }
-.map-guide__key-item--control i {
-  @apply bg-slate-500;
+.learning-guide__actions button {
+  @apply min-h-11 rounded-lg bg-sky-700 px-3 font-semibold text-white hover:bg-sky-800;
 }
-.map-guide__key-item--root-cause i {
-  @apply bg-rose-500;
+.learning-guide__close {
+  @apply min-h-11 min-w-11 rounded-lg text-xl font-bold hover:bg-slate-100;
+}
+.learning-guide__trigger {
+  @apply min-h-11 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-800 shadow-lg;
+}
+.learning-guide details {
+  @apply mt-2 border-t border-slate-200 pt-2;
+}
+.learning-guide summary {
+  @apply min-h-11 cursor-pointer py-2 font-semibold text-sky-800;
+}
+.learning-guide__dismiss {
+  @apply mt-3 min-h-11 rounded-lg px-2 font-semibold text-slate-600 underline;
+}
+.learning-guide__diagram {
+  @apply flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2;
+}
+.learning-guide__diagram span {
+  @apply flex items-center gap-2;
+}
+.learning-guide__diagram b {
+  @apply rounded border border-slate-400 bg-white px-2 py-1;
+}
+.learning-guide__reason {
+  @apply text-xs text-slate-600;
+}
+.help-dialog-backdrop {
+  @apply fixed inset-0 z-[100] grid place-items-center bg-slate-950/40 p-4;
+}
+.help-dialog {
+  @apply w-full max-w-lg rounded-xl bg-white p-5 text-slate-700 shadow-2xl;
+}
+.help-dialog h2 {
+  @apply text-xl font-bold text-slate-950;
+}
+.help-dialog p {
+  @apply my-3 leading-relaxed;
+}
+.help-dialog button {
+  @apply min-h-11 rounded-lg bg-sky-700 px-4 font-semibold text-white;
 }
 
 .react-flow__minimap {
@@ -474,12 +510,10 @@ select:focus-visible {
 
 @media (max-width: 767px) {
   .react-flow__minimap,
-  .map-guide,
   .react-flow__controls {
     display: none;
   }
-  .map-mobile-actions,
-  .mobile-map-guide {
+  .map-mobile-actions {
     display: flex;
   }
   .map-title {
@@ -491,13 +525,25 @@ select:focus-visible {
   .map-title__subtitle {
     display: none;
   }
-  .mobile-map-guide {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-    max-height: min(75vh, 32rem);
-    overflow-y: auto;
+  .learning-guide-root {
+    @apply inset-x-3 bottom-3;
+    left: max(0.75rem, env(safe-area-inset-left));
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
-  .mobile-map-guide .map-guide__key {
-    @apply gap-2;
+  .learning-guide__trigger {
+    @apply ml-auto block;
+  }
+  .learning-guide--sheet {
+    @apply fixed inset-x-0 bottom-0 w-full max-h-[80vh] rounded-b-none px-4 pt-4;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-button,
+  .map-overlay-button {
+    transition: none;
   }
 }
 
