@@ -1,6 +1,6 @@
 # Investigation Model
 
-V4 separates what happened, what contributed, what constrained it, what
+V5 separates what happened, what contributed, what constrained it, what
 supports the analysis, and what should happen next. Display choices never
 create, remove, reorder, or otherwise change causality; only explicit
 `CauseEffectEdge` relationships express causal claims.
@@ -20,19 +20,26 @@ the primary causal canvas, with an auxiliary presentation lane available to
 reveal/focus it. This is useful for detail that provides temporal continuity
 without crowding the causal story. **Timeline-only is solely a display choice:
 it does not weaken, strengthen, add, or remove causality.** Phase and timestamp
-order likewise do not imply cause and effect.
+order likewise do not imply cause and effect. **Chronology represents sequence,
+not causality:** “the alarm sounded before shutdown” is a sequence claim; only
+an explicit causal edge can claim that the alarm caused the shutdown.
 
 ### Event Duration
 
 An Event may have `endTimestamp` as well as `timestamp`. The two strings record
-the displayed interval; V4 does not validate their syntax or require the end to
-follow the start. Missing or invalid start timestamps remain visible in the
+the displayed interval; when both parse as dates, the end cannot precede the
+start. Missing or invalid start timestamps remain visible in the
 final **Untimed Events** chronology group rather than being discarded.
 
 ## Factors and assertion state
 
-A **Factor** is a condition judged to have contributed causally. Its category
-may be Human, Process, Equipment, Technology, Communication, Environment,
+A **Factor** is a condition for which the investigation makes an explicit
+causal judgment: it contributed to producing an Event or Impact. For example,
+“the ambiguous procedure contributed to the incorrect valve setting” is a cause
+and belongs as a Factor; “the incorrect setting increased spill volume”
+describes an effect and belongs as Aggravating Context on that Event or Impact
+unless the setting is itself asserted as a cause in the causal graph. Its
+category may be Human, Process, Equipment, Technology, Communication, Environment,
 Organizational, or Other. **Key Factor** and **Root Cause** are escalating
 Factor-significance classifications, not graph position or relationship types.
 
@@ -76,7 +83,27 @@ available; metadata survives when bytes are missing or rejected.
 ## Context and display modes
 
 Context is a labeled fact at incident level or on an Event, Factor, or Impact.
-A Context item can be pinned to a card and displayed as:
+Every item has an `effect` classification:
+
+- **Context (`Neutral`)** is a relevant, nondirectional fact that helps readers
+  understand the investigation without asserting that it caused or changed an
+  effect. “The asset was 12 years old” is neutral; if age is judged to have
+  caused the failure, model age as a Factor instead.
+- **Aggravating Context (`Aggravating`)** is a circumstance judged to have made
+  an observed Event or Impact worse by increasing its severity, extent, or
+  likelihood. “High occupancy increased the number exposed” describes an
+  effect; “high occupancy caused the evacuation delay” is instead a causal
+  claim and should be a Factor connected by a causal edge.
+- **Mitigating Context (`Mitigating`)** is a circumstance judged to have reduced
+  an observed Event or Impact's severity, extent, or likelihood. “Rapid
+  isolation limited the spill volume” describes an effect; “rapid isolation
+  caused pressure loss” would be a causal claim and should be modeled as a
+  Factor when material to the analysis.
+
+Directional effect classifications are valid only on Events and Impacts.
+Factors may carry Neutral Context only; Actions cannot carry Context. Incident
+metadata may carry any effect classification. An omitted `effect` at the input
+boundary defaults to `Neutral`. A Context item can be pinned to a card and displayed as:
 
 - `Text`: label/value prose;
 - `Chip`: compact categorical emphasis;
@@ -86,6 +113,15 @@ These are **display modes only and do not change causality**. Context is not a
 second causal-node system: promote a condition to a Factor only after making a
 causal judgment. Evidence may support the factual Context while the Factor
 expresses the distinct causal analysis.
+
+## Learning Guide boundary
+
+The Learning Guide, Learn the Map material, How to Read This Map explanations,
+stage labels, and review checklist are educational projections over the current
+map. **The Guide advises but never blocks an edit, changes persisted
+investigation data, or modifies an investigation conclusion.** Its suggestions
+and completeness signals are prompts for professional judgment, not validation,
+proof, or an automated finding.
 
 ## Derived review experiences
 
