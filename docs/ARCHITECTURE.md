@@ -1,120 +1,113 @@
 # Incident Mapping Architecture
 
-## Data flow and four state categories
+## Persistence boundary
 
-The application intentionally separates the saved investigation from rendering
-and view state.
+Strict V4 `MapData` is the canonical document, but `.incidentmap` is the
+canonical **file**. The package is a bounded ZIP containing exactly one root
+`map.json` and active binaries at manifest paths below `attachments/`. Save
+projects Zustand state through `toMap()`, validates it, packages it, and uses
+the File System Access API or download fallback. Open treats bytes as untrusted,
+validates ZIP structure and limits, migrates/validates `map.json`, then loads the
+runtime store. Legacy JSON open remains an import boundary; JSON export omits
+binary content. See [FILE_FORMAT.md](FILE_FORMAT.md).
 
-### 1. Persisted V4 state and package decision
+The browser dependency `fflate` supplies ESM `zipSync`, `unzipSync`, and UTF-8
+helpers without Node polyfills. Synchronous processing is acceptable within the
+enforced 25 MiB per-file and 100 MiB attachment limits. Web Crypto computes
+optional SHA-256 checksums. This architecture is local persistence, not cloud
+storage, synchronization, or a reporting database.
 
-The canonical save document is strict Version 4 `MapData`: incident metadata,
-semantic nodes and coordinates, discriminated relationships, Controls (under
-the historical wire key `barriers`), the global Evidence registry, Context,
-and allocation high-water marks. Action accountability lives on Action nodes.
-The [map schema](MAP_SCHEMA.md) is the complete wire contract.
+## State categories
 
-Open sends all untrusted JSON through `parseAndMigrateMapData` before loading the
-store. Save converts the runtime model with `toMap()`, validates V4, and only
-then writes through the browser's available local-file/download mechanism.
-The default persistence format is a `.incidentmap` ZIP containing one canonical,
-formatted root `map.json` and active binaries below `attachments/`. JSON export
-contains metadata and the attachment manifest only; neither Blob URLs, base64,
-nor binary buffers belong in the document or Zustand history.
+### Persisted investigation metadata
 
-We selected production dependency **fflate 0.8.x** because its browser ESM build
-exposes synchronous `zipSync`/`unzipSync` and UTF-8 helpers without Node
-polyfills. The upstream project reports roughly an 8 kB minified core (about
-3 kB gzip), substantially smaller than general archive libraries; the app uses
-the simple synchronous API because packages are bounded to 100 MB. The browser
-Web Crypto API supplies SHA-256 rather than adding a crypto dependency.
+V4 contains incident metadata, semantic nodes and coordinates, discriminated
+relationships, Controls under historical key `barriers`, Evidence, the
+Attachment manifest, Context, and allocation high-water marks. Objects are
+strict and relationships/references receive whole-map validation. It contains
+neither React Flow rendering fields nor presentation selections.
 
-Attachment bytes, deleted/restorable tombstones, and revocable Blob URLs live
-in a session-only runtime store keyed by attachment ID. Central persistence
-validation limits each file to 25 MB and all attachments to 100 MB, constrains
-normalized bundle paths, and permits only the schema's safe media allowlist.
+### Runtime graph and attachment byte store
 
-### 2. Runtime React Flow state
+Zustand adapts domain nodes/edges to React Flow and owns editable metadata,
+Controls, Evidence, and attachment metadata. A separate session-only attachment
+runtime store maps attachment ID to copied `Uint8Array` bytes. It also maintains
+deleted/restorable tombstones so attachment deletion participates in undo/redo.
+Changing bytes increments a revision used by dirty-state and preview consumers.
+New/open clears obsolete bytes; package open populates only verified payloads.
 
-Zustand owns the editable runtime graph. Persisted domain nodes are adapted to
-React Flow nodes with `data`, position, selection, and component/rendering
-properties; persisted relationships become React Flow edges. Runtime Controls
-and the Evidence registry remain domain collections rather than independent
-causal nodes. Store mutations, history snapshots, selection, dragging, and
-layout operate here. `toMap()` removes React Flow-specific rendering data and
-reconstructs canonical V4.
+History snapshots are deliberately **metadata-only**: nodes, edges, metadata,
+Controls, Evidence, Attachment manifest records, and selection. Large binary
+buffers, base64, ZIP data, and Blob URLs are never copied into history. Undo or
+redo reconciles manifest IDs with active/tombstoned runtime bytes; unreachable
+tombstones can be released.
 
-### 3. Derived Presentation state
+### Blob URL lifecycle
 
-Presentation is a read-only projection of current runtime state. It derives
-card labels, graph roles, classification tags, selected-path styling, Evidence
-summaries, Control placement, legend content, and chronology groups. It does not
-copy or become an alternative source of investigation truth. Saved/unsaved
-status is likewise derived by comparing validated canonical serialization with
-the last new/open/save baseline.
+Evidence preview lazily asks the byte store for one object URL. The same URL is
+reused while active and revoked on viewer unmount, content replacement,
+permanent removal, tombstone release, or store clear. It is never serialized.
+The focus-managed modal renders images, native controlled video, or PDF in a
+sandboxed iframe and retains an open/download fallback. Missing/rejected bytes
+produce an accessible unavailable-content alert while metadata remains intact.
 
-### 4. Ephemeral Chronology visibility
+### Ephemeral application state
 
-Whether Chronology is open, including its responsive overlay/drawer behavior,
-is local ephemeral UI state. It is not persisted and does not enter undo/redo.
-Chronology itself derives Events from runtime state, orders valid timestamps by
-instant and phase, and puts missing or invalid timestamps in a final **Untimed
-Events** group at the bottom. Closing it changes no investigation data.
+Selection/editing aids, menus, viewport/focus requests, presentation mode,
+active lens, detail toggles, chronology visibility, Timeline-Only reveal state,
+Case Summary visibility, and Guided Story step are view state. They are neither
+persisted nor causal and do not enter undo history. Dirty state compares the
+canonical map projection plus attachment-store revision with the last
+new/open/save baseline.
 
-Other ephemeral state includes selection/editing IDs, menus and popovers,
-viewport and focus requests, presentation mode, read-only flags, detail
-visibility, and undo/redo availability. History stacks are runtime-only.
+## Derived views, not parallel truth
 
-## Evidence ownership and references
+Presentation selectors are pure projections over the current graph. The six
+lenses—Overview, Causal Story, Chronology, Controls, Actions, and Evidence—derive
+visibility, emphasis, counts, focus, and chronology opening without mutating
+records. Chronology orders parseable Event timestamps and retains missing or
+invalid values in **Untimed Events**. Timeline-Only reveal and all Context
+display modes are presentation decisions; **display never changes causality**.
 
-The V3 map globally owns each Evidence record once in its Evidence Registry.
-Nodes and Controls contain `evidenceIds` references; they never persist embedded
-copies. One Evidence item can support assertions associated with several nodes
-or Controls. Evidence is not a graph node and does not create a causal edge.
-Future attachment or link fields may extend the Evidence record through a new
-schema decision, but no unused attachment objects are persisted today and the
-application does not imply file storage exists.
+Case Summary derives capped review lists/counts for impacts, Root Causes, Key
+Factors, failed/missing Controls, Control and Action states/types, Action
+completion, Evidence types, Confirmed/Working assertions, and pinned Chip/Metric
+Context. It is not an AI summary or report database.
+
+Guided Story deterministically traverses explicit persisted causal paths toward
+Key Factors and Root Causes (or a selected finding), then includes relevant
+failed/missing Controls, linked Actions, Evidence, and Attachment metadata. It
+fits/focuses existing entities and never generates a conclusion. Manual story
+building, custom authored steps, and persisted story order are not implemented.
 
 ## Relationships, Controls, and layout
 
-Relationship discriminators determine semantics:
+`CauseEffectEdge` connects non-Actions and drives causal hierarchy, roots,
+paths, and Control eligibility. `ActionEdge` associates one non-Action source
+with an Action and is excluded from causal computation. A Control attaches to
+the ordered endpoints of an existing causal edge rather than to an edge ID.
 
-- `CauseEffectEdge` builds the causal hierarchy between non-Action nodes and
-  participates in roots, causal depth, sibling groups, upstream paths, and
-  Control eligibility.
-- `ActionEdge` associates exactly one non-Action source with an Action. It does
-  not affect causal roots, depth, paths, or Control placement.
-- A Control refers to an ordered upstream/downstream causal pair rather than an
-  edge ID. Its Role describes intended function; its Status describes observed
-  performance.
+Layout first positions causal nodes and then places Actions in stable,
+grid-snapped stacks beside their source. Derived lenses, Event phase/time,
+Context mode, Assertion State, and node position do not assert causality.
+`Inferred` records analytical derivation and is not necessarily uncertainty.
 
-Layout has two phases. First it lays out non-Action nodes from the causal
-hierarchy, centering parents over siblings and spacing components. Then it puts
-Actions in stable, grid-snapped stacks to the right of their source. Adding or
-removing an Action therefore cannot move causal nodes.
+## Supported quality, accessibility, and responsive behavior
 
-## Investigation semantics in the UI
+Schema/migration/package tests protect compatibility, references, limits,
+warnings, and security boundaries. Store tests protect history and registry
+ownership; selector/story tests protect non-mutating derivation; component and
+browser tests protect keyboard/read-only/responsive behavior.
 
-Canvas cards expose stable node references and semantic types. Events may show
-Event Phase; Factors may show category and significance, including Key Factor
-or Root Cause; Actions may show purpose (Action Type) and lifecycle (Action
-Status). The Inspector exposes narrative fields, Context where valid, linked
-Evidence, and type-specific classification. Incident Context is edited at the
-incident level. See the [investigation model](INVESTIGATION_MODEL.md) for the
-meaning and boundaries of each concept.
+Dialogs expose roles and labels, trap preview focus, support Escape, restore
+focus, and announce view changes. Lens tabs support arrows, Home, and End.
+Mobile uses an overlay/drawer chronology and closable inspector, full-screen
+preview, touch-sized controls, and bounded overlays at browser zoom. Native
+browser PDF/video support and codecs vary; download remains the fallback and
+captions must be supplied with source media.
 
-Presentation mode remains read-only assistance over the same runtime model. It
-is not a generated report or a certification artifact.
-
-## History and quality boundaries
-
-Domain mutations snapshot runtime nodes, relationships, metadata, Controls,
-Evidence, and relevant selection. Undo/redo restores values and recomputes
-availability; text and Control edits are debounced, and repeated keyboard moves
-within the coalescing window form one operation. Presentation, Chronology
-visibility, viewport/focus requests, and saved status do not create history.
-
-Schema and migration tests protect compatibility and semantic integrity. Store
-tests protect history, Evidence ownership, and serialization. Layout tests
-protect discriminator filtering and deterministic coordinates. Component and
-browser journeys protect adaptive/read-only rendering and save/reopen behavior.
-Schema validation establishes data compatibility, not regulatory compliance.
+Fatal package failures do not replace the investigation. Attachment integrity
+problems are recoverable warnings that preserve metadata but suppress unsafe or
+invalid bytes. These behaviors and package/security limits are product
+contracts, not incidental implementation details. Validation is not malware
+scanning, authenticity proof, regulatory compliance, cloud backup, or audit.

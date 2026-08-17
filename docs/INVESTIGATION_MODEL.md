@@ -1,105 +1,99 @@
 # Investigation Model
 
-This model separates what happened, why it happened, what constrained it, what
-supports the analysis, and what should happen next. The distinctions are both
-investigative guidance and the semantics represented by the V3 wire contract.
+V4 separates what happened, what contributed, what constrained it, what
+supports the analysis, and what should happen next. Display choices never
+create, remove, reorder, or otherwise change causality; only explicit
+`CauseEffectEdge` relationships express causal claims.
 
-## Impact
+## Impacts, Events, and time
 
-An **Impact** is an outcome or consequence of the incident: harm, loss,
-disruption, or another material effect. Impacts belong in the causal story and
-may have severity, narrative, consequences, Context, and linked Evidence. An
-Impact is not an Action and does not describe remediation.
+An **Impact** is harm, loss, disruption, or another material outcome. An
+**Event** is something that occurred. Events may carry a start `timestamp`, an
+optional `endTimestamp`, an Event Phase (`Precursor`, `Incident`, `Detection`,
+`Response`, `Recovery`), Context, and Evidence.
 
-## Event
+### Timeline-Only Events
 
-An **Event** is something that occurred in the incident story. Its timestamp may
-locate it in Chronology; an untimed or invalidly timed Event is retained in the
-final **Untimed Events** group at the bottom rather than omitted. Event nodes can
-carry an Event Phase, Context, and Evidence references.
+Every Event has an Event Display value. `Map` shows it in the causal canvas and
+Chronology. `ChronologyOnly` keeps it in Chronology and normally removes it from
+the primary causal canvas, with an auxiliary presentation lane available to
+reveal/focus it. This is useful for detail that provides temporal continuity
+without crowding the causal story. **Timeline-only is solely a display choice:
+it does not weaken, strengthen, add, or remove causality.** Phase and timestamp
+order likewise do not imply cause and effect.
 
-## Event Phase
+### Event Duration
 
-**Event Phase** locates an Event in the narrative: `Precursor`, `Incident`,
-`Detection`, `Response`, or `Recovery`. It is valid only for Events. Event Phase
-locates an Event in the story; it does not alter causal semantics. Causation is
-expressed by causal relationships, not by phase order, and a later-phase Event
-is not automatically an effect of an earlier one.
+An Event may have `endTimestamp` as well as `timestamp`. The two strings record
+the displayed interval; V4 does not validate their syntax or require the end to
+follow the start. Missing or invalid start timestamps remain visible in the
+final **Untimed Events** chronology group rather than being discarded.
 
-## Factor
+## Factors and assertion state
 
-A **Factor** is a condition the investigation judges to have contributed
-causally. It may be categorized as Human, Process, Equipment, Technology,
-Communication, Environment, Organizational, or Other. Factors participate in
-the causal graph. Context is a fact; a Factor is judged causal. Similar wording
-may appear first as Context and later become a Factor only after that analytical
-judgment.
+A **Factor** is a condition judged to have contributed causally. Its category
+may be Human, Process, Equipment, Technology, Communication, Environment,
+Organizational, or Other. **Key Factor** and **Root Cause** are escalating
+Factor-significance classifications, not graph position or relationship types.
 
-## Key Factor
+Factors and Controls may record an **Assertion State**:
 
-A **Key Factor** is a Factor whose significance is elevated because it is
-important to understanding or addressing the incident. It remains a Factor and
-retains causal semantics; the designation prioritizes it rather than creating a
-new relationship type.
+- `Confirmed`: treated as established by the investigation;
+- `Working`: an active analytical proposition;
+- `Inferred`: analytically derived from other information.
 
-## Root Cause
+**Inferred means analytically derived; it does not necessarily mean uncertain.**
+Assertion State communicates the basis/state of an assertion and does not alter
+its causal edges, significance, Control status, or Evidence links.
 
-A **Root Cause** is a Factor given the strongest causal-significance
-classification in this model. It communicates the investigation's conclusion,
-not merely a graph-layout root or the earliest item in time. Root Cause is a
-Factor significance value, so it should be supported by analysis and linked
-Evidence rather than inferred from node position.
+## Controls
 
-## Control
+A **Control** is a safeguard attached to one ordered causal relationship. The
+wire discriminator remains `Barrier`. Role (`Preventive`, `Detective`, or
+`Mitigating`) describes intended function; Status (`Effective`, `Degraded`,
+`Failed`, or `Missing`) describes observed performance. Neither dimension
+implies the other. A Control does not replace its causal edge and is not a
+free-standing cause.
 
-A **Control** is a safeguard associated with one specific ordered causal
-relationship. It may have a description, Control Role, Control Status, failure
-reason/details, and linked Evidence. The persisted discriminator remains
-`Barrier` for wire compatibility, but the investigation concept is Control.
-Controls do not replace causal edges and are not free-standing causes.
+## Actions and completion
 
-## Control Role
+An **Action** is a response attached by exactly one non-causal Action edge from
+a non-Action. Type (`Immediate`, `Corrective`, `Preventive`) is purpose; Status
+(`Proposed`, `Planned`, `InProgress`, `Completed`, `Cancelled`) is lifecycle.
+`actionDueDate` records the target date and `actionCompletedAt` records actual
+completion separately. A completion timestamp is not inferred from Completed
+status, and the schema does not force those fields to agree. Actions cannot
+carry Context and are not causes.
 
-**Control Role** describes intended function: `Preventive`, `Detective`, or
-`Mitigating`. **Control Status** describes observed performance: `Effective`,
-`Degraded`, `Failed`, or `Missing`. Control Role describes intent; Control
-Status describes performance. A preventive Control can therefore be degraded,
-and a detective Control can be effective; neither dimension implies the other.
+## Evidence and attachments
 
-## Action
+Evidence is a global registry record referenced by nodes and Controls. It may
+link an HTTP(S) external source and zero or more package Attachments. One item
+may support several assertions. Evidence supports a claim; it is not itself a
+cause. Images, supported videos, and PDFs have in-app previews when bytes are
+available; metadata survives when bytes are missing or rejected.
 
-An **Action** is a proposed or managed response linked from exactly one
-non-Action source. Its link is not causal. An Action can record owner, due date,
-Action Type, and Action Status; it cannot carry Context in V3. Actions answer
-what will be done, not what caused the incident.
+## Context and display modes
 
-## Action Type
+Context is a labeled fact at incident level or on an Event, Factor, or Impact.
+A Context item can be pinned to a card and displayed as:
 
-**Action Type** describes purpose: `Immediate`, `Corrective`, or `Preventive`.
-**Action Status** describes lifecycle: `Proposed`, `Planned`, `InProgress`,
-`Completed`, or `Cancelled`. Action Type describes purpose; Action Status
-describes lifecycle. For example, a Preventive Action may still be Proposed or
-Completed.
+- `Text`: label/value prose;
+- `Chip`: compact categorical emphasis;
+- `Metric`: a value with an optional unit (units are forbidden in other modes).
 
-## Evidence
+These are **display modes only and do not change causality**. Context is not a
+second causal-node system: promote a condition to a Factor only after making a
+causal judgment. Evidence may support the factual Context while the Factor
+expresses the distinct causal analysis.
 
-**Evidence** is a globally owned registry record with type, title, and optional
-description, source, and reference. Nodes and Controls link to it by stable ID,
-allowing one item to support multiple assertions without duplication. Evidence
-supports an assertion; Evidence is not itself a cause. Causal judgment belongs
-in Factors and causal relationships, with Evidence supplying support.
+## Derived review experiences
 
-Evidence types are Note, Photo, Video, Document, SystemLog, Interview, and
-Other. These classify the record; they do not claim that a file was uploaded or
-stored. Later attachment or link fields can extend Evidence, but V3 contains no
-unused attachment placeholder and provides no file-storage contract.
-
-## Context
-
-**Context** is a labeled factual condition or circumstance recorded at the
-incident level or on an Event, Factor, or Impact. Examples include weather,
-operating mode, staffing level, or environmental conditions. It may be pinned
-for card display. Context is a fact; a Factor is judged causal. Context neither
-creates a causal relationship nor becomes Evidence: Evidence supports the
-assertion that a contextual fact is true, while a Factor expresses the separate
-judgment that a condition contributed.
+The six read-only lenses—Overview, Causal Story, Chronology, Controls, Actions,
+and Evidence—filter or emphasize the same investigation without mutating it.
+Case Summary derives capped lists and counts for impacts, findings, failed or
+missing Controls, Actions, Evidence, assertions, and pinned Chip/Metric Context.
+Guided Story deterministically walks persisted causal paths to Key Factors and
+Root Causes, including relevant Controls, Actions, Evidence, and attachments.
+It does not generate conclusions, invoke AI, or support manually authored story
+steps.
