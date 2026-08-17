@@ -43,16 +43,50 @@ export const openIncidentPackage = async (
 ): Promise<OpenPackageResult> => {
   if (input.byteLength > MAX_TOTAL_ATTACHMENT_BYTES + 1024 * 1024)
     throw new Error("Package exceeds the allowed size");
+  const archiveBytes = new Uint8Array(input);
+  // `unzipSync` exposes files as an object, so repeated ZIP entry names would
+  // otherwise be silently overwritten. Inspect central-directory records
+  // before extraction to keep package identity unambiguous.
+  const decoder = new TextDecoder();
+  const archivePaths = new Set<string>();
+  for (let offset = 0; offset + 46 <= archiveBytes.byteLength; offset += 1) {
+    if (
+      archiveBytes[offset] !== 0x50 ||
+      archiveBytes[offset + 1] !== 0x4b ||
+      archiveBytes[offset + 2] !== 0x01 ||
+      archiveBytes[offset + 3] !== 0x02
+    )
+      continue;
+    const view = new DataView(
+      archiveBytes.buffer,
+      archiveBytes.byteOffset + offset,
+    );
+    const nameLength = view.getUint16(28, true);
+    const extraLength = view.getUint16(30, true);
+    const commentLength = view.getUint16(32, true);
+    if (
+      offset + 46 + nameLength + extraLength + commentLength >
+      archiveBytes.byteLength
+    )
+      throw new Error("Malformed ZIP central directory");
+    const path = decoder.decode(
+      archiveBytes.subarray(offset + 46, offset + 46 + nameLength),
+    );
+    if (archivePaths.has(path))
+      throw new Error(`Duplicate package path: ${path}`);
+    archivePaths.add(path);
+    offset += 45 + nameLength + extraLength + commentLength;
+  }
   let entries: Record<string, Uint8Array>;
   try {
-    entries = unzipSync(new Uint8Array(input));
+    entries = unzipSync(archiveBytes);
   } catch {
     throw new Error("Unable to unzip incident map package");
   }
   let uncompressedSize = 0;
   for (const [path, bytes] of Object.entries(entries)) {
     uncompressedSize += bytes.byteLength;
-    if (path.startsWith("attachments/")) normalizeBundlePath(path);
+    if (path !== "map.json") normalizeBundlePath(path);
   }
   if (uncompressedSize > MAX_TOTAL_ATTACHMENT_BYTES + 1024 * 1024)
     throw new Error("Uncompressed package exceeds the allowed size");
