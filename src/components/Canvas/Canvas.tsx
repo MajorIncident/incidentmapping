@@ -15,6 +15,7 @@ import {
   type BarrierNodeData,
   type ChainNodeData,
 } from "../../state/useAppStore";
+import { selectContextByEffect } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
 import { BRANCH_LANE_GAP, edgeTypes } from "./IncidentEdge";
 import {
@@ -830,9 +831,15 @@ export const Canvas = ({
             if (node.type === "Barrier")
               return node.data.status === "Effective" ? "#059669" : "#e11d48";
             if (node.data.graphRole?.isRoot) return "#7c3aed";
-            if ((node.data.positiveConsequenceBulletPoints?.length ?? 0) > 0)
+            if (
+              selectContextByEffect(node.data.contextItems ?? [], "Mitigating")
+                .length > 0
+            )
               return "#059669";
-            if ((node.data.negativeConsequenceBulletPoints?.length ?? 0) > 0)
+            if (
+              selectContextByEffect(node.data.contextItems ?? [], "Aggravating")
+                .length > 0
+            )
               return "#e11d48";
             return "#64748b";
           }}

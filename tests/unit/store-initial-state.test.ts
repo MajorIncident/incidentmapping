@@ -8,7 +8,14 @@ const expectCleanRoot = (state: ReturnType<typeof useAppStore.getState>) => {
     title: "Undesirable outcome",
     referenceId: "N-001",
     nodeType: "Impact",
+    contextItems: [],
   });
+  expect(Object.keys(state.nodes[0].data)).not.toContain(
+    "positiveConsequenceBulletPoints",
+  );
+  expect(Object.keys(state.nodes[0].data)).not.toContain(
+    "negativeConsequenceBulletPoints",
+  );
   expect(state.metadata).toMatchObject({
     nodeReferenceHighWaterMark: 1,
     evidenceReferenceHighWaterMark: 0,
