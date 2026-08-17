@@ -548,7 +548,43 @@ select:focus-visible {
 .presentation-emphasized {
   filter: drop-shadow(0 0 5px rgb(37 99 235 / 0.35));
 }
+.story-panel {
+  @apply fixed bottom-16 right-4 z-30 w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-700 shadow-xl backdrop-blur;
+}
+.story-panel__eyebrow {
+  @apply mb-2 flex justify-between gap-3 text-xs font-bold uppercase tracking-wide text-blue-700;
+}
+.story-panel h2 {
+  @apply text-lg font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500;
+}
+.story-panel p {
+  @apply mt-2;
+}
+.story-panel dl {
+  @apply mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1;
+}
+.story-panel dt {
+  @apply font-semibold text-slate-500;
+}
+.story-panel__actions {
+  @apply mt-4 flex gap-2;
+}
+.story-panel__actions button {
+  @apply min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 font-semibold disabled:cursor-not-allowed disabled:opacity-40;
+}
+.story-attachment {
+  @apply mt-3 max-h-48 w-full rounded-lg object-contain;
+}
+.story-attachment-link {
+  @apply mt-3 inline-flex min-h-11 items-center rounded-lg text-blue-700 underline;
+}
 @media (max-width: 767px) {
+  .story-panel {
+    @apply inset-x-0 bottom-0 w-full rounded-b-none;
+    max-height: 42vh;
+    overflow-y: auto;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
   .lens-picker {
     @apply max-w-full overflow-x-auto;
   }

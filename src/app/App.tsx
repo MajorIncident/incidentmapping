@@ -7,7 +7,7 @@ import { Footer } from "../components/Footer/Footer";
 import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
 import { applyHierarchyLayout } from "../features/layout/hierarchy";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
 import { canAddBelowSelection } from "../state/selectors";
@@ -15,6 +15,8 @@ import { CaseSummary } from "../components/Presentation/CaseSummary";
 import { LensPicker } from "../components/Presentation/LensPicker";
 import { type PresentationLens } from "../features/presentation/selectors";
 import { selectCaseSummary } from "../features/presentation/caseSummary";
+import { deriveStorySequence } from "../features/presentation/story";
+import { StoryPanel } from "../components/Presentation/StoryPanel";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -28,6 +30,10 @@ export const App = (): JSX.Element => {
     useState<PresentationLens>("Overview");
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [timelineAnnouncement, setTimelineAnnouncement] = useState("");
+  const [story, setStory] = useState<{
+    startId: string | null;
+    index: number;
+  } | null>(null);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
@@ -46,14 +52,27 @@ export const App = (): JSX.Element => {
   const nodes = useAppStore((state) => state.nodes);
   const barriers = useAppStore((state) => state.barriers);
   const evidence = useAppStore((state) => state.evidence);
+  const edges = useAppStore((state) => state.edges);
+  const attachments = useAppStore((state) => state.attachments);
   const contextItems = useAppStore(
     (state) => state.metadata?.contextItems ?? [],
   );
   const summary = selectCaseSummary(nodes, barriers, evidence, contextItems);
+  const storySequence = useMemo(
+    () =>
+      deriveStorySequence(
+        { nodes, edges, controls: barriers, evidence, attachments },
+        story?.startId,
+      ),
+    [attachments, barriers, edges, evidence, nodes, story?.startId],
+  );
+  const storyStep = story ? storySequence.steps[story.index] : undefined;
+  const exitStory = useCallback(() => setStory(null), []);
   const exitPresentation = useCallback(() => {
     select(null);
     setPresentationHintOpen(false);
     setChronologyOpen(false);
+    setStory(null);
     setPresenting(false);
   }, [select]);
 
@@ -91,6 +110,29 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     if (!presenting) return;
     const exitOnEscape = (event: KeyboardEvent) => {
+      const target = event.target;
+      const editable =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (
+        story &&
+        !editable &&
+        ["ArrowLeft", "ArrowRight"].includes(event.key)
+      ) {
+        event.preventDefault();
+        setStory(
+          (value) =>
+            value && {
+              ...value,
+              index:
+                event.key === "ArrowLeft"
+                  ? Math.max(0, value.index - 1)
+                  : Math.min(storySequence.steps.length - 1, value.index + 1),
+            },
+        );
+        return;
+      }
       if (event.key !== "Escape") {
         // Presentation is a review surface: suppress every editing shortcut.
         if (
@@ -103,24 +145,45 @@ export const App = (): JSX.Element => {
         return;
       }
       if (event.defaultPrevented) return;
+      if (story) {
+        event.preventDefault();
+        exitStory();
+        return;
+      }
       if (chronologyOpen) {
         event.preventDefault();
         setChronologyOpen(false);
         return;
       }
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-      )
-        return;
+      if (editable) return;
       event.preventDefault();
       exitPresentation();
     };
     window.addEventListener("keydown", exitOnEscape, true);
     return () => window.removeEventListener("keydown", exitOnEscape, true);
-  }, [chronologyOpen, exitPresentation, presenting]);
+  }, [
+    chronologyOpen,
+    exitPresentation,
+    exitStory,
+    presenting,
+    story,
+    storySequence.steps.length,
+  ]);
+
+  useEffect(() => {
+    if (!story) return;
+    if (!storySequence.steps.length) {
+      setStory(null);
+      return;
+    }
+    if (story.index >= storySequence.steps.length) {
+      setStory(
+        (value) => value && { ...value, index: storySequence.steps.length - 1 },
+      );
+      return;
+    }
+    select(storySequence.steps[story.index].entityId);
+  }, [select, story, storySequence.steps]);
 
   return (
     <ReactFlowProvider>
@@ -171,6 +234,7 @@ export const App = (): JSX.Element => {
                   showTimelineEvents={showTimelineEvents}
                   presentationLens={presentationLens}
                   evidence={evidence}
+                  storyFocusIds={storyStep?.focusIds}
                 />
               </div>
               {inspectorOpen && !presenting ? (
@@ -247,6 +311,38 @@ export const App = (): JSX.Element => {
                       setPresentationHintOpen(false);
                     }}
                   />
+                  {!story ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selected = nodes.find(
+                          (node) => node.id === selectionId,
+                        );
+                        const startId =
+                          selected?.data.nodeType === "Factor" &&
+                          ["KeyFactor", "RootCause"].includes(
+                            selected.data.factorSignificance ?? "",
+                          )
+                            ? selected.id
+                            : null;
+                        const sequence = deriveStorySequence(
+                          {
+                            nodes,
+                            edges,
+                            controls: barriers,
+                            evidence,
+                            attachments,
+                          },
+                          startId,
+                        );
+                        if (sequence.steps.length)
+                          setStory({ startId, index: 0 });
+                      }}
+                      disabled={storySequence.steps.length === 0}
+                    >
+                      Start Story From Selection
+                    </button>
+                  ) : null}
                   {!summaryOpen ? (
                     <button type="button" onClick={() => setSummaryOpen(true)}>
                       Case Summary
@@ -285,6 +381,35 @@ export const App = (): JSX.Element => {
                     Exit Presentation <span aria-hidden="true">Esc</span>
                   </button>
                 </div>
+                {story && storyStep ? (
+                  <StoryPanel
+                    step={storyStep}
+                    index={story.index}
+                    count={storySequence.steps.length}
+                    onPrevious={() =>
+                      setStory(
+                        (value) =>
+                          value && {
+                            ...value,
+                            index: Math.max(0, value.index - 1),
+                          },
+                      )
+                    }
+                    onNext={() =>
+                      setStory(
+                        (value) =>
+                          value && {
+                            ...value,
+                            index: Math.min(
+                              storySequence.steps.length - 1,
+                              value.index + 1,
+                            ),
+                          },
+                      )
+                    }
+                    onExit={exitStory}
+                  />
+                ) : null}
               </>
             ) : (
               <Footer />

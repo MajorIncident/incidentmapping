@@ -277,6 +277,7 @@ export const Canvas = ({
   showTimelineEvents = false,
   presentationLens = "Overview",
   evidence = [],
+  storyFocusIds,
 }: {
   onInspect?: () => void;
   onPresentationInteract?: () => void;
@@ -285,6 +286,7 @@ export const Canvas = ({
   showTimelineEvents?: boolean;
   presentationLens?: PresentationLens;
   evidence?: EvidenceItem[];
+  storyFocusIds?: string[];
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -423,7 +425,9 @@ export const Canvas = ({
             isRoot: presentation.roots.has(node.id),
             isLeaf: presentation.leaves.has(node.id),
             isOnSelectedPath: presentation.selectedPath.has(node.id),
-            isUnrelated: presentation.unrelated.has(node.id),
+            isUnrelated: storyFocusIds
+              ? !storyFocusIds.includes(node.id)
+              : presentation.unrelated.has(node.id),
           },
           readOnly: presenting,
           viewShowDetails: presentationShowDetails,
@@ -487,7 +491,9 @@ export const Canvas = ({
           viewShowDetails: presentationShowDetails,
           graphRole: {
             isOnSelectedPath: presentation.selectedPath.has(matchingBarrier.id),
-            isUnrelated: presentation.unrelated.has(matchingBarrier.id),
+            isUnrelated: storyFocusIds
+              ? !storyFocusIds.includes(matchingBarrier.id)
+              : presentation.unrelated.has(matchingBarrier.id),
           },
         },
         position: calculateControlPosition(
@@ -590,6 +596,7 @@ export const Canvas = ({
     presenting,
     presentationLens,
     selectionId,
+    storyFocusIds,
   ]);
 
   useEffect(() => {
@@ -604,6 +611,21 @@ export const Canvas = ({
     });
     return () => cancelAnimationFrame(frame);
   }, [presenting, reactFlow, selectionId]);
+
+  useEffect(() => {
+    if (!presenting || !storyFocusIds?.length) return;
+    const frame = requestAnimationFrame(() => {
+      const focused = reactFlow
+        .getNodes()
+        .filter((node) => storyFocusIds.includes(node.id));
+      if (focused.length)
+        void reactFlow.fitBounds(getNodesBounds(focused), {
+          padding: 0.35,
+          duration: viewportAnimationDuration(300),
+        });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [presenting, reactFlow, storyFocusIds]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<ChainNodeData | BarrierNodeData>) => {
