@@ -16,7 +16,7 @@ example.incidentmap
 
 There must be exactly one `map.json`, and it must be the root entry. A nested or
 second `map.json` is a fatal package error. `map.json` is canonical, formatted,
-newline-terminated strict V4 `MapData`; its root `attachments` array is the
+newline-terminated strict V5 `MapData`; its root `attachments` array is the
 manifest. Each manifest record supplies stable ID, display filename,
 allowed MIME type, declared byte size, unique `bundlePath`, and optional SHA-256
 digest. Evidence links to manifest IDs through `attachmentIds`.
@@ -29,7 +29,7 @@ content and should not be relied upon.
 
 ## Supported media and centralized limits
 
-The V4 manifest permits JPEG, PNG, WebP, PDF, MP4, WebM, plain text, CSV, and
+The V5 manifest permits JPEG, PNG, WebP, PDF, MP4, WebM, plain text, CSV, and
 JSON MIME types. The current upload UI intentionally accepts the previewable
 subset: JPEG, PNG, WebP, PDF, MP4, and WebM. Each attachment is limited to
 25 MiB and declared attachment bytes total at most 100 MiB. Compressed input and
@@ -44,12 +44,12 @@ or declared/actual size mismatch.
 
 ## Canonical save flow
 
-1. Project the runtime store to V4 `MapData` and strictly validate it.
+1. Project the runtime store to V5 `MapData` and strictly validate it.
 2. Validate the attachment manifest, safe paths, MIME types, per-file size, and
    total declared size.
 3. Retrieve each active attachment's bytes by ID from the session runtime byte
    store and verify its declared size.
-4. Serialize validated V4 as formatted root `map.json`; add binaries at their
+4. Serialize validated V5 as formatted root `map.json`; add binaries at their
    exact manifest `bundlePath`; ZIP with `fflate`.
 5. Write/download a `.incidentmap` using the File System Access API where
    supported or the browser download fallback. The dirty baseline advances only
@@ -59,8 +59,8 @@ or declared/actual size mismatch.
 
 1. Bound compressed input, unzip with `fflate`, sum uncompressed entries, and
    validate attachment-looking paths.
-2. Require exactly one root `map.json`; UTF-8 decode, JSON parse, migrate V1–V3
-   if necessary, and strictly validate V4 plus its manifest.
+2. Require exactly one root `map.json`; UTF-8 decode, JSON parse, migrate V1–V4
+   if necessary, and strictly validate V5 plus its manifest.
 3. For each manifest record, require an exact entry, size match, and checksum
    match when a checksum is present and digest computation is available.
 4. Replace the active byte store only after structural processing and load all
@@ -70,16 +70,19 @@ Unsafe ZIPs, oversize packages, unzip errors, missing/root ambiguity for
 `map.json`, malformed JSON, unsupported versions, invalid schema/graph,
 disallowed media, unsafe/duplicate paths, or limit violations are **fatal**:
 the requested map is not opened. A missing attachment, a size mismatch, or a
-checksum mismatch is a **recoverable warning**: the V4 investigation and its
+checksum mismatch is a **recoverable warning**: the V5 investigation and its
 Evidence/manifest metadata open, but that payload is excluded and its preview
 reports unavailable content. Warnings are shown in an accessible modal dialog;
 save failures are reported and do not claim success.
 
 ## Legacy JSON import and metadata export
 
-Open accepts `.json` as a legacy boundary. V1, V2, and V3 are deterministically
-migrated; strict V4 JSON is also accepted. JSON is **not** the canonical save
-format. Export JSON exists for metadata/interchange and writes V4 `map.json`
+Open accepts `.json` as a legacy boundary. V1 through V4 are deterministically
+migrated; strict V5 JSON is also accepted. Frozen positive/negative consequence
+fields are read only at that legacy boundary and deterministically become
+Mitigating/Aggravating Context; canonical nodes contain `contextItems` with an
+`effect` and never contain those retired fields. JSON is **not** the canonical
+save format. Export JSON exists for metadata/interchange and writes V5 `map.json`
 content only. If attachments are listed, the UI warns that binary files are not
 included. Importing that JSON preserves manifest metadata but clears runtime
 bytes, so previews are unavailable until content is supplied through a package.

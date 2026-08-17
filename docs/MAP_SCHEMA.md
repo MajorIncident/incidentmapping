@@ -1,6 +1,6 @@
-# Map Schema: Canonical Version 4
+# Map Schema: Canonical Version 5
 
-Version 4 (`schemaVersion: 4`) is the strict canonical map document stored as
+Version 5 (`schemaVersion: 5`) is the strict canonical map document stored as
 the root `map.json` in a `.incidentmap` package. JSON is a legacy import and
 metadata-export representation, not the canonical file format. Every object
 below is strict: unknown keys are rejected. All arrays shown are required;
@@ -12,11 +12,12 @@ metadata is present.
 `?` means optional. `NonEmptyString` has at least one character;
 `TrimmedNonEmptyString` must contain a non-whitespace character. Numbers in a
 position are finite JavaScript numbers. Date/timestamp fields remain strings;
-V4 neither requires ISO syntax nor validates chronological order.
+Date syntax is not required. When both Event timestamps parse as dates, however,
+`endTimestamp` cannot be earlier than `timestamp`.
 
 ```ts
 type MapData = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   metadata?: Metadata;
   nodes: ChainNode[];
   edges: (CauseEffectEdge | ActionEdge)[];
@@ -59,8 +60,6 @@ type ChainNode = {
   actionCompletedAt?: string;
   eventPhase?: EventPhase;
   actionType?: ActionType;
-  positiveConsequenceBulletPoints: string[];
-  negativeConsequenceBulletPoints: string[];
   evidenceIds: NonEmptyString[];
   contextItems: ContextItem[];
   position: { x: number; y: number };
@@ -120,6 +119,7 @@ type ContextItem = {
   value: TrimmedNonEmptyString;
   showOnCard?: boolean;
   displayMode: ContextDisplayMode;
+  effect: ContextEffect;
   unit?: TrimmedNonEmptyString;
 };
 ```
@@ -141,6 +141,7 @@ type ContextItem = {
 | `ControlRole`          | `Preventive`, `Detective`, `Mitigating`                                                                                                   |
 | `ControlFailureReason` | `NotFollowed`, `Bypassed`, `IncorrectConfiguration`, `SystemFailure`, `InadequateDesign`, `Unavailable`, `NotInPlace`, `Unknown`, `Other` |
 | `EvidenceType`         | `Note`, `Photo`, `Video`, `Document`, `SystemLog`, `Interview`, `Other`                                                                   |
+| `ContextEffect`        | `Neutral`, `Aggravating`, `Mitigating`                                                                                                    |
 | `ContextDisplayMode`   | `Text`, `Chip`, `Metric`                                                                                                                  |
 | `AttachmentMimeType`   | `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `video/mp4`, `video/webm`, `text/plain`, `text/csv`, `application/json`       |
 
@@ -156,7 +157,9 @@ Shape parsing is followed by whole-map validation.
   node fields. A Control may independently carry `assertionState`.
 - `actionType`, `actionStatus`, `actionDueDate`, and `actionCompletedAt` are
   Action-only. Context is allowed at incident level and on Event, Factor, and
-  Impact nodes; an Action's `contextItems` must be empty.
+  Impact nodes; an Action's `contextItems` must be empty. `Aggravating` and
+  `Mitigating` effects are restricted to Events and Impacts. Factor Context must be `Neutral`; incident metadata may use any
+  effect.
 - A Context `unit` is valid only when `displayMode` is `Metric`. Display modes,
   card pinning, Event display, lenses, and chronology placement are presentation
   choices: **they do not create, remove, or change causality**.
@@ -201,9 +204,25 @@ that exceeds all surviving references.
 ## Deterministic migration and import
 
 `parseAndMigrateMapData` is the only untrusted JSON boundary. It accepts frozen
-V1, V2, V3, and strict V4 documents, never mutates input, rejects unsupported
-versions, and validates the resulting V4 map. Saving always emits V4 inside an
+V1, V2, V3, V4, and strict V5 documents, never mutates input, rejects unsupported
+versions, and validates the resulting V5 map. Saving always emits V5 inside an
 `.incidentmap` package.
+
+### V4 to V5
+
+- Existing incident and node Context retains identity and order and receives
+  `effect: "Neutral"`.
+- Frozen legacy positive-consequence bullet points become `Mitigating` Context;
+  frozen legacy negative-consequence bullet points become `Aggravating` Context.
+  Nonblank values are appended after existing Context in source-array order,
+  use labels `Mitigating context` or `Aggravating context`,
+  `displayMode: "Text"`, and `showOnCard: true`. Blank values are discarded.
+- Generated IDs are deterministic from the URI-encoded node ID, lowercase
+  effect, and zero-based source index (for example,
+  `context-pump-1-mitigating-0`). If that ID is already used anywhere in map
+  Context, suffixes `-2`, `-3`, and so on select the first free ID.
+- The two frozen bullet-point fields are removed. No causal edge or conclusion
+  is inferred from the migrated effect Context.
 
 ### V3 to V4
 
@@ -218,7 +237,8 @@ versions, and validates the resulting V4 map. Saving always emits V4 inside an
 - Existing metadata, graph, positions, ordering, IDs, evidence references, and
   node/evidence allocation history are retained.
 
-V1 and V2 first follow the frozen migrations into V3, then the steps above.
+V1, V2, and V3 first follow the frozen migrations into V4, then the V4-to-V5
+steps above.
 V2 embedded Evidence becomes global `Note` Evidence in deterministic node/item
 order. Legacy enum spellings and retired Action-edge fields are normalized only
 at the documented compatibility boundary; collisions fail rather than being
@@ -230,7 +250,7 @@ unavailable.
 
 ## Explicit non-goals
 
-V4 does not provide hosted/cloud storage, collaboration, identity, permissions,
+V5 does not provide hosted/cloud storage, collaboration, identity, permissions,
 an audit log, AI-generated summaries, a reporting database, regulatory
 certification, visual/PDF report export, or manual story authoring. Case Summary,
 lenses, Chronology, and Guided Story are derived review views, not persisted

@@ -2,7 +2,7 @@
 
 ## Persistence boundary
 
-Strict V4 `MapData` is the canonical document, but `.incidentmap` is the
+Strict V5 `MapData` is the canonical document, but `.incidentmap` is the
 canonical **file**. The package is a bounded ZIP containing exactly one root
 `map.json` and active binaries at manifest paths below `attachments/`. Save
 projects Zustand state through `toMap()`, validates it, packages it, and uses
@@ -21,7 +21,7 @@ storage, synchronization, or a reporting database.
 
 ### Persisted investigation metadata
 
-V4 contains incident metadata, semantic nodes and coordinates, discriminated
+V5 contains incident metadata, semantic nodes and coordinates, discriminated
 relationships, Controls under historical key `barriers`, Evidence, the
 Attachment manifest, Context, and allocation high-water marks. Objects are
 strict and relationships/references receive whole-map validation. It contains
@@ -55,26 +55,46 @@ produce an accessible unavailable-content alert while metadata remains intact.
 
 Selection/editing aids, menus, viewport/focus requests, presentation mode,
 active lens, detail toggles, chronology visibility, Timeline-Only reveal state,
-Case Summary visibility, and Guided Story step are view state. They are neither
-persisted nor causal and do not enter undo history. Dirty state compares the
-canonical map projection plus attachment-store revision with the last
-new/open/save baseline.
+Case Summary visibility, Guided Story step, investigation-stage and checklist
+results, first-use acknowledgement, and per-tip dismissal are view state. Tip
+dismissal and first-use acknowledgement live only in session storage; checklist
+completion is recomputed rather than stored. They are neither persisted nor
+causal and do not enter undo history. Dirty state compares the canonical map
+projection plus attachment-store revision with the last new/open/save baseline.
+
+The Learning Guide's enabled preference is the one durable Guide setting. It is
+kept locally in browser `localStorage`, is not part of `MapData`, does not travel
+with a package, and has no bearing on dirty state or undo history.
 
 ## Derived views, not parallel truth
 
-`src/content/investigationModel.ts` is the single ordered, typed source for the
-nine investigation concepts and their decision guide. In-app map keys and
-legends project names and visual roles from it, while definitions, questions,
-examples, and relationships support consistent education without duplicating
-content in components. Its stable IDs and validated relationships also provide
-a future data source for generated wallcharts. That later renderer may consume
-the module as structured content; PDF generation and a PDF toolchain are
-deliberately outside this milestone.
+`src/content/investigationModel.ts` is the shared, ordered, typed source for the
+nine investigation concepts and semantic decision guide. In-app keys, legends,
+Learning Guide content, Learn the Map, and How to Read This Map project names,
+definitions, questions, examples, visual roles, and relationships from shared
+concept/Guide content rather than inventing separate semantic vocabularies.
+`src/content/investigationGuide.ts` supplies structured Guide blocks and actions;
+`src/content/learnMap.ts` supplies shared explanatory pages and diagrams.
+
+Stable IDs and validated relationships are also the future synchronization
+boundary for generated wallcharts: a later wallchart renderer should consume
+the same structured sources so printed and in-app teaching stay aligned, not
+copy editable prose into a second source of truth. PDF generation, distribution,
+and a PDF toolchain remain outside this milestone.
+
+Guidance selectors are pure functions of selection, graph content, and current
+view signals. They deterministically derive applicable tips, priority, stage,
+and an ephemeral review checklist; they neither dispatch store actions nor
+persist results. Suggested-action buttons may navigate to an existing editor or
+creation affordance only after the user chooses them. **The Guide advises but
+never blocks work, edits map data on its own, or modifies investigation
+conclusions.** A checklist signal is not validation or proof.
 
 Presentation selectors are pure projections over the current graph. The six
 lenses—Overview, Causal Story, Chronology, Controls, Actions, and Evidence—derive
 visibility, emphasis, counts, focus, and chronology opening without mutating
-records. Chronology orders parseable Event timestamps and retains missing or
+records. Chronology represents sequence rather than causality: it orders
+parseable Event timestamps and retains missing or
 invalid values in **Untimed Events**. Timeline-Only reveal and all Context
 display modes are presentation decisions; **display never changes causality**.
 
