@@ -7,10 +7,48 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
   "image/png",
   "image/webp",
   "application/pdf",
+  "video/mp4",
+  "video/webm",
   "text/plain",
   "text/csv",
   "application/json",
 ]);
+
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "video/mp4",
+  "video/webm",
+]);
+
+export const sanitizeAttachmentFilename = (filename: string): string => {
+  const leaf = filename.replace(/\\/g, "/").split("/").pop() ?? "";
+  const sanitized = leaf
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^[.-]+|[.-]+$/g, "")
+    .slice(0, 120);
+  if (!sanitized || sanitized === "." || sanitized === "..")
+    throw new Error("Attachment filename is invalid");
+  return sanitized;
+};
+
+export const validateAttachmentFile = (
+  file: Pick<File, "name" | "type" | "size">,
+  currentTotal: number,
+): string => {
+  if (!file.name.trim() || /[\0\r\n]/.test(file.name))
+    throw new Error("Attachment filename is invalid");
+  if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.type))
+    throw new Error("Choose a JPEG, PNG, WebP, PDF, MP4, or WebM file");
+  if (file.size > MAX_ATTACHMENT_BYTES)
+    throw new Error("Attachment exceeds the 25 MB file limit");
+  if (currentTotal + file.size > MAX_TOTAL_ATTACHMENT_BYTES)
+    throw new Error("Attachments exceed the 100 MB package limit");
+  return sanitizeAttachmentFilename(file.name);
+};
 
 export const normalizeBundlePath = (path: string): string => {
   if (path.includes("\\") || path.startsWith("/") || path.includes("\0"))
