@@ -898,13 +898,6 @@ export const Inspector = ({
           </div>
         ) : null}
 
-        {node.data.nodeType !== "Action" ? (
-          <ContextEditor
-            target={node.id}
-            items={node.data.contextItems ?? []}
-          />
-        ) : null}
-
         <EvidenceSection target={{ kind: "node", id: node.id }} />
 
         <div className="flex flex-col gap-1">
@@ -1077,6 +1070,36 @@ export const Inspector = ({
               onChange={handleTimestampChange}
             />
           </div>
+        ) : null}
+
+        {node.data.nodeType === "Impact" || node.data.nodeType === "Event" ? (
+          <>
+            <ContextEditor
+              target={node.id}
+              items={node.data.contextItems ?? []}
+              effect="Aggravating"
+              lockedEffect="Aggravating"
+            />
+            <ContextEditor
+              target={node.id}
+              items={node.data.contextItems ?? []}
+              effect="Mitigating"
+              lockedEffect="Mitigating"
+            />
+            <ContextEditor
+              target={node.id}
+              items={node.data.contextItems ?? []}
+              effect="Neutral"
+              lockedEffect="Neutral"
+            />
+          </>
+        ) : node.data.nodeType === "Factor" ? (
+          <ContextEditor
+            target={node.id}
+            items={node.data.contextItems ?? []}
+            effect="Neutral"
+            lockedEffect="Neutral"
+          />
         ) : null}
 
         {node.data.nodeType === "Event" ? (

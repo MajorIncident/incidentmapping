@@ -906,8 +906,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(showOnCard === undefined ? {} : { showOnCard }),
       };
       if (
-        node &&
-        validateNodeContextEffect(node.data.nodeType ?? "Event", item)
+        target !== "incident" &&
+        validateNodeContextEffect(node!.data.nodeType ?? "Event", item)
       )
         return null;
       if (target === "incident")

@@ -1,5 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider } from "reactflow";
 import {
@@ -7,6 +14,7 @@ import {
   localControlToPersistedTimestamp,
   persistedTimestampToLocalControl,
 } from "../../src/components/Sidebar/Inspector";
+import { App } from "../../src/app/App";
 import { useAppStore } from "../../src/state/useAppStore";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 
@@ -125,21 +133,159 @@ describe("Inspector and keyboard workflows", () => {
     expect(persistedTimestampToLocalControl("not-a-date")).toBe("");
   });
 
-  it("uses canonical Context editing for non-Action nodes", async () => {
+  it("orders effect-specific Context after timing and limits unsupported nodes", async () => {
     const nodeId = await renderSelectedNode();
-    expect(screen.getByRole("region", { name: "Context" })).toBeVisible();
+    const headings = screen
+      .getAllByRole("heading")
+      .map((heading) => heading.textContent);
+    expect(headings.indexOf("Aggravating Context")).toBeLessThan(
+      headings.indexOf("Mitigating Context"),
+    );
+    expect(headings.indexOf("Mitigating Context")).toBeLessThan(
+      headings.indexOf("Context"),
+    );
+    expect(
+      screen
+        .getByText("Event timing")
+        .compareDocumentPosition(
+          screen.getByRole("heading", { name: "Aggravating Context" }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
-    expect(screen.getByRole("region", { name: "Context" })).toBeVisible();
-
-    let actionId = "";
+    expect(screen.getByRole("heading", { name: "Context" })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Aggravating Context" }),
+    ).toBeNull();
     act(() => {
-      actionId = useAppStore.getState().actions.addAction(nodeId) ?? "";
+      const actionId = useAppStore.getState().actions.addAction(nodeId);
       useAppStore.getState().actions.select(actionId);
     });
-    expect(
-      screen.queryByRole("region", { name: "Context" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Context/ })).toBeNull();
+  });
+
+  it("adds a child via Enter and starts inline editing", async () => {
+    const { actions } = useAppStore.getState();
+    let rootId: string | null = null;
+    act(() => {
+      rootId = actions.addChild();
+    });
+    expect(rootId).toBeTruthy();
+    act(() => {
+      actions.finishEditing();
+    });
+
+    await act(async () => {
+      render(<App />);
+    });
+
+    await screen.findByRole("button", { name: "Add Below" });
+    await waitFor(() => {
+      expect(useAppStore.getState().nodes).toHaveLength(1);
+    });
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Enter" });
+    });
+
+    await waitFor(() => {
+      expect(useAppStore.getState().nodes).toHaveLength(2);
+    });
+
+    const nodes = await screen.findAllByTestId("chain-node");
+    expect(nodes).toHaveLength(2);
+
+    const newNodeId = useAppStore.getState().nodes[1]?.id;
+    expect(useAppStore.getState().editingId).toBe(newNodeId);
+
+    await waitFor(() => {
+      const editor = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Node title"]',
+      );
+      expect(editor).not.toBeNull();
+      expect(editor).toBe(document.activeElement);
+    });
+  });
+
+  it("keeps Enter and Shift+Enter in parity with causal Add Below availability", () => {
+    render(<App />);
+    let nodeId = "";
+    act(() => {
+      nodeId = useAppStore.getState().actions.addChild() ?? "";
+      useAppStore.getState().actions.finishEditing();
+    });
+
+    for (const nodeType of ["Impact", "Event", "Factor"] as const) {
+      act(() => {
+        const actions = useAppStore.getState().actions;
+        actions.select(nodeId);
+        actions.setNodeType(nodeId, nodeType);
+      });
+      const before = useAppStore.getState().nodes.length;
+      expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(false);
+      expect(useAppStore.getState().nodes).toHaveLength(before + 1);
+    }
+
+    act(() => {
+      const actions = useAppStore.getState().actions;
+      actions.select(nodeId);
+      nodeId = actions.addAction(nodeId) ?? "";
+      actions.finishEditing();
+    });
+    let before = useAppStore.getState().nodes.length;
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
+      true,
+    );
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+
+    act(() => {
+      useAppStore.getState().actions.loadMap(sampleMap);
+      useAppStore.getState().actions.select("barrier-root-child");
+    });
+    before = useAppStore.getState().nodes.length;
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(window, { key: "Enter", shiftKey: true })).toBe(
+      true,
+    );
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+
+    act(() => useAppStore.getState().actions.select(null));
+    expect(fireEvent.keyDown(window, { key: "Enter" })).toBe(true);
+    expect(useAppStore.getState().nodes).toHaveLength(before);
+  });
+
+  it("focuses a new Control purpose, updates its card live, and undoes it as one edit", async () => {
+    const mapWithoutBarrier = { ...sampleMap, barriers: [] };
+    act(() => {
+      useAppStore.getState().actions.loadMap(mapWithoutBarrier);
+    });
+    render(<App />);
+
+    act(() => {
+      useAppStore.getState().actions.addBarrier("root", "child");
+    });
+
+    const description = await screen.findByRole("textbox", {
+      name: /^Control Purpose$/i,
+    });
+    await waitFor(() => expect(description).toHaveFocus());
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
+      "Failed",
+    );
+
+    const user = userEvent.setup();
+    await user.type(description, "Firewall active");
+    expect(screen.getByTestId("control-node")).toHaveTextContent(
+      "Firewall active",
+    );
+
+    act(() => {
+      useAppStore.getState().actions.undo();
+    });
+    expect(screen.getByTestId("control-node")).toHaveTextContent(
+      "No control purpose provided.",
+    );
   });
 
   it("lists every downstream branch and creates a Control on a chosen non-first child", async () => {
@@ -225,6 +371,34 @@ describe("Inspector and keyboard workflows", () => {
         name: "Control between Parent and Duplicate",
       }),
     ).toBeVisible();
+  });
+
+  it("quick-adds preselected effects and restores focus after add and remove", async () => {
+    const nodeId = await renderSelectedNode();
+    const user = userEvent.setup();
+    const section = screen.getByRole("region", { name: "Aggravating Context" });
+    await user.type(within(section).getByLabelText("New label"), "Weather");
+    await user.type(within(section).getByLabelText("New value"), "Storm");
+    await user.click(
+      within(section).getByRole("button", { name: "Add aggravating context" }),
+    );
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === nodeId)?.data
+        .contextItems,
+    ).toEqual([expect.objectContaining({ effect: "Aggravating" })]);
+    expect(within(section).getByLabelText("New label")).toHaveFocus();
+    await user.click(
+      within(section).getByRole("button", {
+        name: /Delete aggravating context item Weather/,
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        within(section).getByRole("button", {
+          name: "Add aggravating context",
+        }),
+      ).toHaveFocus(),
+    );
   });
 
   it("creates typed evidence atomically and unlinks without deleting it", async () => {

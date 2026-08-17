@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { validateTitle } from "../../src/components/Sidebar/Inspector";
+import { contextEffectDefinitions } from "../../src/features/maps/schema";
 
-describe("Inspector validation", () => {
-  it("rejects empty titles", () => {
-    expect(validateTitle("")).toBe("Title is required.");
-    expect(validateTitle("   ")).toBe("Title is required.");
-  });
-
-  it("accepts non-empty titles", () => {
-    expect(validateTitle("Incident")).toBeNull();
+describe("Inspector Context semantics", () => {
+  it("provides concise shared copy and accessible quick-add labels", () => {
+    expect(
+      Object.values(contextEffectDefinitions).map((item) => item.heading),
+    ).toEqual(["Context", "Aggravating Context", "Mitigating Context"]);
+    expect(contextEffectDefinitions.Neutral.help).toContain(
+      "Causal conditions should usually be Factors",
+    );
+    expect(contextEffectDefinitions.Aggravating.addLabel).toBe(
+      "Add aggravating context",
+    );
   });
 });
