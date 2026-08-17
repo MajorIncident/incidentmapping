@@ -20,6 +20,55 @@ describe("useAppStore actions", () => {
     }
   });
 
+  it.each([
+    ["Impact", undefined, true],
+    ["Impact", "Neutral", true],
+    ["Impact", "Aggravating", true],
+    ["Impact", "Mitigating", true],
+    ["Event", undefined, true],
+    ["Event", "Neutral", true],
+    ["Event", "Aggravating", true],
+    ["Event", "Mitigating", true],
+    ["Factor", undefined, true],
+    ["Factor", "Neutral", true],
+    ["Factor", "Aggravating", false],
+    ["Factor", "Mitigating", false],
+    ["Action", undefined, false],
+    ["Action", "Neutral", false],
+    ["Action", "Aggravating", false],
+    ["Action", "Mitigating", false],
+  ] as const)(
+    "guards %s Context with %s effect (allowed: %s)",
+    (nodeType, effect, allowed) => {
+      const actions = useAppStore.getState().actions;
+      const rootId = actions.addChild() as string;
+      let nodeId = rootId;
+      if (nodeType === "Event") nodeId = actions.addChild() as string;
+      if (nodeType === "Factor") {
+        nodeId = actions.addChild() as string;
+        actions.setNodeType(nodeId, "Factor");
+      }
+      if (nodeType === "Action") nodeId = actions.addAction(rootId) as string;
+
+      actions.updateNodeData(nodeId, {
+        contextItems: [
+          {
+            id: "weather",
+            label: "Weather",
+            value: "Rain",
+            displayMode: "Text",
+            effect: effect ?? "Neutral",
+          },
+        ],
+      });
+      const items = useAppStore
+        .getState()
+        .nodes.find((node) => node.id === nodeId)?.data.contextItems;
+      expect(items).toHaveLength(allowed ? 1 : 0);
+      if (allowed) expect(items?.[0].effect).toBe(effect ?? "Neutral");
+    },
+  );
+
   it("uses a fresh, clean root state both initially and after newMap", () => {
     const initial = createNewMapState();
     const initialRoot = initial.nodes[0];

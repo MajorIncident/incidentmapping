@@ -715,6 +715,22 @@ export const contextEffectSchema = z.enum([
   "Aggravating",
   "Mitigating",
 ]);
+type ContextEffectInput = z.input<typeof contextEffectSchema> | undefined;
+
+/** Returns the semantic error for a node's Context item, or null when allowed. */
+export const validateNodeContextEffect = (
+  nodeType: z.infer<typeof nodeTypeSchema>,
+  item: { label: string; effect?: ContextEffectInput },
+): string | null => {
+  const effect = item.effect ?? "Neutral";
+  const supported =
+    nodeType === "Event" ||
+    nodeType === "Impact" ||
+    (nodeType === "Factor" && effect === "Neutral");
+  return supported
+    ? null
+    : `${nodeType} Context item "${item.label}" does not support effect "${effect}"`;
+};
 export const contextItemSchema = contextItemV4Schema.extend({
   value: z.string().refine((value) => value.trim().length > 0, {
     message: "Context value is required",
@@ -748,6 +764,19 @@ export const mapDataSchema = strictObject({
   evidence: z.array(evidenceItemSchema),
   attachments: z.array(attachmentSchema),
 }).superRefine((map, ctx) => {
+  map.nodes.forEach((node, nodeIndex) =>
+    node.contextItems.forEach((item, itemIndex) => {
+      const message = validateNodeContextEffect(node.nodeType, item);
+      if (message)
+        issue(ctx, message, [
+          "nodes",
+          nodeIndex,
+          "contextItems",
+          itemIndex,
+          "effect",
+        ]);
+    }),
+  );
   const withoutEffect = (item: z.infer<typeof contextItemSchema>) => {
     const { effect: _effect, ...legacy } = item;
     return legacy;
