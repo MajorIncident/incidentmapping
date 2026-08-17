@@ -4,6 +4,7 @@ type Props = {
   items: ContextItem[];
   variant?: "compact" | "detail";
   ariaLabel?: string;
+  className?: string;
 };
 
 /** A neutral presentation of investigator-authored Context values. */
@@ -11,12 +12,13 @@ export const ContextPresentation = ({
   items,
   variant = "compact",
   ariaLabel = "Context",
+  className = "",
 }: Props): JSX.Element => (
   <dl
     className={
       variant === "detail"
-        ? "flex min-w-0 flex-col gap-2 text-[13px] text-slate-700"
-        : "flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600"
+        ? `flex min-w-0 flex-col gap-2 text-[13px] text-slate-700 ${className}`
+        : `flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 ${className}`
     }
     aria-label={ariaLabel}
   >

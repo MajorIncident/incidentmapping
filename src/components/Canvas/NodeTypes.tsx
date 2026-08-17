@@ -6,7 +6,8 @@ import {
   formatEventDateTime,
   formatEventDuration,
   resolveEvidence,
-  selectPinnedContext,
+  selectCompactContext,
+  selectContextGroups,
   timestampNeedsSeconds,
 } from "../../state/selectors";
 import { ContextPresentation } from "../Context/ContextPresentation";
@@ -254,7 +255,8 @@ const ChainNodeComponent = ({
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
   const contextItems = data.contextItems ?? [];
-  const compactContext = selectPinnedContext(contextItems).slice(0, 2);
+  const compactContext = selectCompactContext(contextItems, data.nodeType);
+  const contextGroups = selectContextGroups(contextItems, data.nodeType);
   const hasVisibleDetails =
     hasDescription ||
     hasPositivePoints ||
@@ -508,12 +510,17 @@ const ChainNodeComponent = ({
           ) : null}
         </div>
       ) : null}
-      {!isEditing && !showDetails && compactContext.length ? (
+      {!isEditing && !showDetails && compactContext.visible.length ? (
         <div className="mt-2 text-[11px]">
           <ContextPresentation
-            items={compactContext}
+            items={compactContext.visible}
             ariaLabel="Pinned context"
           />
+          {compactContext.hiddenCount > 0 ? (
+            <div className="mt-1 font-medium text-slate-500">
+              +{compactContext.hiddenCount} more
+            </div>
+          ) : null}
         </div>
       ) : null}
       {!isEditing && showDetails && hasVisibleDetails ? (
@@ -526,14 +533,33 @@ const ChainNodeComponent = ({
               {data.description}
             </p>
           ) : null}
-          {contextItems.length ? (
-            <div className="space-y-1" data-testid="context-details">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                Context
-              </div>
-              <ContextPresentation items={contextItems} variant="detail" />
-            </div>
-          ) : null}
+          {(
+            [
+              ["Aggravating", "Aggravating Context", "text-rose-600"],
+              ["Mitigating", "Mitigating Context", "text-emerald-600"],
+              ["Neutral", "Context", "text-slate-600"],
+            ] as const
+          ).map(([effect, label, headingClass]) =>
+            contextGroups[effect].length ? (
+              <section
+                key={effect}
+                className="space-y-1"
+                data-testid={`context-${effect.toLowerCase()}`}
+              >
+                <h4
+                  className={`text-[11px] font-semibold uppercase tracking-wide ${headingClass}`}
+                >
+                  {label}
+                </h4>
+                <ContextPresentation
+                  items={contextGroups[effect]}
+                  variant="detail"
+                  ariaLabel={label}
+                  className="text-slate-700"
+                />
+              </section>
+            ) : null,
+          )}
           {hasPositivePoints || hasNegativePoints ? (
             <div
               className={`grid gap-2 ${

@@ -24,6 +24,7 @@ import {
   CONTROL_NODE_WIDTH,
 } from "../../features/layout/dimensions";
 import type { EvidenceItem } from "../../features/maps/schema";
+import { selectContextGroups } from "../../state/selectors";
 import {
   selectLensPresentation,
   type PresentationLens,
@@ -830,10 +831,14 @@ export const Canvas = ({
             if (node.type === "Barrier")
               return node.data.status === "Effective" ? "#059669" : "#e11d48";
             if (node.data.graphRole?.isRoot) return "#7c3aed";
-            if ((node.data.positiveConsequenceBulletPoints?.length ?? 0) > 0)
-              return "#059669";
-            if ((node.data.negativeConsequenceBulletPoints?.length ?? 0) > 0)
-              return "#e11d48";
+            const context = selectContextGroups(
+              node.data.contextItems ?? [],
+              node.data.nodeType,
+            );
+            if (context.Aggravating.length && context.Mitigating.length)
+              return "#7c3aed";
+            if (context.Aggravating.length) return "#e11d48";
+            if (context.Mitigating.length) return "#059669";
             return "#64748b";
           }}
           maskColor="rgba(241, 245, 249, 0.72)"

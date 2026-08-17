@@ -86,6 +86,48 @@ export const selectEvidenceLinkedEntities = (
 export const selectPinnedContext = (items: ContextItem[]) =>
   items.filter((item) => item.showOnCard).map((item) => ({ ...item }));
 
+export type ContextEffect = "Aggravating" | "Mitigating" | "Neutral";
+export type ContextGroups = Record<ContextEffect, ContextItem[]>;
+
+/** Normalizes legacy Context and partitions it for consistent presentation. */
+export const selectContextGroups = (
+  items: ContextItem[],
+  nodeType?: ChainNodeData["nodeType"],
+): ContextGroups => {
+  const groups: ContextGroups = {
+    Aggravating: [],
+    Mitigating: [],
+    Neutral: [],
+  };
+  items.forEach((item) => {
+    const effect =
+      nodeType === "Factor" ? "Neutral" : (item.effect ?? "Neutral");
+    groups[effect].push({ ...item, effect });
+  });
+  return groups;
+};
+
+/** Selects a balanced two-item card summary and its single overflow count. */
+export const selectCompactContext = (
+  items: ContextItem[],
+  nodeType?: ChainNodeData["nodeType"],
+) => {
+  const pinned = selectPinnedContext(items);
+  const groups = selectContextGroups(pinned, nodeType);
+  const visible = [groups.Aggravating[0], groups.Mitigating[0]]
+    .filter((item): item is ContextItem => Boolean(item))
+    .slice(0, 2);
+  if (visible.length < 2) {
+    const selected = new Set(visible.map((item) => item.id));
+    visible.push(
+      ...pinned
+        .filter((item) => !selected.has(item.id))
+        .slice(0, 2 - visible.length),
+    );
+  }
+  return { visible, hiddenCount: pinned.length - visible.length };
+};
+
 export const chronologyPhaseOrder: EventPhase[] = [
   "Precursor",
   "Incident",

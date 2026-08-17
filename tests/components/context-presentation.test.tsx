@@ -40,6 +40,23 @@ describe("Context presentation", () => {
     expect(screen.getByLabelText("Reading 42 ms")).toHaveTextContent("42ms");
   });
 
+  it("keeps Text, Chip, and Metric bodies neutral in a directional group", () => {
+    render(
+      <ContextPresentation
+        items={items.slice(0, 3)}
+        variant="detail"
+        ariaLabel="Aggravating Context"
+        className="text-slate-700"
+      />,
+    );
+    const group = screen.getByLabelText("Aggravating Context");
+    expect(group).toHaveClass("text-slate-700");
+    expect(within(group).getByText("Observed").closest("dd")).toHaveClass(
+      "text-slate-700",
+    );
+    expect(within(group).getByText("42")).toHaveClass("text-slate-900");
+  });
+
   it("allows only explicitly pinned Chip and Metric values in Case Summary", () => {
     render(<CaseSummary factors={[]} controls={[]} contextItems={items} />);
     const summary = screen.getByLabelText("Pinned summary context");

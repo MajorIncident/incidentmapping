@@ -70,6 +70,124 @@ describe("ChainNode details", () => {
     });
   });
 
+  it("groups Context by effect in the required order with neutral body styling", () => {
+    renderChainNode({
+      nodeType: "Event",
+      contextItems: [
+        {
+          id: "n",
+          label: "Weather",
+          value: "Rain",
+          displayMode: "Text",
+          effect: "Neutral",
+        },
+        {
+          id: "m",
+          label: "Response",
+          value: "Fast",
+          displayMode: "Chip",
+          effect: "Mitigating",
+        },
+        {
+          id: "a",
+          label: "Traffic",
+          value: "Heavy",
+          displayMode: "Metric",
+          effect: "Aggravating",
+        },
+      ],
+    });
+
+    const headings = screen.getAllByRole("heading", { level: 4 });
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      "Aggravating Context",
+      "Mitigating Context",
+      "Context",
+    ]);
+    expect(screen.getByLabelText("Aggravating Context")).toHaveClass(
+      "text-slate-700",
+    );
+    expect(screen.getByText("Aggravating Context")).toHaveClass(
+      "text-rose-600",
+    );
+    expect(screen.getByText("Mitigating Context")).toHaveClass(
+      "text-emerald-600",
+    );
+  });
+
+  it("balances compact pinned Context and reports all hidden eligible items once", () => {
+    act(() => useAppStore.getState().actions.setShowDetails(false));
+    renderChainNode({
+      nodeType: "Impact",
+      contextItems: [
+        {
+          id: "a1",
+          label: "A1",
+          value: "Shown aggravating",
+          displayMode: "Text",
+          effect: "Aggravating",
+          showOnCard: true,
+        },
+        {
+          id: "a2",
+          label: "A2",
+          value: "Hidden aggravating",
+          displayMode: "Text",
+          effect: "Aggravating",
+          showOnCard: true,
+        },
+        {
+          id: "m1",
+          label: "M1",
+          value: "Shown mitigating",
+          displayMode: "Text",
+          effect: "Mitigating",
+          showOnCard: true,
+        },
+        {
+          id: "n1",
+          label: "N1",
+          value: "Hidden neutral",
+          displayMode: "Text",
+          effect: "Neutral",
+          showOnCard: true,
+        },
+        {
+          id: "unpinned",
+          label: "No",
+          value: "Not eligible",
+          displayMode: "Text",
+          effect: "Neutral",
+        },
+      ],
+    });
+
+    expect(screen.getByText("Shown aggravating")).toBeVisible();
+    expect(screen.getByText("Shown mitigating")).toBeVisible();
+    expect(screen.getAllByText("+2 more")).toHaveLength(1);
+    expect(screen.queryByText("Hidden neutral")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not eligible")).not.toBeInTheDocument();
+  });
+
+  it("keeps all Factor Context in one neutral section", () => {
+    renderChainNode({
+      nodeType: "Factor",
+      contextItems: [
+        {
+          id: "legacy",
+          label: "Legacy",
+          value: "Imported",
+          displayMode: "Text",
+          effect: "Aggravating",
+        },
+      ],
+    });
+    expect(screen.getByRole("heading", { name: "Context" })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Aggravating Context" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("labels independent Action lifecycle dates without exposing a retained due date", () => {
     const { rerender } = renderChainNode({
       nodeType: "Action",
