@@ -50,7 +50,7 @@ const v1: MapDataV1 = {
 describe("parseAndMigrateMapData", () => {
   it("migrates V1 to deterministic canonical V3 without inferred classifications", () => {
     const migrated = parseAndMigrateMapData(v1);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.metadata).toEqual({
       title: "Original investigation",
       nodeReferenceHighWaterMark: 2,
@@ -68,7 +68,6 @@ describe("parseAndMigrateMapData", () => {
       timestamp: "2024-01-02",
       nodeType: "Event",
       evidenceIds: [],
-      contextItems: [],
       position: { x: 13, y: 29 },
     });
     expect(migrated.nodes[0]).not.toHaveProperty("eventPhase");
@@ -167,14 +166,19 @@ describe("parseAndMigrateMapData", () => {
     ).toEqual(
       v1.nodes.map(({ id, title, position }) => ({ id, title, position })),
     );
-    expect(migrated.nodes[0].positiveConsequenceBulletPoints).toEqual([
-      "positive",
-    ]);
-    expect(migrated.nodes[0].negativeConsequenceBulletPoints).toEqual([
-      "negative",
+    expect(migrated.nodes[0].contextItems).toEqual([
+      expect.objectContaining({ value: "positive", effect: "Mitigating" }),
+      expect.objectContaining({ value: "negative", effect: "Aggravating" }),
     ]);
     expect(migrated.edges).toEqual(v1.edges);
     expect(migrated.evidence).toEqual([]);
+    expect(migrated.nodes[0]).not.toHaveProperty(
+      "positiveConsequenceBulletPoints",
+    );
+    expect(migrated.nodes[0]).not.toHaveProperty(
+      "negativeConsequenceBulletPoints",
+    );
+    expect(parseAndMigrateMapData(v1)).toEqual(migrated);
   });
 
   it("canonicalizes sparse V2 references without lowering either high-water mark", () => {
@@ -189,7 +193,7 @@ describe("parseAndMigrateMapData", () => {
     const migrated = parseAndMigrateMapData(input);
 
     expect(input).toEqual(original);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.metadata).toMatchObject({
       nodeReferenceHighWaterMark: 41,
       evidenceReferenceHighWaterMark: 27,

@@ -432,7 +432,8 @@ export type Barrier = z.infer<typeof barrierSchema>;
 export type MapMetadataV3 = NonNullable<MapDataV3["metadata"]>;
 export type MapMetadataV2 = NonNullable<MapDataV2["metadata"]>;
 
-// V3 above is frozen as an import-only contract. All newly persisted maps use V4.
+// V3 above is frozen as an import-only contract. V4 is also frozen below.
+
 export const eventDisplaySchema = z.enum(["Map", "ChronologyOnly"]);
 export const assertionStateSchema = z.enum([
   "Confirmed",
@@ -452,7 +453,7 @@ export const attachmentMimeTypeSchema = z.enum([
   "application/json",
 ]);
 
-export const contextItemSchema = strictObject({
+export const contextItemV4Schema = strictObject({
   id: z.string().min(1),
   label: z.string().trim().min(1),
   value: z.string().trim().min(1),
@@ -460,7 +461,7 @@ export const contextItemSchema = strictObject({
   displayMode: contextDisplayModeSchema,
   unit: z.string().trim().min(1).optional(),
 });
-export const evidenceItemSchema = strictObject({
+export const evidenceItemV4Schema = strictObject({
   id: z.string().min(1),
   type: evidenceTypeSchema,
   title: z.string().min(1),
@@ -477,7 +478,7 @@ export const evidenceItemSchema = strictObject({
     )
     .optional(),
 });
-export const attachmentSchema = strictObject({
+export const attachmentV4Schema = strictObject({
   id: z.string().min(1),
   filename: z.string().trim().min(1),
   mimeType: attachmentMimeTypeSchema,
@@ -491,7 +492,7 @@ export const attachmentSchema = strictObject({
     )
     .optional(),
 });
-export const chainNodeSchema = strictObject({
+export const chainNodeV4Schema = strictObject({
   id: z.string().min(1),
   kind: z.literal("ChainNode"),
   referenceId: z.string().min(1),
@@ -514,10 +515,10 @@ export const chainNodeSchema = strictObject({
   positiveConsequenceBulletPoints: z.array(z.string()),
   negativeConsequenceBulletPoints: z.array(z.string()),
   evidenceIds: z.array(z.string().min(1)),
-  contextItems: z.array(contextItemSchema),
+  contextItems: z.array(contextItemV4Schema),
   position: positionSchema,
 });
-export const controlSchema = barrierSchema
+export const controlV4Schema = barrierSchema
   .extend({
     referenceId: z.string().min(1),
     controlRole: controlRoleSchema.optional(),
@@ -525,7 +526,7 @@ export const controlSchema = barrierSchema
     evidenceIds: z.array(z.string().min(1)),
   })
   .strict();
-export const metadataSchema = strictObject({
+export const metadataV4Schema = strictObject({
   title: optionalMetadataText,
   incidentId: optionalMetadataText,
   occurredAt: optionalMetadataText,
@@ -536,17 +537,17 @@ export const metadataSchema = strictObject({
   evidenceReferenceHighWaterMark: z.number().int().nonnegative().optional(),
   controlReferenceHighWaterMark: z.number().int().nonnegative().optional(),
   attachmentReferenceHighWaterMark: z.number().int().nonnegative().optional(),
-  contextItems: z.array(contextItemSchema).default([]),
+  contextItems: z.array(contextItemV4Schema).default([]),
 }).optional();
 
-export const mapDataSchema = strictObject({
+export const mapDataV4Schema = strictObject({
   schemaVersion: z.literal(4),
-  metadata: metadataSchema,
-  nodes: z.array(chainNodeSchema),
+  metadata: metadataV4Schema,
+  nodes: z.array(chainNodeV4Schema),
   edges: z.array(relationshipEdgeSchema),
-  barriers: z.array(controlSchema),
-  evidence: z.array(evidenceItemSchema),
-  attachments: z.array(attachmentSchema),
+  barriers: z.array(controlV4Schema),
+  evidence: z.array(evidenceItemV4Schema),
+  attachments: z.array(attachmentV4Schema),
 }).superRefine((map, ctx) => {
   // Reuse every frozen V3 graph/reference invariant after removing V4-only data.
   const legacy = mapDataV3Schema.safeParse({
@@ -637,7 +638,7 @@ export const mapDataSchema = strictObject({
         ]);
     });
   });
-  const checkContext = (items: ContextItem[], path: (string | number)[]) =>
+  const checkContext = (items: ContextItemV4[], path: (string | number)[]) =>
     items.forEach((item, index) => {
       if (item.displayMode !== "Metric" && item.unit !== undefined)
         issue(ctx, "Context unit is only valid for Metric display", [
@@ -701,9 +702,78 @@ export const mapDataSchema = strictObject({
 export type EventDisplay = z.infer<typeof eventDisplaySchema>;
 export type AssertionState = z.infer<typeof assertionStateSchema>;
 export type ContextDisplayMode = z.infer<typeof contextDisplayModeSchema>;
+export type AttachmentV4 = z.infer<typeof attachmentV4Schema>;
+export type MapDataV4 = z.infer<typeof mapDataV4Schema>;
+export type ChainNodeV4 = z.infer<typeof chainNodeV4Schema>;
+export type EvidenceItemV4 = z.infer<typeof evidenceItemV4Schema>;
+export type ContextItemV4 = z.infer<typeof contextItemV4Schema>;
+export type MapMetadataV4 = NonNullable<MapDataV4["metadata"]>;
+
+// V5 is the canonical write contract. Earlier versions above are import-only.
+export const contextEffectSchema = z.enum([
+  "Neutral",
+  "Aggravating",
+  "Mitigating",
+]);
+export const contextItemSchema = contextItemV4Schema.extend({
+  value: z.string().refine((value) => value.trim().length > 0, {
+    message: "Context value is required",
+  }),
+  effect: contextEffectSchema.default("Neutral"),
+});
+export const evidenceItemSchema = evidenceItemV4Schema;
+export const attachmentSchema = attachmentV4Schema;
+export const chainNodeSchema = chainNodeV4Schema
+  .omit({
+    positiveConsequenceBulletPoints: true,
+    negativeConsequenceBulletPoints: true,
+    contextItems: true,
+  })
+  .extend({ contextItems: z.array(contextItemSchema) })
+  .strict();
+export const controlSchema = controlV4Schema;
+export const metadataSchema = metadataV4Schema
+  .unwrap()
+  .omit({ contextItems: true })
+  .extend({ contextItems: z.array(contextItemSchema).default([]) })
+  .strict()
+  .optional();
+
+export const mapDataSchema = strictObject({
+  schemaVersion: z.literal(5),
+  metadata: metadataSchema,
+  nodes: z.array(chainNodeSchema),
+  edges: z.array(relationshipEdgeSchema),
+  barriers: z.array(controlSchema),
+  evidence: z.array(evidenceItemSchema),
+  attachments: z.array(attachmentSchema),
+}).superRefine((map, ctx) => {
+  const withoutEffect = (item: z.infer<typeof contextItemSchema>) => {
+    const { effect: _effect, ...legacy } = item;
+    return legacy;
+  };
+  const legacy = mapDataV4Schema.safeParse({
+    ...map,
+    schemaVersion: 4,
+    metadata: map.metadata && {
+      ...map.metadata,
+      contextItems: map.metadata.contextItems.map(withoutEffect),
+    },
+    nodes: map.nodes.map((node) => ({
+      ...node,
+      positiveConsequenceBulletPoints: [],
+      negativeConsequenceBulletPoints: [],
+      contextItems: node.contextItems.map(withoutEffect),
+    })),
+  });
+  if (!legacy.success)
+    legacy.error.issues.forEach((item) => ctx.addIssue(item));
+});
+
+export type ContextEffect = z.infer<typeof contextEffectSchema>;
 export type Attachment = z.infer<typeof attachmentSchema>;
 export type MapData = z.infer<typeof mapDataSchema>;
 export type ChainNode = z.infer<typeof chainNodeSchema>;
 export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
-export type ContextItem = z.infer<typeof contextItemSchema>;
+export type ContextItem = z.input<typeof contextItemSchema>;
 export type MapMetadata = NonNullable<MapData["metadata"]>;

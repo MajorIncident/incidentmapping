@@ -1,7 +1,7 @@
 import type { MapData } from "./schema";
 
 export const sampleMap: MapData = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   metadata: {
     title: "Sample Incident Chain",
     contextItems: [],
@@ -16,8 +16,6 @@ export const sampleMap: MapData = {
       nodeType: "Event",
       eventDisplay: "Map",
       title: "Root Event",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
       evidenceIds: [],
       contextItems: [],
       position: { x: 0, y: 0 },
@@ -29,8 +27,6 @@ export const sampleMap: MapData = {
       nodeType: "Event",
       eventDisplay: "Map",
       title: "Follow-up Event",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
       evidenceIds: [],
       contextItems: [],
       position: { x: 0, y: 160 },
@@ -61,7 +57,7 @@ export const sampleMap: MapData = {
 };
 
 export const emptyMap: MapData = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   metadata: {
     title: "Untitled Map",
     contextItems: [],

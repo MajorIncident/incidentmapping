@@ -80,6 +80,9 @@ describe("incident map packages", () => {
 
     const archive = unzipSync(new Uint8Array(packageBytes));
     expect(archive["map.json"]).toEqual(strToU8(canonicalMapJson(map)));
+    const exportedJson = new TextDecoder().decode(archive["map.json"]);
+    expect(exportedJson).not.toContain("positiveConsequenceBulletPoints");
+    expect(exportedJson).not.toContain("negativeConsequenceBulletPoints");
     expect(archive[map.attachments[0].bundlePath]).toEqual(jpeg);
     expect(archive[map.attachments[1].bundlePath]).toEqual(pdf);
 

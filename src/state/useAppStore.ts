@@ -317,8 +317,8 @@ const chainNodeToReactNode = (
     timestamp: node.timestamp,
     endTimestamp: node.endTimestamp,
     eventDisplay: node.eventDisplay,
-    positiveConsequenceBulletPoints: node.positiveConsequenceBulletPoints ?? [],
-    negativeConsequenceBulletPoints: node.negativeConsequenceBulletPoints ?? [],
+    positiveConsequenceBulletPoints: [],
+    negativeConsequenceBulletPoints: [],
     evidenceItems: node.evidenceIds.map((id) => {
       const item = evidence.find((candidate) => candidate.id === id)!;
       return { id, text: item.title };
@@ -366,8 +366,6 @@ const serializeNodes = (nodes: Node<ChainNodeData>[]): ChainNode[] =>
       (node.data.nodeType ?? "Event") === "Event"
         ? (node.data.eventDisplay ?? "Map")
         : undefined,
-    positiveConsequenceBulletPoints: node.data.positiveConsequenceBulletPoints,
-    negativeConsequenceBulletPoints: node.data.negativeConsequenceBulletPoints,
     evidenceIds: [
       ...(node.data.evidenceIds ??
         (node.data.evidenceItems ?? []).map((item) => item.id)),
@@ -567,8 +565,6 @@ export const createRootNode = (): ChainNode => ({
   referenceId: "N-001",
   nodeType: "Impact",
   description: "",
-  positiveConsequenceBulletPoints: [],
-  negativeConsequenceBulletPoints: [],
   evidenceIds: [],
   contextItems: [],
   position: snapPosition({ x: 0, y: 0 }),
@@ -576,7 +572,7 @@ export const createRootNode = (): ChainNode => ({
 
 /** Creates a fresh interactive map; imported maps may still legitimately be empty. */
 export const createNewMap = (): MapData => ({
-  schemaVersion: 4,
+  schemaVersion: 5,
   metadata: {
     title: "Untitled Map",
     nodeReferenceHighWaterMark: 1,
@@ -690,7 +686,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     toMap: () => {
       const { nodes, edges, metadata, barriers, evidence, attachments } = get();
       return {
-        schemaVersion: 4,
+        schemaVersion: 5,
         metadata: metadata
           ? {
               ...metadata,
@@ -899,11 +895,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       let id = createId("context");
       while (used.has(id)) id = createId("context");
-      const item: ContextItem = {
+      const item: NonNullable<MapData["metadata"]>["contextItems"][number] = {
         id,
         label,
         value,
         displayMode,
+        effect: "Neutral",
         ...(displayMode === "Metric" && rawUnit?.trim()
           ? { unit: rawUnit.trim() }
           : {}),

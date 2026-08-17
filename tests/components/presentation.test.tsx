@@ -24,8 +24,6 @@ const actionMap: MapData = {
       nodeType: "Action",
       title: "Prevent recurrence",
       actionStatus: "Planned",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
       evidenceIds: [],
       contextItems: [],
       position: { x: 260, y: 160 },
