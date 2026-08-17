@@ -62,6 +62,15 @@ new/open/save baseline.
 
 ## Derived views, not parallel truth
 
+`src/content/investigationModel.ts` is the single ordered, typed source for the
+nine investigation concepts and their decision guide. In-app map keys and
+legends project names and visual roles from it, while definitions, questions,
+examples, and relationships support consistent education without duplicating
+content in components. Its stable IDs and validated relationships also provide
+a future data source for generated wallcharts. That later renderer may consume
+the module as structured content; PDF generation and a PDF toolchain are
+deliberately outside this milestone.
+
 Presentation selectors are pure projections over the current graph. The six
 lenses—Overview, Causal Story, Chronology, Controls, Actions, and Evidence—derive
 visibility, emphasis, counts, focus, and chronology opening without mutating
