@@ -82,4 +82,28 @@ describe("Learning Guide", () => {
     render(<LearningGuide match={match} enabled={false} onAction={vi.fn()} />);
     expect(screen.queryByLabelText("Learning Guide")).not.toBeInTheDocument();
   });
+
+  it("falls back safely when browser storage is unavailable", () => {
+    const local = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("Storage disabled", "SecurityError");
+      });
+    const session = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("Storage disabled", "SecurityError");
+      });
+
+    expect(getLearningGuideEnabled()).toBe(true);
+    expect(() => setLearningGuideEnabled(false)).not.toThrow();
+    render(<LearningGuide match={match} enabled onAction={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss this tip/i }));
+    expect(
+      screen.getByRole("complementary", { name: "Learning Guide" }),
+    ).toBeVisible();
+
+    local.mockRestore();
+    session.mockRestore();
+  });
 });

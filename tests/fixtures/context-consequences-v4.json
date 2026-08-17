@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 4,
+  "metadata": {
+    "title": "Context migration coverage",
+    "contextItems": [
+      {
+        "id": "context-node%20id-mitigating-0",
+        "label": "Weather",
+        "value": "Existing map context",
+        "displayMode": "Text"
+      }
+    ],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "node id",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "title": "Event with legacy consequences",
+      "eventDisplay": "Map",
+      "positiveConsequenceBulletPoints": [
+        "Faster recovery",
+        "  Lower customer impact  ",
+        "   "
+      ],
+      "negativeConsequenceBulletPoints": [
+        "Longer outage",
+        "  Higher cost  ",
+        "\t"
+      ],
+      "evidenceIds": [],
+      "contextItems": [
+        {
+          "id": "existing-node-context",
+          "label": "Shift",
+          "value": "Night",
+          "showOnCard": true,
+          "displayMode": "Chip"
+        }
+      ],
+      "position": { "x": 10, "y": 20 }
+    }
+  ],
+  "edges": [],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}

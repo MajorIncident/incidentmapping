@@ -44,32 +44,46 @@ test("chooses a non-first downstream branch when adding a Control", async ({
 }) => {
   await page.goto("/");
   const map = {
-    schemaVersion: 1,
-    metadata: { title: "Branched incident" },
+    schemaVersion: 5,
+    metadata: {
+      title: "Branched incident",
+      contextItems: [],
+      controlReferenceHighWaterMark: 0,
+      attachmentReferenceHighWaterMark: 0,
+    },
     nodes: [
       {
         id: "parent",
         kind: "ChainNode",
+        referenceId: "N-001",
+        nodeType: "Event",
+        eventDisplay: "Map",
         title: "Parent",
+        evidenceIds: [],
+        contextItems: [],
         position: { x: 0, y: 0 },
-        positiveConsequenceBulletPoints: [],
-        negativeConsequenceBulletPoints: [],
       },
       {
         id: "first-child",
         kind: "ChainNode",
+        referenceId: "N-002",
+        nodeType: "Event",
+        eventDisplay: "Map",
         title: "First child",
+        evidenceIds: [],
+        contextItems: [],
         position: { x: -200, y: 200 },
-        positiveConsequenceBulletPoints: [],
-        negativeConsequenceBulletPoints: [],
       },
       {
         id: "second-child",
         kind: "ChainNode",
+        referenceId: "N-003",
+        nodeType: "Event",
+        eventDisplay: "Map",
         title: "Second child",
+        evidenceIds: [],
+        contextItems: [],
         position: { x: 200, y: 200 },
-        positiveConsequenceBulletPoints: [],
-        negativeConsequenceBulletPoints: [],
       },
     ],
     edges: [
@@ -87,6 +101,8 @@ test("chooses a non-first downstream branch when adding a Control", async ({
       },
     ],
     barriers: [],
+    evidence: [],
+    attachments: [],
   };
   const fileChooserPromise = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: /^Open/ }).click();
