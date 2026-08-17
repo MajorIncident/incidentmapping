@@ -188,6 +188,11 @@ describe("parseAndMigrateMapData", () => {
     input.metadata.evidenceReferenceHighWaterMark = 27;
     input.nodes[0].referenceId = "N-099";
     input.nodes[0].evidenceItems[0].id = "EV-019";
+    // Force the pre-contract V2 compatibility parser while retaining the
+    // consequence arrays that must still be migrated rather than discarded.
+    (
+      input.nodes[0] as MapDataV2["nodes"][number] & { incidentStatus: string }
+    ).incidentStatus = "Open";
     const original = structuredClone(input);
 
     const migrated = parseAndMigrateMapData(input);
@@ -202,6 +207,18 @@ describe("parseAndMigrateMapData", () => {
       referenceId: "N-099",
       evidenceIds: ["EV-019"],
     });
+    expect(migrated.nodes[0].contextItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: "All bags were traced",
+          effect: "Mitigating",
+        }),
+        expect.objectContaining({
+          value: "Connections put at risk",
+          effect: "Aggravating",
+        }),
+      ]),
+    );
     expect(migrated.evidence[0]).toMatchObject({
       id: "EV-019",
       type: "Note",
