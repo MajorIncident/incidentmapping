@@ -8,6 +8,7 @@ import type {
   MapData,
   RelationshipEdge,
 } from "../features/maps/schema";
+import { validateNodeContextEffect } from "../features/maps/schema";
 import { parseAndMigrateMapData } from "../features/maps/migration";
 import { createId } from "../lib/id";
 import { attachmentRuntimeStore } from "../features/persistence/attachmentRuntimeStore";
@@ -781,6 +782,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         value === "Action"
       )
         return;
+      if (
+        (node.data.contextItems ?? []).some((item) =>
+          validateNodeContextEffect(value, item),
+        )
+      )
+        return;
       // Causal-type conversion preserves universal narrative, Context and Evidence
       // fields, but drops every classification that is invalid for the destination.
       get().actions.updateNodeData(id, {
@@ -917,6 +924,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return id;
     },
     updateContext: (target, contextId, patch) => {
+      const node = get().nodes.find((item) => item.id === target);
       const items =
         target === "incident"
           ? (get().metadata?.contextItems ?? [])
@@ -933,6 +941,14 @@ export const useAppStore = create<AppState>((set, get) => ({
             }
           : item,
       );
+      if (
+        target !== "incident" &&
+        (!node ||
+          next.some((item) =>
+            validateNodeContextEffect(node.data.nodeType ?? "Event", item),
+          ))
+      )
+        return false;
       if (target === "incident")
         get().actions.updateMetadata({ contextItems: next });
       else get().actions.updateNodeData(target, { contextItems: next });
@@ -2097,6 +2113,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           ) as typeof patch;
           const destinationType =
             normalizedPatch.nodeType ?? node.data.nodeType;
+          const destinationContext =
+            normalizedPatch.contextItems ?? node.data.contextItems ?? [];
+          if (
+            destinationContext.some((item) =>
+              validateNodeContextEffect(destinationType ?? "Event", item),
+            )
+          )
+            return node;
           if (
             normalizedPatch.eventPhase !== undefined &&
             destinationType !== "Event"
