@@ -143,7 +143,7 @@ test("mobile canvas overlays remain usable with a long title at 200% zoom", asyn
     .fill("A very long incident map title that must not cover canvas actions");
   await page.getByLabel("Map title").press("Enter");
 
-  const info = page.getByRole("button", { name: "How to read this map" });
+  const info = page.getByRole("button", { name: "? Guide" });
   const fit = page.getByRole("button", { name: "Fit map" });
   await expect(info).toBeVisible();
   await expect(fit).toBeVisible();
@@ -159,12 +159,12 @@ test("mobile canvas overlays remain usable with a long title at 200% zoom", asyn
     page.getByRole("button", { name: "Open an existing map" }),
   ).toBeVisible();
   await info.click();
-  await expect(
-    page.getByRole("complementary", { name: "How to read this map" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Dismiss map guide" }).click();
-  await page.reload();
-  await expect(
-    page.getByRole("complementary", { name: "How to read this map" }),
-  ).toHaveCount(0);
+  const sheet = page.getByRole("dialog", { name: "Learning Guide" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("heading", { name: /Impact/i })).toBeVisible();
+  await sheet.getByRole("button", { name: "Close Learning Guide" }).click();
+  await expect(info).toBeFocused();
+  await info.click();
+  await sheet.getByRole("button", { name: /Dismiss this tip/i }).click();
+  await expect(sheet).toContainText(/Impact|Event|Factor|Control|Evidence/i);
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -29,42 +29,6 @@ import {
   selectLensPresentation,
   type PresentationLens,
 } from "../../features/presentation/selectors";
-import { getInvestigationConcept } from "../../content/investigationModel";
-
-const guideConcepts = (
-  ["impact", "event", "factor", "action", "control"] as const
-).map(getInvestigationConcept);
-
-export const GuideContent = (): JSX.Element => (
-  <>
-    <p className="map-guide__intro">
-      Start with the <strong>Impact</strong> at the top. Investigators work
-      downward by asking <strong>why</strong>; lower nodes identify the
-      contributing events and factors.
-    </p>
-    <p className="map-guide__intro">
-      Unconnected timestamped Events appear in a separate chronological lane.
-      Their order shows time, not causation.
-    </p>
-    <div className="map-guide__key" aria-label="Map key">
-      {[
-        ...guideConcepts.map(
-          ({ name, visualRole }) => [name, visualRole] as const,
-        ),
-        ["Key Factor", "key-factor"],
-        ["Root Cause", "root-cause"],
-      ].map(([label, kind]) => (
-        <span
-          key={kind}
-          className={`map-guide__key-item map-guide__key-item--${kind}`}
-        >
-          <i aria-hidden="true" /> {label}
-        </span>
-      ))}
-    </div>
-  </>
-);
-
 export type GraphRole = {
   roots: Set<string>;
   leaves: Set<string>;
@@ -308,7 +272,6 @@ export const Canvas = ({
   const reactFlow = useReactFlow();
   const nodesInitialized = useNodesInitialized();
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
   const measurementFrame = useRef(0);
   const submitMeasurements = useCallback(
     (measuredNodes: Node[]) => {
@@ -737,28 +700,7 @@ export const Canvas = ({
       aria-label={`${mapTitle} incident map`}
     >
       {!presenting ? (
-        <aside
-          className="map-guide absolute bottom-4 left-4 z-10 max-w-xs rounded-xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-700 shadow-sm"
-          aria-label="Incident map legend"
-        >
-          <div className="mb-1 font-semibold text-slate-900">
-            How to read this map
-          </div>
-          <GuideContent />
-        </aside>
-      ) : null}
-      {!presenting ? (
         <div className="map-mobile-actions absolute right-3 top-3 z-20 flex flex-col gap-2">
-          <button
-            type="button"
-            className="map-overlay-button"
-            aria-label="How to read this map"
-            aria-expanded={guideOpen}
-            aria-controls="mobile-map-guide"
-            onClick={() => setGuideOpen((open) => !open)}
-          >
-            <span aria-hidden="true">i</span>
-          </button>
           <button
             type="button"
             className="map-overlay-button"
@@ -769,33 +711,6 @@ export const Canvas = ({
             <span aria-hidden="true">⌗</span>
           </button>
         </div>
-      ) : null}
-      {guideOpen && !presenting ? (
-        <aside
-          id="mobile-map-guide"
-          className="mobile-map-guide absolute inset-x-3 bottom-3 z-20 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-lg"
-          aria-label="How to read this map"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-slate-900">
-                How to read this map
-              </h2>
-              <GuideContent />
-            </div>
-            <button
-              type="button"
-              className="min-h-11 min-w-11 rounded-lg text-xl"
-              aria-label="Dismiss map guide"
-              onClick={() => {
-                sessionStorage.setItem("incident-map-guide-dismissed", "true");
-                setGuideOpen(false);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </aside>
       ) : null}
       <ReactFlow
         style={{ width: "100%", height: "100%" }}

@@ -17,6 +17,14 @@ import { type PresentationLens } from "../features/presentation/selectors";
 import { selectCaseSummary } from "../features/presentation/caseSummary";
 import { deriveStorySequence } from "../features/presentation/story";
 import { StoryPanel } from "../components/Presentation/StoryPanel";
+import { LearningGuide } from "../components/LearningGuide/LearningGuide";
+import { selectInvestigationGuidance } from "../features/guidance/selectors";
+import {
+  getDismissedLearningTips,
+  getLearningGuideEnabled,
+  setLearningGuideEnabled as persistLearningGuideEnabled,
+} from "../features/guidance/preferences";
+import type { GuideActionId } from "../content/investigationGuide";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -30,6 +38,13 @@ export const App = (): JSX.Element => {
     useState<PresentationLens>("Overview");
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [timelineAnnouncement, setTimelineAnnouncement] = useState("");
+  const [learningGuideEnabled, setLearningGuideEnabled] = useState(
+    getLearningGuideEnabled,
+  );
+  const [, setGuideRevision] = useState(0);
+  const [helpTopic, setHelpTopic] = useState<
+    "map" | "basics" | "shortcuts" | "about" | null
+  >(null);
   const [story, setStory] = useState<{
     startId: string | null;
     index: number;
@@ -67,6 +82,66 @@ export const App = (): JSX.Element => {
     [attachments, barriers, edges, evidence, nodes, story?.startId],
   );
   const storyStep = story ? storySequence.steps[story.index] : undefined;
+  const guidance = useMemo(
+    () =>
+      selectInvestigationGuidance({
+        selectedEntity: selectionId,
+        nodes: nodes.map((node) => ({ id: node.id, ...node.data })),
+        edges,
+        controls: barriers,
+        evidence,
+        presentation: presenting,
+        chronology: chronologyOpen,
+        activeLens: presentationLens,
+      }),
+    [
+      barriers,
+      chronologyOpen,
+      edges,
+      evidence,
+      nodes,
+      presentationLens,
+      presenting,
+      selectionId,
+    ],
+  );
+  const guideMatch =
+    guidance.matches.find(
+      ({ entry }) => !getDismissedLearningTips().has(entry.id),
+    ) ?? null;
+
+  const runGuideAction = (action: GuideActionId) => {
+    const state = useAppStore.getState();
+    if (action === "open-chronology") {
+      setChronologyOpen(true);
+      return;
+    }
+    if (action === "open-presentation") {
+      setPresenting(true);
+      return;
+    }
+    if (action === "review-assertion") {
+      if (state.selectionId) setInspectorOpen(true);
+      return;
+    }
+    if (action === "add-action") {
+      state.actions.addAction(state.selectionId ?? undefined);
+      return;
+    }
+    const types = {
+      "add-impact": "Impact",
+      "add-event": "Event",
+      "add-factor": "Factor",
+    } as const;
+    if (action in types) {
+      const id = state.actions.addChild(state.selectionId ?? undefined);
+      if (id)
+        state.actions.setNodeType(id, types[action as keyof typeof types]);
+      return;
+    }
+    if (action === "add-evidence" && state.selectionId)
+      state.actions.addEvidence(state.selectionId, "New evidence");
+  };
   const exitStory = useCallback(() => setStory(null), []);
   const exitPresentation = useCallback(() => {
     select(null);
@@ -221,6 +296,12 @@ export const App = (): JSX.Element => {
                   setPresentationLens("Overview");
                   setPresenting(true);
                 }}
+                learningGuideEnabled={learningGuideEnabled}
+                onLearningGuideChange={(enabled) => {
+                  setLearningGuideEnabled(enabled);
+                  persistLearningGuideEnabled(enabled);
+                }}
+                onHelpTopic={setHelpTopic}
               />
             ) : null}
             <IncidentHeader readOnly={presenting} />
@@ -236,6 +317,14 @@ export const App = (): JSX.Element => {
                   evidence={evidence}
                   storyFocusIds={storyStep?.focusIds}
                 />
+                {!presenting ? (
+                  <LearningGuide
+                    match={guideMatch}
+                    enabled={learningGuideEnabled}
+                    onAction={runGuideAction}
+                    onDismissed={() => setGuideRevision((value) => value + 1)}
+                  />
+                ) : null}
               </div>
               {inspectorOpen && !presenting ? (
                 <Inspector onClose={() => setInspectorOpen(false)} />
@@ -414,6 +503,45 @@ export const App = (): JSX.Element => {
             ) : (
               <Footer />
             )}
+            {helpTopic ? (
+              <div className="help-dialog-backdrop" role="presentation">
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="help-dialog-title"
+                  className="help-dialog"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setHelpTopic(null);
+                  }}
+                >
+                  <h2 id="help-dialog-title">
+                    {helpTopic === "map"
+                      ? "Learn the Map"
+                      : helpTopic === "basics"
+                        ? "Investigation Basics"
+                        : helpTopic === "shortcuts"
+                          ? "Keyboard Shortcuts"
+                          : "About IncidentMapping"}
+                  </h2>
+                  <p>
+                    {helpTopic === "map"
+                      ? "Read downward by asking why. Impacts lead to events, factors, controls, evidence, and actions."
+                      : helpTopic === "basics"
+                        ? "Build the story, analyze causes, test findings with evidence, then plan actions."
+                        : helpTopic === "shortcuts"
+                          ? "Enter adds below. Delete removes a selection. F fits the map. Escape closes overlays."
+                          : "IncidentMapping helps teams build evidence-aware incident investigations."}
+                  </p>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => setHelpTopic(null)}
+                  >
+                    Close
+                  </button>
+                </section>
+              </div>
+            ) : null}
           </div>
         )}
       </FileMenu>

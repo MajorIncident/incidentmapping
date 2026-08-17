@@ -82,6 +82,7 @@ describe("Toolbar map title", () => {
       addBelow,
       present,
       screen.getByRole("button", { name: "More menu" }),
+      screen.getByRole("button", { name: "Help menu" }),
     ]);
 
     let nodeId = "";
