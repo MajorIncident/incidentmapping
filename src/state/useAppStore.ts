@@ -36,8 +36,6 @@ export type ChainNodeData = {
   timestamp?: string;
   endTimestamp?: ChainNode["endTimestamp"];
   eventDisplay?: ChainNode["eventDisplay"];
-  positiveConsequenceBulletPoints: string[];
-  negativeConsequenceBulletPoints: string[];
   evidenceItems?: Array<{ id: string; text: string }>;
   evidenceIds?: string[];
   contextItems?: ChainNode["contextItems"];
@@ -319,8 +317,6 @@ const chainNodeToReactNode = (
     timestamp: node.timestamp,
     endTimestamp: node.endTimestamp,
     eventDisplay: node.eventDisplay,
-    positiveConsequenceBulletPoints: [],
-    negativeConsequenceBulletPoints: [],
     evidenceItems: node.evidenceIds.map((id) => {
       const item = evidence.find((candidate) => candidate.id === id)!;
       return { id, text: item.title };
@@ -396,12 +392,6 @@ const cloneNode = (node: Node<ChainNodeData>): Node<ChainNodeData> => {
     position: { ...node.position },
     data: {
       ...persistedData,
-      positiveConsequenceBulletPoints: [
-        ...node.data.positiveConsequenceBulletPoints,
-      ],
-      negativeConsequenceBulletPoints: [
-        ...node.data.negativeConsequenceBulletPoints,
-      ],
       evidenceItems: (node.data.evidenceItems ?? []).map((item) => ({
         ...item,
       })),
@@ -945,6 +935,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...patch,
               label: patch.label?.trim() || item.label,
               value: patch.value?.trim() || item.value,
+              displayMode: patch.displayMode ?? item.displayMode,
+              showOnCard: patch.showOnCard ?? item.showOnCard,
+              effect: patch.effect ?? item.effect ?? "Neutral",
             }
           : item,
       );
@@ -1343,8 +1336,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             nodeType: "Event",
             eventDisplay: "Map",
             eventPhase: "Incident",
-            positiveConsequenceBulletPoints: [],
-            negativeConsequenceBulletPoints: [],
             evidenceItems: [],
             evidenceIds: [],
             contextItems: [],
@@ -1476,8 +1467,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
             nodeType: "Action",
             actionStatus: "Proposed",
-            positiveConsequenceBulletPoints: [],
-            negativeConsequenceBulletPoints: [],
             evidenceItems: [],
             evidenceIds: [],
             contextItems: [],
@@ -1559,8 +1548,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             nodeType: "Event",
             eventDisplay: "Map",
             eventPhase: "Incident",
-            positiveConsequenceBulletPoints: [],
-            negativeConsequenceBulletPoints: [],
             evidenceItems: [],
             evidenceIds: [],
             contextItems: [],

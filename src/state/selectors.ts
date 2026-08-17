@@ -86,6 +86,11 @@ export const selectEvidenceLinkedEntities = (
 export const selectPinnedContext = (items: ContextItem[]) =>
   items.filter((item) => item.showOnCard).map((item) => ({ ...item }));
 
+export const selectContextByEffect = (
+  items: ContextItem[],
+  effect: NonNullable<ContextItem["effect"]>,
+) => items.filter((item) => (item.effect ?? "Neutral") === effect);
+
 export const chronologyPhaseOrder: EventPhase[] = [
   "Precursor",
   "Incident",
