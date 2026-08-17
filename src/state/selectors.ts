@@ -86,10 +86,59 @@ export const selectEvidenceLinkedEntities = (
 export const selectPinnedContext = (items: ContextItem[]) =>
   items.filter((item) => item.showOnCard).map((item) => ({ ...item }));
 
+export type ContextGroups = {
+  Aggravating: ContextItem[];
+  Mitigating: ContextItem[];
+  Neutral: ContextItem[];
+};
+
+/** Partitions Context while preserving author order and legacy Neutral defaults. */
+export const selectContextGroups = (items: ContextItem[]): ContextGroups => {
+  const groups: ContextGroups = {
+    Aggravating: [],
+    Mitigating: [],
+    Neutral: [],
+  };
+  items.forEach((item) => groups[item.effect ?? "Neutral"].push({ ...item }));
+  return groups;
+};
+
 export const selectContextByEffect = (
   items: ContextItem[],
   effect: NonNullable<ContextItem["effect"]>,
-) => items.filter((item) => (item.effect ?? "Neutral") === effect);
+) => selectContextGroups(items)[effect];
+
+export type CompactContextSelection = ContextGroups & { overflow: number };
+
+/**
+ * Selects at most two pinned items: one item from each directional group first,
+ * then Neutral Context. The overflow counts every other pinned item.
+ */
+export const selectCompactContext = (
+  items: ContextItem[],
+): CompactContextSelection => {
+  const pinned = selectContextGroups(selectPinnedContext(items));
+  const selected: ContextGroups = {
+    Aggravating: pinned.Aggravating.slice(0, 1),
+    Mitigating: pinned.Mitigating.slice(0, 1),
+    Neutral: [],
+  };
+  const remaining =
+    2 - selected.Aggravating.length - selected.Mitigating.length;
+  selected.Neutral = pinned.Neutral.slice(0, Math.max(0, remaining));
+  const shown =
+    selected.Aggravating.length +
+    selected.Mitigating.length +
+    selected.Neutral.length;
+  return {
+    ...selected,
+    overflow:
+      pinned.Aggravating.length +
+      pinned.Mitigating.length +
+      pinned.Neutral.length -
+      shown,
+  };
+};
 
 export const chronologyPhaseOrder: EventPhase[] = [
   "Precursor",

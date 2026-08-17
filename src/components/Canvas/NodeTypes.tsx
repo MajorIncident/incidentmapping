@@ -6,14 +6,44 @@ import {
   formatEventDateTime,
   formatEventDuration,
   resolveEvidence,
-  selectContextByEffect,
-  selectPinnedContext,
+  selectCompactContext,
+  selectContextGroups,
   timestampNeedsSeconds,
 } from "../../state/selectors";
 import { ContextPresentation } from "../Context/ContextPresentation";
 import type { BarrierNodeData, ChainNodeData } from "../../state/useAppStore";
+import type { ContextItem } from "../../features/maps/schema";
 import { NodeTagMenu } from "../NodeTagMenu/NodeTagMenu";
 import { AssertionMarker } from "../AssertionState/AssertionState";
+
+const ContextGroup = ({
+  title,
+  effect,
+  items,
+  variant = "compact",
+}: {
+  title: string;
+  effect: "Aggravating" | "Mitigating" | "Neutral";
+  items: ContextItem[];
+  variant?: "compact" | "detail";
+}): JSX.Element => {
+  const headingColor =
+    effect === "Aggravating"
+      ? "text-rose-700"
+      : effect === "Mitigating"
+        ? "text-emerald-700"
+        : "text-slate-600";
+  return (
+    <section className="space-y-1" data-context-effect={effect}>
+      <div
+        className={`text-[11px] font-semibold uppercase tracking-wide ${headingColor}`}
+      >
+        {title}
+      </div>
+      <ContextPresentation items={items} variant={variant} ariaLabel={title} />
+    </section>
+  );
+};
 
 const causalNodeTypeOptions = ["Event", "Factor", "Impact"].map((value) => ({
   value: value as NonNullable<ChainNodeData["nodeType"]>,
@@ -230,8 +260,15 @@ const ChainNodeComponent = ({
   }, [data.factorSignificance, data.nodeType, graphRole, selected]);
 
   const contextItems = data.contextItems ?? [];
-  const mitigatingContext = selectContextByEffect(contextItems, "Mitigating");
-  const aggravatingContext = selectContextByEffect(contextItems, "Aggravating");
+  const contextGroups = selectContextGroups(contextItems);
+  const directionalContext =
+    data.nodeType === undefined ||
+    data.nodeType === "Impact" ||
+    data.nodeType === "Event";
+  const mitigatingContext = directionalContext ? contextGroups.Mitigating : [];
+  const aggravatingContext = directionalContext
+    ? contextGroups.Aggravating
+    : [];
   const hasMitigatingContext = mitigatingContext.length > 0;
   const hasAggravatingContext = aggravatingContext.length > 0;
   const evidenceRegistry = useAppStore((state) => state.evidence);
@@ -251,7 +288,9 @@ const ChainNodeComponent = ({
   const visibleEvidence = evidenceItems.slice(0, 3);
   const evidenceOverflow = evidenceItems.length - visibleEvidence.length;
   const hasDescription = Boolean(data.description?.trim());
-  const compactContext = selectPinnedContext(contextItems).slice(0, 2);
+  const compactContext = selectCompactContext(
+    directionalContext ? contextItems : contextGroups.Neutral,
+  );
   const hasVisibleDetails =
     hasDescription ||
     hasMitigatingContext ||
@@ -505,12 +544,41 @@ const ChainNodeComponent = ({
           ) : null}
         </div>
       ) : null}
-      {!isEditing && !showDetails && compactContext.length ? (
-        <div className="mt-2 text-[11px]">
-          <ContextPresentation
-            items={compactContext}
-            ariaLabel="Pinned context"
-          />
+      {!isEditing &&
+      !showDetails &&
+      (compactContext.Aggravating.length ||
+        compactContext.Mitigating.length ||
+        compactContext.Neutral.length) ? (
+        <div
+          className="mt-2 space-y-1.5 text-[11px]"
+          data-testid="compact-context"
+        >
+          {directionalContext && compactContext.Aggravating.length ? (
+            <ContextGroup
+              title="Aggravating Context"
+              effect="Aggravating"
+              items={compactContext.Aggravating}
+            />
+          ) : null}
+          {directionalContext && compactContext.Mitigating.length ? (
+            <ContextGroup
+              title="Mitigating Context"
+              effect="Mitigating"
+              items={compactContext.Mitigating}
+            />
+          ) : null}
+          {compactContext.Neutral.length ? (
+            <ContextGroup
+              title="Context"
+              effect="Neutral"
+              items={compactContext.Neutral}
+            />
+          ) : null}
+          {compactContext.overflow > 0 ? (
+            <div className="font-medium text-slate-500">
+              +{compactContext.overflow} more
+            </div>
+          ) : null}
         </div>
       ) : null}
       {!isEditing && showDetails && hasVisibleDetails ? (
@@ -523,13 +591,29 @@ const ChainNodeComponent = ({
               {data.description}
             </p>
           ) : null}
-          {contextItems.length ? (
-            <div className="space-y-1" data-testid="context-details">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                Context
-              </div>
-              <ContextPresentation items={contextItems} variant="detail" />
-            </div>
+          {directionalContext && aggravatingContext.length ? (
+            <ContextGroup
+              title="Aggravating Context"
+              effect="Aggravating"
+              items={aggravatingContext}
+              variant="detail"
+            />
+          ) : null}
+          {directionalContext && mitigatingContext.length ? (
+            <ContextGroup
+              title="Mitigating Context"
+              effect="Mitigating"
+              items={mitigatingContext}
+              variant="detail"
+            />
+          ) : null}
+          {contextGroups.Neutral.length ? (
+            <ContextGroup
+              title="Context"
+              effect="Neutral"
+              items={contextGroups.Neutral}
+              variant="detail"
+            />
           ) : null}
           {evidenceItems.length > 0 ? (
             <div data-testid="evidence-summary" className="space-y-1">
@@ -555,29 +639,6 @@ const ChainNodeComponent = ({
                 ) : null}
               </ul>
             </div>
-          ) : null}
-        </div>
-      ) : null}
-      {!isEditing &&
-      !showDetails &&
-      !data.readOnly &&
-      (hasMitigatingContext || hasAggravatingContext) ? (
-        <div className="mt-2 flex gap-1.5" aria-label="Context effects">
-          {hasMitigatingContext ? (
-            <span
-              className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800"
-              aria-label={`${mitigatingContext.length} mitigating context items`}
-            >
-              +{mitigatingContext.length}
-            </span>
-          ) : null}
-          {hasAggravatingContext ? (
-            <span
-              className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-800"
-              aria-label={`${aggravatingContext.length} aggravating context items`}
-            >
-              −{aggravatingContext.length}
-            </span>
           ) : null}
         </div>
       ) : null}
