@@ -25,6 +25,7 @@ import {
   setLearningGuideEnabled as persistLearningGuideEnabled,
 } from "../features/guidance/preferences";
 import type { GuideActionId } from "../content/investigationGuide";
+import { LearnMapDialog } from "../components/LearningGuide/LearnMapDialog";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -352,7 +353,7 @@ export const App = (): JSX.Element => {
                     </button>
                   </aside>
                 ) : null}
-                <Legend />
+                <Legend onLearnMap={() => setHelpTopic("map")} />
                 {summaryOpen ? (
                   <CaseSummary
                     summary={summary}
@@ -503,7 +504,9 @@ export const App = (): JSX.Element => {
             ) : (
               <Footer />
             )}
-            {helpTopic ? (
+            {helpTopic === "map" ? (
+              <LearnMapDialog onClose={() => setHelpTopic(null)} />
+            ) : helpTopic ? (
               <div className="help-dialog-backdrop" role="presentation">
                 <section
                   role="dialog"
@@ -515,22 +518,18 @@ export const App = (): JSX.Element => {
                   }}
                 >
                   <h2 id="help-dialog-title">
-                    {helpTopic === "map"
-                      ? "Learn the Map"
-                      : helpTopic === "basics"
-                        ? "Investigation Basics"
-                        : helpTopic === "shortcuts"
-                          ? "Keyboard Shortcuts"
-                          : "About IncidentMapping"}
+                    {helpTopic === "basics"
+                      ? "Investigation Basics"
+                      : helpTopic === "shortcuts"
+                        ? "Keyboard Shortcuts"
+                        : "About IncidentMapping"}
                   </h2>
                   <p>
-                    {helpTopic === "map"
-                      ? "Read downward by asking why. Impacts lead to events, factors, controls, evidence, and actions."
-                      : helpTopic === "basics"
-                        ? "Build the story, analyze causes, test findings with evidence, then plan actions."
-                        : helpTopic === "shortcuts"
-                          ? "Enter adds below. Delete removes a selection. F fits the map. Escape closes overlays."
-                          : "IncidentMapping helps teams build evidence-aware incident investigations."}
+                    {helpTopic === "basics"
+                      ? "Build the story, analyze causes, test findings with evidence, then plan actions."
+                      : helpTopic === "shortcuts"
+                        ? "Enter adds below. Delete removes a selection. F fits the map. Escape closes overlays."
+                        : "IncidentMapping helps teams build evidence-aware incident investigations."}
                   </p>
                   <button
                     type="button"
