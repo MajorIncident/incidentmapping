@@ -1,11 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   act,
+  fireEvent,
   render,
   screen,
-  fireEvent,
-  within,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactFlowProvider } from "reactflow";
@@ -42,9 +42,6 @@ describe("Inspector and keyboard workflows", () => {
     expect(id).toBeTruthy();
     return id ?? "";
   };
-
-  const consequenceSection = (label: "Positive" | "Negative") =>
-    screen.getByText(label).parentElement?.parentElement as HTMLElement;
 
   beforeAll(() => {
     vi.stubGlobal(
@@ -136,46 +133,35 @@ describe("Inspector and keyboard workflows", () => {
     expect(persistedTimestampToLocalControl("not-a-date")).toBe("");
   });
 
-  it("shows consequence editing only for Impact and Event nodes", async () => {
+  it("orders effect-specific Context after timing and limits unsupported nodes", async () => {
     const nodeId = await renderSelectedNode();
-    const consequences = () =>
-      screen.queryByRole("heading", { name: "Consequences" });
-
-    expect(consequences()).toBeVisible();
-    act(() => {
-      useAppStore.getState().actions.updateNodeData(nodeId, {
-        positiveConsequenceBulletPoints: ["Persisted outcome"],
-      });
-      useAppStore.getState().actions.setNodeType(nodeId, "Impact");
-    });
-    expect(consequences()).toBeVisible();
+    const headings = screen
+      .getAllByRole("heading")
+      .map((heading) => heading.textContent);
+    expect(headings.indexOf("Aggravating Context")).toBeLessThan(
+      headings.indexOf("Mitigating Context"),
+    );
+    expect(headings.indexOf("Mitigating Context")).toBeLessThan(
+      headings.indexOf("Context"),
+    );
+    expect(
+      screen
+        .getByText("Event timing")
+        .compareDocumentPosition(
+          screen.getByRole("heading", { name: "Aggravating Context" }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
-    expect(consequences()).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Context" })).toBeVisible();
     expect(
-      useAppStore.getState().nodes.find((node) => node.id === nodeId)?.data
-        .positiveConsequenceBulletPoints,
-    ).toEqual(["Persisted outcome"]);
-
-    let actionId = "";
+      screen.queryByRole("heading", { name: "Aggravating Context" }),
+    ).toBeNull();
     act(() => {
-      actionId = useAppStore.getState().actions.addAction(nodeId) ?? "";
+      const actionId = useAppStore.getState().actions.addAction(nodeId);
       useAppStore.getState().actions.select(actionId);
     });
-    expect(consequences()).not.toBeInTheDocument();
-
-    act(() => {
-      useAppStore.getState().actions.loadMap(sampleMap);
-      useAppStore.getState().actions.select("barrier-root-child");
-    });
-    expect(consequences()).not.toBeInTheDocument();
-
-    act(() => {
-      useAppStore.getState().actions.loadMap(emptyMap);
-      const eventId = useAppStore.getState().actions.addChild() ?? "";
-      useAppStore.getState().actions.select(eventId);
-    });
-    expect(consequences()).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /Context/ })).toBeNull();
   });
 
   it("adds a child via Enter and starts inline editing", async () => {
@@ -387,45 +373,32 @@ describe("Inspector and keyboard workflows", () => {
     ).toBeVisible();
   });
 
-  it.each([
-    ["Positive", "Add a positive consequence"],
-    ["Negative", "Add a negative consequence"],
-  ] as const)(
-    "adds and focuses successive %s consequences with Enter",
-    async (label, placeholder) => {
-      await renderSelectedNode();
-      const user = userEvent.setup();
-      await user.click(
-        within(consequenceSection(label)).getByRole("button", { name: "Add" }),
-      );
-      const first = screen.getByPlaceholderText(placeholder);
-      expect(first).toHaveFocus();
-
-      await user.type(first, "First value{Enter}");
-      const inputs = screen.getAllByPlaceholderText(placeholder);
-      expect(inputs).toHaveLength(2);
-      expect(inputs[1]).toHaveFocus();
-      await user.type(inputs[1], "Second value");
-      expect(inputs[1]).toHaveValue("Second value");
-    },
-  );
-
-  it("keeps focus on the first invalid consequence when Enter validation fails", async () => {
-    await renderSelectedNode();
+  it("quick-adds preselected effects and restores focus after add and remove", async () => {
+    const nodeId = await renderSelectedNode();
     const user = userEvent.setup();
+    const section = screen.getByRole("region", { name: "Aggravating Context" });
+    await user.type(within(section).getByLabelText("New label"), "Weather");
+    await user.type(within(section).getByLabelText("New value"), "Storm");
     await user.click(
-      within(consequenceSection("Positive")).getByRole("button", {
-        name: "Add",
+      within(section).getByRole("button", { name: "Add aggravating context" }),
+    );
+    expect(
+      useAppStore.getState().nodes.find((node) => node.id === nodeId)?.data
+        .contextItems,
+    ).toEqual([expect.objectContaining({ effect: "Aggravating" })]);
+    expect(within(section).getByLabelText("New label")).toHaveFocus();
+    await user.click(
+      within(section).getByRole("button", {
+        name: /Delete aggravating context item Weather/,
       }),
     );
-    const input = screen.getByPlaceholderText("Add a positive consequence");
-    await user.keyboard("{Enter}");
-
-    expect(
-      screen.getAllByPlaceholderText("Add a positive consequence"),
-    ).toHaveLength(1);
-    expect(input).toHaveFocus();
-    expect(screen.getByText("This field is required.")).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(section).getByRole("button", {
+          name: "Add aggravating context",
+        }),
+      ).toHaveFocus(),
+    );
   });
 
   it("creates typed evidence atomically and unlinks without deleting it", async () => {
@@ -461,49 +434,6 @@ describe("Inspector and keyboard workflows", () => {
         ?.data.evidenceIds,
     ).toEqual([]);
     expect(useAppStore.getState().evidence).toHaveLength(1);
-  });
-
-  it("focuses Add after removing the only empty item and the previous input otherwise", async () => {
-    await renderSelectedNode();
-    const user = userEvent.setup();
-    const section = consequenceSection("Negative");
-    const addButton = within(section).getByRole("button", { name: "Add" });
-    await user.click(addButton);
-    await user.keyboard("{Backspace}");
-    expect(addButton).toHaveFocus();
-
-    await user.click(addButton);
-    await user.type(
-      screen.getByPlaceholderText("Add a negative consequence"),
-      "Kept{Enter}",
-    );
-    const inputs = screen.getAllByPlaceholderText("Add a negative consequence");
-    await user.keyboard("{Backspace}");
-    expect(inputs[0]).toHaveFocus();
-  });
-
-  it("clears pending list focus when the selected node changes", async () => {
-    await renderSelectedNode();
-    const { actions } = useAppStore.getState();
-    const addButton = within(consequenceSection("Positive")).getByRole(
-      "button",
-      { name: "Add" },
-    );
-    fireEvent.click(addButton);
-    act(() => {
-      const nextId = actions.addChild();
-      actions.select(nextId);
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.queryByPlaceholderText("Add a positive consequence"),
-      ).not.toBeInTheDocument();
-    });
-    expect(document.activeElement).not.toHaveAttribute(
-      "placeholder",
-      "Add a positive consequence",
-    );
   });
 
   it("shows failure fields only for non-effective statuses and preserves their values", async () => {

@@ -13,8 +13,6 @@ import {
 const defaultData: ChainNodeData = {
   title: "Incident",
   description: "",
-  positiveConsequenceBulletPoints: [],
-  negativeConsequenceBulletPoints: [],
 };
 
 const renderBarrierNode = (data: Partial<BarrierNodeData> = {}) => {
@@ -234,8 +232,7 @@ describe("ChainNode details", () => {
   it("does not render the details wrapper when all details are empty", () => {
     renderChainNode({
       description: "   ",
-      positiveConsequenceBulletPoints: [""],
-      negativeConsequenceBulletPoints: ["  "],
+      contextItems: [],
     });
 
     expect(screen.queryByTestId("node-details")).not.toBeInTheDocument();
@@ -243,29 +240,30 @@ describe("ChainNode details", () => {
     expect(screen.queryByText("No negative impacts")).not.toBeInTheDocument();
   });
 
-  it("renders one populated category in a single-column grid", () => {
+  it("renders effectful items through canonical Context presentation", () => {
     renderChainNode({
-      positiveConsequenceBulletPoints: ["Faster recovery", "  "],
+      contextItems: [
+        {
+          id: "context-1",
+          label: "Recovery",
+          value: "Faster recovery",
+          displayMode: "Text",
+          effect: "Mitigating",
+        },
+        {
+          id: "context-2",
+          label: "Disruption",
+          value: "Customer disruption",
+          displayMode: "Text",
+          effect: "Aggravating",
+        },
+      ],
     });
 
-    expect(screen.getByText("Positive")).toBeInTheDocument();
+    expect(screen.getByTestId("context-details")).toBeInTheDocument();
     expect(screen.getByText("Faster recovery")).toBeInTheDocument();
-    expect(screen.queryByText("Negative")).not.toBeInTheDocument();
-    expect(screen.getByTestId("consequence-grid")).toHaveClass("grid-cols-1");
-    expect(screen.getByTestId("consequence-grid")).not.toHaveClass(
-      "grid-cols-2",
-    );
-  });
-
-  it("renders both populated categories in a two-column grid", () => {
-    renderChainNode({
-      positiveConsequenceBulletPoints: ["Faster recovery"],
-      negativeConsequenceBulletPoints: ["Customer disruption"],
-    });
-
-    expect(screen.getByText("Positive")).toBeInTheDocument();
-    expect(screen.getByText("Negative")).toBeInTheDocument();
-    expect(screen.getByTestId("consequence-grid")).toHaveClass("grid-cols-2");
+    expect(screen.getByText("Customer disruption")).toBeInTheDocument();
+    expect(screen.queryByTestId("consequence-grid")).not.toBeInTheDocument();
   });
 
   it("hides populated details when the global setting is disabled", () => {
@@ -275,8 +273,22 @@ describe("ChainNode details", () => {
 
     renderChainNode({
       description: "Root cause details",
-      positiveConsequenceBulletPoints: ["Faster recovery"],
-      negativeConsequenceBulletPoints: ["Customer disruption"],
+      contextItems: [
+        {
+          id: "context-1",
+          label: "Recovery",
+          value: "Faster recovery",
+          displayMode: "Text",
+          effect: "Mitigating",
+        },
+        {
+          id: "context-2",
+          label: "Disruption",
+          value: "Customer disruption",
+          displayMode: "Text",
+          effect: "Aggravating",
+        },
+      ],
     });
 
     expect(screen.queryByTestId("node-details")).not.toBeInTheDocument();
@@ -286,15 +298,36 @@ describe("ChainNode details", () => {
   it("shows compact accessible consequence counts in summary mode", () => {
     act(() => useAppStore.getState().actions.setShowDetails(false));
     renderChainNode({
-      positiveConsequenceBulletPoints: ["Recovery"],
-      negativeConsequenceBulletPoints: ["Delay", "Cost"],
+      contextItems: [
+        {
+          id: "context-1",
+          label: "Recovery",
+          value: "Improved",
+          displayMode: "Text",
+          effect: "Mitigating",
+        },
+        {
+          id: "context-2",
+          label: "Delay",
+          value: "High",
+          displayMode: "Text",
+          effect: "Aggravating",
+        },
+        {
+          id: "context-3",
+          label: "Cost",
+          value: "High",
+          displayMode: "Text",
+          effect: "Aggravating",
+        },
+      ],
     });
-    expect(screen.getByLabelText("1 positive consequences")).toHaveTextContent(
-      "+1",
-    );
-    expect(screen.getByLabelText("2 negative consequences")).toHaveTextContent(
-      "−2",
-    );
+    expect(
+      screen.getByLabelText("1 mitigating context items"),
+    ).toHaveTextContent("+1");
+    expect(
+      screen.getByLabelText("2 aggravating context items"),
+    ).toHaveTextContent("−2");
     expect(screen.queryByText("Recovery")).not.toBeInTheDocument();
   });
 

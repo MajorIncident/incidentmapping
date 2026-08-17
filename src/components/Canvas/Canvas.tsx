@@ -15,6 +15,7 @@ import {
   type BarrierNodeData,
   type ChainNodeData,
 } from "../../state/useAppStore";
+import { selectContextByEffect } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
 import { BRANCH_LANE_GAP, edgeTypes } from "./IncidentEdge";
 import {
@@ -29,6 +30,11 @@ import {
   selectLensPresentation,
   type PresentationLens,
 } from "../../features/presentation/selectors";
+import { getInvestigationConcept } from "../../content/investigationModel";
+
+const guideConcepts = (
+  ["impact", "event", "factor", "action", "control"] as const
+).map(getInvestigationConcept);
 
 export const GuideContent = (): JSX.Element => (
   <>
@@ -43,11 +49,9 @@ export const GuideContent = (): JSX.Element => (
     </p>
     <div className="map-guide__key" aria-label="Map key">
       {[
-        ["Impact", "impact"],
-        ["Event", "event"],
-        ["Factor", "factor"],
-        ["Action", "action"],
-        ["Control", "control"],
+        ...guideConcepts.map(
+          ({ name, visualRole }) => [name, visualRole] as const,
+        ),
         ["Key Factor", "key-factor"],
         ["Root Cause", "root-cause"],
       ].map(([label, kind]) => (

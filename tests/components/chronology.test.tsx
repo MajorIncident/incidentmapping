@@ -16,8 +16,6 @@ const nodes: Node<ChainNodeData>[] = [
       title: "Alarm sounded",
       timestamp: "2024-01-02T12:30:00Z",
       eventPhase: "Detection",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
   {
@@ -28,8 +26,6 @@ const nodes: Node<ChainNodeData>[] = [
       nodeType: "Event",
       referenceId: "E-2",
       title: "Investigation began",
-      positiveConsequenceBulletPoints: [],
-      negativeConsequenceBulletPoints: [],
     },
   },
 ];

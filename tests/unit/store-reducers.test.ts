@@ -945,7 +945,13 @@ describe("useAppStore actions", () => {
       "Weather",
       "Rain",
       true,
+      "Metric",
+      "mm",
+      "Aggravating",
     ) as string;
+    expect(
+      actions.updateContext(eventId, contextId, { value: "Heavy rain" }),
+    ).toBe(true);
     actions.toggleContextShowOnCard(eventId, contextId);
     actions.setActionType(eventId, "Corrective");
     expect(
@@ -959,7 +965,15 @@ describe("useAppStore actions", () => {
     ).toMatchObject({
       eventPhase: "Recovery",
       contextItems: [
-        { id: contextId, label: "Weather", value: "Rain", showOnCard: false },
+        {
+          id: contextId,
+          label: "Weather",
+          value: "Heavy rain",
+          displayMode: "Metric",
+          unit: "mm",
+          showOnCard: false,
+          effect: "Aggravating",
+        },
       ],
     });
   });

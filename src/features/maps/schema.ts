@@ -715,6 +715,23 @@ export const contextEffectSchema = z.enum([
   "Aggravating",
   "Mitigating",
 ]);
+export const contextEffectDefinitions = {
+  Neutral: {
+    heading: "Context",
+    addLabel: "Add context",
+    help: "A relevant fact that does not imply a helpful or harmful effect. Causal conditions should usually be Factors.",
+  },
+  Aggravating: {
+    heading: "Aggravating Context",
+    addLabel: "Add aggravating context",
+    help: "A relevant fact that made the Event or Impact worse. Causal conditions should usually be Factors.",
+  },
+  Mitigating: {
+    heading: "Mitigating Context",
+    addLabel: "Add mitigating context",
+    help: "A relevant fact that reduced the Event or Impact. Causal conditions should usually be Factors.",
+  },
+} as const;
 type ContextEffectInput = z.input<typeof contextEffectSchema> | undefined;
 
 /** Returns the semantic error for a node's Context item, or null when allowed. */

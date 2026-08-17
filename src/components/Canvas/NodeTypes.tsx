@@ -229,14 +229,11 @@ const ChainNodeComponent = ({
     return `${containerClasses} chain-node-card border-slate-200 ${classification} ${action} ${related} ${active}`;
   }, [data.factorSignificance, data.nodeType, graphRole, selected]);
 
-  const positivePoints = (data.positiveConsequenceBulletPoints ?? []).filter(
-    (point) => point.trim().length > 0,
-  );
-  const negativePoints = (data.negativeConsequenceBulletPoints ?? []).filter(
-    (point) => point.trim().length > 0,
-  );
-  const hasPositivePoints = positivePoints.length > 0;
-  const hasNegativePoints = negativePoints.length > 0;
+  const contextItems = data.contextItems ?? [];
+  const mitigatingContext = selectContextByEffect(contextItems, "Mitigating");
+  const aggravatingContext = selectContextByEffect(contextItems, "Aggravating");
+  const hasMitigatingContext = mitigatingContext.length > 0;
+  const hasAggravatingContext = aggravatingContext.length > 0;
   const evidenceRegistry = useAppStore((state) => state.evidence);
   const registryEvidence = resolveEvidence(
     data.evidenceIds ?? [],
@@ -259,8 +256,8 @@ const ChainNodeComponent = ({
   const contextGroups = selectContextGroups(contextItems, data.nodeType);
   const hasVisibleDetails =
     hasDescription ||
-    hasPositivePoints ||
-    hasNegativePoints ||
+    hasMitigatingContext ||
+    hasAggravatingContext ||
     evidenceItems.length > 0 ||
     contextItems.length > 0;
   const showSeconds =
@@ -635,22 +632,22 @@ const ChainNodeComponent = ({
       {!isEditing &&
       !showDetails &&
       !data.readOnly &&
-      (hasPositivePoints || hasNegativePoints) ? (
-        <div className="mt-2 flex gap-1.5" aria-label="Consequences">
-          {hasPositivePoints ? (
+      (hasMitigatingContext || hasAggravatingContext) ? (
+        <div className="mt-2 flex gap-1.5" aria-label="Context effects">
+          {hasMitigatingContext ? (
             <span
               className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800"
-              aria-label={`${positivePoints.length} positive consequences`}
+              aria-label={`${mitigatingContext.length} mitigating context items`}
             >
-              +{positivePoints.length}
+              +{mitigatingContext.length}
             </span>
           ) : null}
-          {hasNegativePoints ? (
+          {hasAggravatingContext ? (
             <span
               className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-800"
-              aria-label={`${negativePoints.length} negative consequences`}
+              aria-label={`${aggravatingContext.length} aggravating context items`}
             >
-              −{negativePoints.length}
+              −{aggravatingContext.length}
             </span>
           ) : null}
         </div>

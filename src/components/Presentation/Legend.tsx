@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { useAppStore } from "../../state/useAppStore";
+import { getInvestigationConcept } from "../../content/investigationModel";
 
 type LegendItem = readonly [label: string, treatment: string];
 
@@ -15,6 +16,10 @@ const item = (value: string): LegendItem => [
   value.replace(/([a-z])([A-Z])/g, "$1 $2"),
   value.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase(),
 ];
+
+const primaryConcepts = (["impact", "event", "factor", "action"] as const).map(
+  getInvestigationConcept,
+);
 
 const Items = ({ items }: { items: LegendItem[] }): JSX.Element => (
   <ul>
@@ -38,11 +43,16 @@ export const Legend = (): JSX.Element => {
   const panelId = useId();
 
   const primaryItems = useMemo(() => {
-    const types = orderedValues(
-      ["Impact", "Event", "Factor", "Action"] as const,
-      nodes.map((node) => node.data.nodeType),
-    ).map(item);
-    if (barriers.length) types.push(["Control", "control"]);
+    const presentTypes = new Set(nodes.map((node) => node.data.nodeType));
+    const types: LegendItem[] = primaryConcepts
+      .filter(({ name }) =>
+        presentTypes.has(name as (typeof nodes)[number]["data"]["nodeType"]),
+      )
+      .map(({ name, visualRole }) => [name, visualRole]);
+    if (barriers.length) {
+      const { name, visualRole } = getInvestigationConcept("control");
+      types.push([name, visualRole]);
+    }
     if (selectionId) types.push(["Selected relationship", "relationship"]);
     return types;
   }, [barriers.length, nodes, selectionId]);
