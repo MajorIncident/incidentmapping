@@ -181,6 +181,46 @@ describe("parseAndMigrateMapData", () => {
     expect(parseAndMigrateMapData(v1)).toEqual(migrated);
   });
 
+  it("migrates every non-blank consequence beside existing Context without ID collisions", () => {
+    const migrated = parseAndMigrateMapData(
+      fixture("context-consequences-v4.json"),
+    );
+    expect(migrated.metadata?.contextItems).toEqual([
+      expect.objectContaining({
+        id: "context-node%20id-mitigating-0",
+        value: "Existing map context",
+        effect: "Neutral",
+      }),
+    ]);
+    expect(migrated.nodes[0].contextItems).toEqual([
+      expect.objectContaining({
+        id: "existing-node-context",
+        value: "Night",
+        effect: "Neutral",
+      }),
+      expect.objectContaining({
+        id: "context-node%20id-mitigating-0-2",
+        value: "Faster recovery",
+        effect: "Mitigating",
+      }),
+      expect.objectContaining({
+        id: "context-node%20id-mitigating-1",
+        value: "  Lower customer impact  ",
+        effect: "Mitigating",
+      }),
+      expect.objectContaining({
+        id: "context-node%20id-aggravating-0",
+        value: "Longer outage",
+        effect: "Aggravating",
+      }),
+      expect.objectContaining({
+        id: "context-node%20id-aggravating-1",
+        value: "  Higher cost  ",
+        effect: "Aggravating",
+      }),
+    ]);
+  });
+
   it("canonicalizes sparse V2 references without lowering either high-water mark", () => {
     const input = fixture("baggage-incident-v2.json") as MapDataV2;
     if (!input.metadata) throw new Error("Fixture metadata is required");

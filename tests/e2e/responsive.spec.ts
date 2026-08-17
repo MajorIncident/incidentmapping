@@ -168,3 +168,62 @@ test("mobile canvas overlays remain usable with a long title at 200% zoom", asyn
   await sheet.getByRole("button", { name: /Dismiss this tip/i }).click();
   await expect(sheet).toContainText(/Impact|Event|Factor|Control|Evidence/i);
 });
+
+test("desktop Guide floats over the canvas and remains keyboard dismissible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+
+  const guide = page.getByRole("complementary", { name: "Learning Guide" });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText("Context:");
+  await expect(guide.getByText("Why this tip?")).toBeVisible();
+  const [guideBox, canvasBox] = await Promise.all([
+    guide.boundingBox(),
+    page.locator(".react-flow").boundingBox(),
+  ]);
+  expect(guideBox!.x).toBeGreaterThan(canvasBox!.x + canvasBox!.width / 2);
+  expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(
+    canvasBox!.y + canvasBox!.height,
+  );
+
+  await guide.getByRole("button", { name: "Collapse Learning Guide" }).focus();
+  await page.keyboard.press("Escape");
+  const trigger = page.getByRole("button", { name: "? Guide" });
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+});
+
+test("mobile Guide is a labelled bottom sheet and restores keyboard focus", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto("/");
+  const trigger = page.getByRole("button", { name: "? Guide" });
+  await trigger.click();
+  const guide = page.getByRole("dialog", { name: "Learning Guide" });
+  await expect(guide).toHaveAttribute("aria-modal", "true");
+  await expect(
+    guide.getByRole("button", { name: "Close Learning Guide" }),
+  ).toBeFocused();
+  const box = await guide.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+  await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();
+
+  await page.getByLabel("More menu").click();
+  await expect(
+    page.getByRole("button", { name: /Learning Guide: On/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Learn the Map" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Present map" }).click();
+  await expect(
+    page.getByRole("button", { name: /Exit Presentation/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "? Guide" })).toBeVisible();
+});

@@ -65,6 +65,18 @@ const exactBuffer = (bytes: Uint8Array): ArrayBuffer =>
 const zipBuffer = (entries: Record<string, Uint8Array>): ArrayBuffer =>
   exactBuffer(zipSync(entries));
 
+const expectNoRetiredConsequenceKeys = (value: unknown): void => {
+  if (Array.isArray(value)) {
+    value.forEach(expectNoRetiredConsequenceKeys);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  const record = value as Record<string, unknown>;
+  expect(record).not.toHaveProperty("positiveConsequenceBulletPoints");
+  expect(record).not.toHaveProperty("negativeConsequenceBulletPoints");
+  Object.values(record).forEach(expectNoRetiredConsequenceKeys);
+};
+
 describe("incident map packages", () => {
   afterEach(() => {
     attachmentRuntimeStore.clear();
@@ -81,8 +93,7 @@ describe("incident map packages", () => {
     const archive = unzipSync(new Uint8Array(packageBytes));
     expect(archive["map.json"]).toEqual(strToU8(canonicalMapJson(map)));
     const exportedJson = new TextDecoder().decode(archive["map.json"]);
-    expect(exportedJson).not.toContain("positiveConsequenceBulletPoints");
-    expect(exportedJson).not.toContain("negativeConsequenceBulletPoints");
+    expectNoRetiredConsequenceKeys(JSON.parse(exportedJson));
     expect(archive[map.attachments[0].bundlePath]).toEqual(jpeg);
     expect(archive[map.attachments[1].bundlePath]).toEqual(pdf);
 
