@@ -1,28 +1,28 @@
-# Map Schema: Canonical Version 3
+# Map Schema: Canonical Version 4
 
-This document is the wire contract for saved incident maps. The canonical
-persisted form is `MapData` with `schemaVersion: 3`. Opening untrusted JSON goes
-through the versioned migration boundary; saving always validates and emits V3.
-Objects are strict unless a legacy migration shape explicitly says otherwise,
-so unknown fields are rejected rather than silently retained.
+Version 4 (`schemaVersion: 4`) is the strict canonical map document stored as
+the root `map.json` in a `.incidentmap` package. JSON is a legacy import and
+metadata-export representation, not the canonical file format. Every object
+below is strict: unknown keys are rejected. All arrays shown are required;
+`metadata` is optional and `metadata.contextItems` defaults to `[]` when
+metadata is present.
 
 ## Complete persisted shape
 
-`?` means optional. All listed arrays are required in canonical V3 (except
-`metadata.contextItems`, which defaults to `[]` when metadata is present).
-Strings marked **non-empty** have a minimum length of one; **trimmed non-empty**
-strings must also contain a non-whitespace character. Dates and timestamps are
-stored as strings: the schema does not require an ISO format or prove that they
-are valid dates.
+`?` means optional. `NonEmptyString` has at least one character;
+`TrimmedNonEmptyString` must contain a non-whitespace character. Numbers in a
+position are finite JavaScript numbers. Date/timestamp fields remain strings;
+V4 neither requires ISO syntax nor validates chronological order.
 
 ```ts
 type MapData = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   metadata?: Metadata;
   nodes: ChainNode[];
   edges: (CauseEffectEdge | ActionEdge)[];
-  barriers: Control[]; // historical wire name; the product calls these Controls
+  barriers: Control[]; // historical wire key; UI terminology is Control
   evidence: Evidence[];
+  attachments: Attachment[];
 };
 
 type Metadata = {
@@ -34,7 +34,9 @@ type Metadata = {
   status?: IncidentStatus;
   nodeReferenceHighWaterMark?: NonNegativeInteger;
   evidenceReferenceHighWaterMark?: NonNegativeInteger;
-  contextItems: ContextItem[]; // defaults to [] while parsing
+  controlReferenceHighWaterMark?: NonNegativeInteger;
+  attachmentReferenceHighWaterMark?: NonNegativeInteger;
+  contextItems: ContextItem[];
 };
 
 type ChainNode = {
@@ -46,11 +48,15 @@ type ChainNode = {
   description?: string;
   owner?: string;
   timestamp?: string;
+  endTimestamp?: string;
+  eventDisplay?: EventDisplay;
   severity?: Severity;
   factorCategory?: FactorCategory;
   factorSignificance?: FactorSignificance;
+  assertionState?: AssertionState;
   actionStatus?: ActionStatus;
   actionDueDate?: string;
+  actionCompletedAt?: string;
   eventPhase?: EventPhase;
   actionType?: ActionType;
   positiveConsequenceBulletPoints: string[];
@@ -66,7 +72,6 @@ type CauseEffectEdge = {
   fromId: NonEmptyString;
   toId: NonEmptyString;
 };
-
 type ActionEdge = {
   id: NonEmptyString;
   kind: "ActionEdge";
@@ -76,7 +81,8 @@ type ActionEdge = {
 
 type Control = {
   id: NonEmptyString;
-  kind: "Barrier"; // retained discriminator for wire compatibility
+  kind: "Barrier"; // retained for wire compatibility
+  referenceId: NonEmptyString;
   upstreamNodeId: NonEmptyString;
   downstreamNodeId: NonEmptyString;
   description?: string;
@@ -84,6 +90,7 @@ type Control = {
   failureReason?: ControlFailureReason;
   failureDetails?: string;
   controlRole?: ControlRole;
+  assertionState?: AssertionState;
   evidenceIds: NonEmptyString[];
 };
 
@@ -94,6 +101,17 @@ type Evidence = {
   description?: string;
   source?: string;
   reference?: string;
+  attachmentIds: NonEmptyString[];
+  externalUrl?: HttpOrHttpsUrl;
+};
+
+type Attachment = {
+  id: NonEmptyString;
+  filename: TrimmedNonEmptyString;
+  mimeType: AttachmentMimeType;
+  size: NonNegativeInteger;
+  bundlePath: TrimmedNonEmptyString;
+  sha256?: HexStringOfExactly64Characters;
 };
 
 type ContextItem = {
@@ -101,153 +119,119 @@ type ContextItem = {
   label: TrimmedNonEmptyString;
   value: TrimmedNonEmptyString;
   showOnCard?: boolean;
+  displayMode: ContextDisplayMode;
+  unit?: TrimmedNonEmptyString;
 };
 ```
 
-## Allowed enums
+## Enums
 
-| Name                   | Allowed wire values                                                                                                                       |
+| Name                   | Allowed values                                                                                                                            |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `Severity`             | `Low`, `Medium`, `High`, `Critical`                                                                                                       |
 | `IncidentStatus`       | `Draft`, `Open`, `InProgress`, `Closed`                                                                                                   |
 | `FactorCategory`       | `Human`, `Process`, `Equipment`, `Technology`, `Communication`, `Environment`, `Organizational`, `Other`                                  |
 | `FactorSignificance`   | `Normal`, `KeyFactor`, `RootCause`                                                                                                        |
+| `AssertionState`       | `Confirmed`, `Working`, `Inferred`                                                                                                        |
 | `ActionStatus`         | `Proposed`, `Planned`, `InProgress`, `Completed`, `Cancelled`                                                                             |
-| `EventPhase`           | `Precursor`, `Incident`, `Detection`, `Response`, `Recovery`                                                                              |
 | `ActionType`           | `Immediate`, `Corrective`, `Preventive`                                                                                                   |
+| `EventPhase`           | `Precursor`, `Incident`, `Detection`, `Response`, `Recovery`                                                                              |
+| `EventDisplay`         | `Map`, `ChronologyOnly`                                                                                                                   |
 | `ControlStatus`        | `Effective`, `Degraded`, `Failed`, `Missing`                                                                                              |
 | `ControlRole`          | `Preventive`, `Detective`, `Mitigating`                                                                                                   |
 | `ControlFailureReason` | `NotFollowed`, `Bypassed`, `IncorrectConfiguration`, `SystemFailure`, `InadequateDesign`, `Unavailable`, `NotInPlace`, `Unknown`, `Other` |
 | `EvidenceType`         | `Note`, `Photo`, `Video`, `Document`, `SystemLog`, `Interview`, `Other`                                                                   |
+| `ContextDisplayMode`   | `Text`, `Chip`, `Metric`                                                                                                                  |
+| `AttachmentMimeType`   | `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `video/mp4`, `video/webm`, `text/plain`, `text/csv`, `application/json`       |
 
-Enum spelling and capitalization are part of the wire contract.
+Spelling and capitalization are part of the contract.
 
-## Semantic validation
+## Placement and semantic validation
 
-Shape validation is followed by whole-map validation:
+Shape parsing is followed by whole-map validation.
 
-- Node IDs, node `referenceId` values, edge IDs, Control IDs, and Evidence
-  registry IDs must each be unique in their respective namespaces.
-- Every edge endpoint must name an existing node. A `CauseEffectEdge` cannot
-  touch an Action. Duplicate ordered causal pairs are invalid.
-- An `ActionEdge` must start at a non-Action and end at an Action. Every Action
-  must have exactly one incoming `ActionEdge`; duplicate ordered Action pairs
-  are invalid. Action relationships express ownership/response, not causation.
-- Every Control endpoint must exist, and its ordered upstream/downstream pair
-  must exactly match a `CauseEffectEdge`. Controls reference the causal pair,
-  not an edge ID.
-- `eventPhase` is permitted only on Event nodes. `factorCategory` and
-  `factorSignificance` are permitted only on Factor nodes. `actionType`,
-  `actionStatus`, and `actionDueDate` are permitted only on Action nodes.
-- Context is allowed on incident metadata and on Event, Factor, and Impact
-  nodes. An Action's `contextItems` array must be empty.
-- Every node and Control `evidenceIds` value must resolve to the global
-  `evidence` registry. A given owner cannot repeat the same Evidence ID, though
-  the same registry item may intentionally be referenced by multiple owners.
+- `eventDisplay` is required on every Event; `eventDisplay` and `endTimestamp`
+  are forbidden elsewhere. `eventPhase` is also Event-only.
+- `factorCategory`, `factorSignificance`, and `assertionState` are Factor-only
+  node fields. A Control may independently carry `assertionState`.
+- `actionType`, `actionStatus`, `actionDueDate`, and `actionCompletedAt` are
+  Action-only. Context is allowed at incident level and on Event, Factor, and
+  Impact nodes; an Action's `contextItems` must be empty.
+- A Context `unit` is valid only when `displayMode` is `Metric`. Display modes,
+  card pinning, Event display, lenses, and chronology placement are presentation
+  choices: **they do not create, remove, or change causality**.
+- `externalUrl`, when present, must be a syntactically valid HTTP or HTTPS URL.
+  Attachment media type, path, and byte limits receive additional package-level
+  validation described in [FILE_FORMAT.md](FILE_FORMAT.md).
+- Every edge endpoint exists. A causal edge connects only non-Actions and an
+  ordered causal pair occurs at most once. An Action edge starts at a non-Action
+  and ends at an Action; every Action has exactly one incoming Action edge and
+  each ordered Action pair is unique. Action edges are response ownership, not
+  causal assertions.
+- Each Control's endpoints exist and exactly match an ordered causal edge.
+  Controls refer to the node pair, not an edge ID.
+- The graph is not required to be acyclic. Optional classifications are not
+  made mandatory, and string dates are not interpreted by schema validation.
 
-The schema does not require type-specific optional classifications, validate
-string date formats, constrain graph acyclicity, or require high-water marks to
-match current IDs. Those omissions are part of the current contract, not an
-invitation for importers to invent fields.
+## Identity, references, and uniqueness
 
-## Evidence registry and references
+Node IDs, node `referenceId`s, edge IDs, Control IDs, Control `referenceId`s,
+Evidence IDs, Attachment IDs, and Attachment `bundlePath`s are each unique
+within their own namespace. The contract does not require IDs from different
+namespaces to differ. Context IDs have no map-wide uniqueness rule.
 
-Evidence is owned once by the map-wide `evidence` registry. Nodes and Controls
-hold only `evidenceIds`; they do not embed or own copies. Deleting a reference
-from a node or Control does not by itself redefine the Evidence item, while
-removing an Evidence registry item requires removing all of its references.
-Evidence supports an assertion recorded in the investigation; Evidence is not
-itself a cause.
+Every node/Control `evidenceIds` entry resolves to the global Evidence registry;
+every Evidence `attachmentIds` entry resolves to the attachment manifest. An
+owner cannot repeat the same reference locally, but a registry item may be
+shared by several owners. Evidence and Attachments are registered once rather
+than embedded. Deleting a registry record therefore requires removing all
+references to it.
 
-The current Evidence record stores descriptive metadata only. A later schema
-version may extend Evidence with attachment or link fields. V3 deliberately has
-no unused attachment placeholder object, and this contract does not claim that
-file upload, binary persistence, or hosted file storage exists.
+## High-water allocation
 
-## Context rules
+Human-facing references conventionally use `N-001` (nodes), `EV-001`
+(Evidence), `C-001` (Controls), and `ATT-001` (Attachments). The four optional
+metadata marks record allocation history, not collection sizes. Allocation is
+above the greater of the stored mark and the highest well-formed extant
+reference for that namespace. Deletion does not compact or reuse a number;
+gaps survive save/open. Validation intentionally accepts absent or stale-low
+marks, so readers must reconcile before allocating and must preserve a mark
+that exceeds all surviving references.
 
-Context records factual conditions or circumstances, such as weather, operating
-mode, or location detail. Incident Context belongs in `metadata.contextItems`;
-node Context belongs on a non-Action node. `showOnCard` is an optional display
-preference, not a causal classification. Context is a fact; a Factor is a
-condition judged to have causally contributed. Promote a fact into a Factor
-only when the investigation makes that causal judgment—do not use Context as a
-second causal-node system.
+## Deterministic migration and import
 
-Context IDs are non-empty but are not registry references and V3 does not impose
-map-wide uniqueness on them. Labels and values are trimmed non-empty strings.
+`parseAndMigrateMapData` is the only untrusted JSON boundary. It accepts frozen
+V1, V2, V3, and strict V4 documents, never mutates input, rejects unsupported
+versions, and validates the resulting V4 map. Saving always emits V4 inside an
+`.incidentmap` package.
 
-## Stable references and high-water marks
+### V3 to V4
 
-Internal `id` values connect graph objects. `referenceId` is the stable,
-human-facing node label (`N-001`, `N-002`, …). Evidence IDs conventionally use
-`EV-001`, `EV-002`, … and are both registry identity and display reference.
+- Controls retain order and identity and receive sequential `C-001`, `C-002`,
+  … references. The Control high-water mark covers the result.
+- Every Event receives `eventDisplay: "Map"`; no duration, assertion state, or
+  Action completion date is invented.
+- Every incident/node Context item receives `displayMode: "Text"`; no unit is
+  invented.
+- Every Evidence item receives `attachmentIds: []`; root `attachments` is `[]`
+  and its high-water mark is zero. No link or binary is invented.
+- Existing metadata, graph, positions, ordering, IDs, evidence references, and
+  node/evidence allocation history are retained.
 
-`metadata.nodeReferenceHighWaterMark` and
-`metadata.evidenceReferenceHighWaterMark` are optional, non-negative integers
-used by the application allocator. New identities are allocated above the
-greater of the stored mark and the highest well-formed corresponding persisted
-reference. Deletion does not compact numbering or permit reuse; gaps are
-preserved through save and reopen. A stale low mark therefore cannot reuse a
-well-formed extant reference. Importers should preserve marks even when the
-highest-numbered item has been deleted. The marks are allocation history, not
-counts, and semantic validation does not reject a stale mark.
+V1 and V2 first follow the frozen migrations into V3, then the steps above.
+V2 embedded Evidence becomes global `Note` Evidence in deterministic node/item
+order. Legacy enum spellings and retired Action-edge fields are normalized only
+at the documented compatibility boundary; collisions fail rather than being
+silently renumbered. V1 nodes become sequentially referenced Events and legacy
+breach state maps to Control status. See source migration tests for preserved
+legacy details. A metadata-only JSON export containing attachment records can
+be imported, but its binary bytes cannot be reconstructed and previews remain
+unavailable.
 
-## Deterministic migration to V3
+## Explicit non-goals
 
-`parseAndMigrateMapData` is the sole boundary for untrusted persisted JSON.
-Unsupported versions fail. Migration does not mutate the input, and its output
-is validated as canonical V3.
-
-### Version 2 to Version 3
-
-Canonical V2 is parsed using its frozen strict schema. Each node's embedded
-`evidenceItems`, in node-array order and then item-array order, becomes the
-global Evidence registry. Each `{ id, text }` becomes
-`{ id, type: "Note", title: text }`, and that node receives the same IDs in
-`evidenceIds`. Node and metadata `contextItems`, Control `evidenceIds`, and the
-root `evidence` array are materialized; no Event Phase, Action Type, or Control
-Role is inferred. The Evidence high-water mark becomes the greater of its old
-value and the largest well-formed migrated `EV-<digits>` ID. Existing metadata,
-nodes, relationships, Controls, IDs, ordering, positions, and other domain
-fields are retained.
-
-Some early V2 files use a separately recognized compatibility shape. On that
-path only:
-
-- `Procedure` becomes `Process`; `Organization` becomes `Organizational`.
-- Control failure reasons map as `Absent` → `NotInPlace`, `Inadequate` →
-  `InadequateDesign`, `NotUsed` → `NotFollowed`, and `Failed` → `SystemFailure`.
-- Retired node `incidentStatus` and node evidence counters are discarded;
-  metadata status remains authoritative.
-- Retired `ActionEdge.status` and `.dueDate` move to the target Action only when
-  its node-owned value is absent, so explicit Action fields win. They are then
-  removed from the edge.
-
-Migration preserves Evidence IDs; it does not silently renumber collisions.
-Consequently, duplicated embedded V2 Evidence IDs produce an invalid V3 map and
-fail deterministically rather than changing identity.
-
-### Version 1 to Version 3
-
-V1 first transforms through the frozen V2 meaning, then follows the V2-to-V3
-steps above. For each V1 node at zero-based array index `i`, migration preserves
-its content and adds `referenceId` `N-${i + 1}` padded to three digits,
-`nodeType: "Event"`, and empty embedded Evidence. The node high-water mark is
-the node count and the initial Evidence mark is zero. A legacy Control with
-`breached: false` becomes `Effective`; `breached: true` becomes `Failed`.
-Non-empty `breachedItems` are newline-joined into `failureDetails`. IDs,
-ordering, coordinates, edges, endpoint references, descriptions, owners,
-timestamps, consequences, and metadata title are retained. No Event Phase or
-Context is invented.
-
-Every subsequent save emits only canonical V3. A future incompatible contract
-requires a new schema version and an explicit deterministic migration.
-
-## Chronology and persistence boundary
-
-Chronology is a derived view over Events, not another persisted timeline. Valid
-timestamps sort by parsed instant and Event Phase organizes the story. Missing
-or invalid timestamps remain visible at the bottom in **Untimed Events**.
-Whether Chronology is open is ephemeral UI state and is neither serialized nor
-placed in undo history.
+V4 does not provide hosted/cloud storage, collaboration, identity, permissions,
+an audit log, AI-generated summaries, a reporting database, regulatory
+certification, visual/PDF report export, or manual story authoring. Case Summary,
+lenses, Chronology, and Guided Story are derived review views, not persisted
+parallel truth or causal inference.
