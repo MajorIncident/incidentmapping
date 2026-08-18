@@ -178,9 +178,13 @@ describe("presentation mode 2.0", () => {
     expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Chronology" })).toBeVisible();
     fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
+    expect(screen.getByText("· 2 of 2")).toBeVisible();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(await screen.findByText("WHY DID IT HAPPEN?")).toBeVisible();
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
+    expect(screen.getByText("· 2 of 2")).toBeVisible();
   });
 
   it("moves advanced lenses into Explore and resumes the briefing", async () => {

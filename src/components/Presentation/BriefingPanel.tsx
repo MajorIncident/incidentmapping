@@ -75,10 +75,13 @@ export const BriefingPanel = ({
         ))}
       </div>
       <p className="briefing-panel__chapter">
-        {chapter.title}
-        {chapter.steps.length > 1
-          ? ` · ${stepIndex + 1} of ${chapter.steps.length}`
-          : ""}
+        <span>{chapter.title}</span>
+        {chapter.steps.length > 1 ? (
+          <span className="briefing-panel__step-position">
+            {" "}
+            · {stepIndex + 1} of {chapter.steps.length}
+          </span>
+        ) : null}
       </p>
       <h2 id="briefing-step-title" tabIndex={-1}>
         {step.title}
