@@ -332,8 +332,12 @@ export const layoutHierarchy = <Data>(
       y: levelY[depth.get(id) ?? 0],
     });
     positions.set(id, sourcePosition);
-    let actionTop = sourcePosition.y;
-    for (const action of actionsBySource.get(id) ?? []) {
+    const actions = actionsBySource.get(id) ?? [];
+    let actionTop =
+      sourcePosition.y +
+      nodeSize.height / 2 -
+      (actionColumns.get(id)?.height ?? 0) / 2;
+    for (const action of actions) {
       actionPositions.set(
         action.id,
         snapPosition({
@@ -559,22 +563,24 @@ export const layoutHierarchy = <Data>(
   chronologyNodes.forEach((node) => {
     const position = snapPosition({ x: chronologyX, y: chronologyTop });
     positions.set(node.id, position);
-    let actionTop = position.y;
-    for (const action of actionsBySource.get(node.id) ?? []) {
+    const nodeSize = getNodeSize(node, canvasDetail);
+    const actions = actionsBySource.get(node.id) ?? [];
+    let actionTop =
+      position.y +
+      nodeSize.height / 2 -
+      (actionColumns.get(node.id)?.height ?? 0) / 2;
+    for (const action of actions) {
       actionPositions.set(
         action.id,
         snapPosition({
-          x:
-            chronologyX +
-            getNodeSize(node, canvasDetail).width +
-            ACTION_HORIZONTAL_GAP,
+          x: chronologyX + nodeSize.width + ACTION_HORIZONTAL_GAP,
           y: actionTop,
         }),
       );
       actionTop +=
         getNodeSize(action, canvasDetail).height + ACTION_VERTICAL_GAP;
     }
-    chronologyTop += getNodeSize(node, canvasDetail).height + VERTICAL_GAP;
+    chronologyTop += nodeSize.height + VERTICAL_GAP;
   });
 
   const causalResult = nonActionNodes.map((node) => ({

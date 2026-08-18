@@ -285,6 +285,42 @@ describe("layoutHierarchy", () => {
     expect(after.find((item) => item.id === "action")!.position.x % 8).toBe(0);
   });
 
+  it("centers unequal measured Action heights on their source", () => {
+    const source = { ...node("root"), width: 256, height: 200 };
+    const action = { ...actionNode("action"), width: 232, height: 120 };
+    const result = layoutHierarchy(
+      [source, action],
+      [{ ...edge("root", "action"), data: { kind: "ActionEdge" } }],
+      false,
+    );
+    const byId = new Map(result.map((item) => [item.id, item]));
+
+    expect(byId.get("action")!.position.y + 120 / 2).toBe(
+      byId.get("root")!.position.y + 200 / 2,
+    );
+  });
+
+  it("centers the aggregate bounds of unequal measured Actions", () => {
+    const source = { ...node("root"), width: 256, height: 216 };
+    const short = { ...actionNode("short"), width: 224, height: 80 };
+    const tall = { ...actionNode("tall"), width: 240, height: 112 };
+    const result = layoutHierarchy(
+      [source, short, tall],
+      [
+        { ...edge("root", "short"), data: { kind: "ActionEdge" } },
+        { ...edge("root", "tall"), data: { kind: "ActionEdge" } },
+      ],
+      false,
+    );
+    const byId = new Map(result.map((item) => [item.id, item]));
+    const stackTop = byId.get("short")!.position.y;
+    const stackBottom = byId.get("tall")!.position.y + 112;
+
+    expect((stackTop + stackBottom) / 2).toBe(
+      byId.get("root")!.position.y + 216 / 2,
+    );
+  });
+
   it("stacks actions deterministically and remains idempotent", () => {
     const nodes = [node("root", 7, 11), actionNode("a2"), actionNode("a1")];
     const edges: Edge[] = [

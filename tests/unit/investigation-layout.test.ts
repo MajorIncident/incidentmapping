@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { layoutInvestigation } from "../../src/features/layout/investigationLayout";
 import type { InvestigationLayoutInput } from "../../src/features/layout/layoutModel";
+import { ACTION_GAP } from "../../src/features/layout/geometry/spacing";
 import { loadLayoutFixture } from "../helpers/layout/fixtures";
 
 const base: InvestigationLayoutInput = {
@@ -138,6 +139,88 @@ describe("post-causal projections", () => {
     expect(
       result.relationships.find((edge) => edge.id === "action-edge")?.route[0],
     ).toEqual({ x: root.x + root.width, y: root.y + root.height / 2 });
+  });
+
+  it("centers measured Actions and their routes on a differently sized source", () => {
+    const result = layoutInvestigation(
+      {
+        nodes: [
+          {
+            id: "root",
+            kind: "Event",
+            dimensions: { width: 248, height: 176 },
+          },
+        ],
+        relationships: [
+          {
+            id: "action-edge",
+            kind: "Action",
+            fromId: "root",
+            toId: "action",
+          },
+        ],
+        actions: [
+          {
+            id: "action",
+            kind: "Action",
+            attachedToId: "root",
+            dimensions: { width: 232, height: 96 },
+          },
+        ],
+      },
+      { mode: "ArrangeMap" },
+    );
+    const root = result.nodes.find((node) => node.id === "root")!.rectangle;
+    const action = result.nodes.find((node) => node.id === "action")!.rectangle;
+    const route = result.relationships.find(
+      (edge) => edge.id === "action-edge",
+    )!.route;
+
+    expect(action.y + action.height / 2).toBe(root.y + root.height / 2);
+    expect(route.every((point) => point.y === root.y + root.height / 2)).toBe(
+      true,
+    );
+  });
+
+  it("centers the aggregate bounds of a measured Action stack", () => {
+    const result = layoutInvestigation(
+      {
+        nodes: [
+          {
+            id: "root",
+            kind: "Event",
+            dimensions: { width: 240, height: 216 },
+          },
+        ],
+        relationships: [],
+        actions: [
+          {
+            id: "short",
+            kind: "Action",
+            attachedToId: "root",
+            dimensions: { width: 224, height: 80 },
+          },
+          {
+            id: "tall",
+            kind: "Action",
+            attachedToId: "root",
+            dimensions: { width: 240, height: 112 },
+          },
+        ],
+      },
+      { mode: "ArrangeMap" },
+    );
+    const root = result.nodes.find((node) => node.id === "root")!.rectangle;
+    const actions = ["short", "tall"].map(
+      (id) => result.nodes.find((node) => node.id === id)!.rectangle,
+    );
+    const top = Math.min(...actions.map((action) => action.y));
+    const bottom = Math.max(
+      ...actions.map((action) => action.y + action.height),
+    );
+
+    expect(actions[1].y - (actions[0].y + actions[0].height)).toBe(ACTION_GAP);
+    expect((top + bottom) / 2).toBe(root.y + root.height / 2);
   });
 
   it("does not move causal nodes when an Action is added", async () => {
