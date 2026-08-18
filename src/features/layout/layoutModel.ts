@@ -21,6 +21,8 @@ export type SemanticNode = Readonly<{
   position?: Point;
   dimensions?: MeasuredDimensions;
   layoutHints?: LayoutHints;
+  /** Events excluded from the causal graph and projected into the chronology lane. */
+  eventDisplay?: "Map" | "ChronologyOnly";
 }>;
 
 export type Action = Readonly<{
@@ -111,6 +113,8 @@ export type LayoutResult = Readonly<{
   /** Ephemeral drawing geometry; these are not map entities and are never persisted. */
   sharedSegments: readonly SharedRouteSegment[];
   bounds: Rectangle;
+  /** Bounds of the causal semantic graph, excluding Actions and chronology. */
+  causalBounds: Rectangle;
 }>;
 
 export type InvestigationLayoutInput = Readonly<{

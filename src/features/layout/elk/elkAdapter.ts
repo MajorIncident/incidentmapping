@@ -387,5 +387,21 @@ export const layoutWithElk = async (
         ...nodes.map((node) => node.rectangle.y + node.rectangle.height),
       ),
     },
+    causalBounds: {
+      x: 0,
+      y: 0,
+      width: Math.max(
+        0,
+        ...nodes
+          .filter((node) => node.role === "Semantic")
+          .map((node) => node.rectangle.x + node.rectangle.width),
+      ),
+      height: Math.max(
+        0,
+        ...nodes
+          .filter((node) => node.role === "Semantic")
+          .map((node) => node.rectangle.y + node.rectangle.height),
+      ),
+    },
   };
 };

@@ -19,10 +19,6 @@ import { selectContextGroups } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
 import { BRANCH_LANE_GAP, edgeTypes, routeIncidentEdge } from "./IncidentEdge";
 import {
-  CHRONOLOGY_GUTTER,
-  CAUSAL_ROW_GAP,
-} from "../../features/layout/geometry/spacing";
-import {
   CHAIN_NODE_HEIGHT,
   CHAIN_NODE_WIDTH,
   CONTROL_NODE_HEIGHT,
@@ -277,28 +273,11 @@ export const Canvas = ({
     if (!showTimelineEvents && presentationLens !== "Chronology") return normal;
     const timeline = chainNodes
       .filter((node) => node.data.eventDisplay === "ChronologyOnly")
-      .slice()
-      .sort(
-        (a, b) =>
-          Date.parse(a.data.timestamp ?? "") -
-            Date.parse(b.data.timestamp ?? "") || a.id.localeCompare(b.id),
-      );
-    const right =
-      Math.max(
-        0,
-        ...normal.map(
-          (node) => node.position.x + (node.width ?? CHAIN_NODE_WIDTH),
-        ),
-      ) + CHRONOLOGY_GUTTER;
-    const top = Math.min(0, ...normal.map((node) => node.position.y));
+      .slice();
     return [
       ...normal,
-      ...timeline.map((node, index) => ({
+      ...timeline.map((node) => ({
         ...node,
-        position: {
-          x: right,
-          y: top + index * (CHAIN_NODE_HEIGHT + CAUSAL_ROW_GAP),
-        },
         className: `${node.className ?? ""} timeline-event-node`,
       })),
     ];

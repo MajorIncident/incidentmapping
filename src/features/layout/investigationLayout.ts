@@ -6,23 +6,27 @@ import {
 } from "./dimensions";
 import {
   ACTION_GAP,
-  ACTION_GUTTER,
   CAUSAL_ROW_GAP,
+  CHRONOLOGY_GUTTER,
   CONTROL_BAND_HEIGHT,
   SIBLING_GAP,
 } from "./geometry/spacing";
 import type {
   InvestigationLayoutInput,
   InvestigationLayoutOptions,
+  CausalRelationship,
   LayoutNodeGeometry,
   LayoutResult,
   MeasuredDimensions,
-  OrthogonalRoute,
   Point,
   Rectangle,
   RoutedRelationship,
 } from "./layoutModel";
 import { routeCausalRelationships } from "./routing/causalRouting";
+import {
+  placeActionStacks,
+  routeActionRelationships,
+} from "./routing/actionRouting";
 
 type PositionedSize = Readonly<{
   position: Point;
@@ -72,17 +76,18 @@ const size = (
   dimensions: MeasuredDimensions | undefined,
   fallback: MeasuredDimensions,
 ) => dimensions ?? fallback;
-const centerTop = (rectangle: Rectangle): Point => ({
-  x: rectangle.x + rectangle.width / 2,
-  y: rectangle.y,
-});
-const centerBottom = (rectangle: Rectangle): Point => ({
-  x: rectangle.x + rectangle.width / 2,
-  y: rectangle.y + rectangle.height,
-});
-const orthogonal = (from: Point, to: Point): OrthogonalRoute => {
-  const middleY = (from.y + to.y) / 2;
-  return [from, { x: from.x, y: middleY }, { x: to.x, y: middleY }, to];
+const boundsOf = (nodes: readonly LayoutNodeGeometry[]): Rectangle => {
+  const left = Math.min(0, ...nodes.map((node) => node.rectangle.x));
+  const top = Math.min(0, ...nodes.map((node) => node.rectangle.y));
+  const right = Math.max(
+    0,
+    ...nodes.map((node) => node.rectangle.x + node.rectangle.width),
+  );
+  const bottom = Math.max(
+    0,
+    ...nodes.map((node) => node.rectangle.y + node.rectangle.height),
+  );
+  return { x: left, y: top, width: right - left, height: bottom - top };
 };
 
 /**
@@ -97,18 +102,29 @@ export const layoutInvestigation = async (
   const hGap = options.horizontalGap ?? SIBLING_GAP;
   const vGap = options.verticalGap ?? CAUSAL_ROW_GAP;
   const snap = (value: number) => Math.round(value / grid) * grid;
-  const causal = input.relationships.filter((edge) => edge.kind === "Causal");
+  const chronologyIds = new Set(
+    input.nodes
+      .filter((node) => node.eventDisplay === "ChronologyOnly")
+      .map((node) => node.id),
+  );
+  const causalNodes = input.nodes.filter((node) => !chronologyIds.has(node.id));
+  const causal = input.relationships.filter(
+    (edge): edge is CausalRelationship =>
+      edge.kind === "Causal" &&
+      !chronologyIds.has(edge.fromId) &&
+      !chronologyIds.has(edge.toId),
+  );
   // Rank is graph structure, never node classification or a claimed parent.
-  const rank = new Map(input.nodes.map((node) => [node.id, 0]));
+  const rank = new Map(causalNodes.map((node) => [node.id, 0]));
   const children = new Map<string, string[]>();
-  const remaining = new Map(input.nodes.map((node) => [node.id, 0]));
+  const remaining = new Map(causalNodes.map((node) => [node.id, 0]));
   causal.forEach((edge) => {
     const next = children.get(edge.fromId) ?? [];
     if (!next.includes(edge.toId)) next.push(edge.toId);
     children.set(edge.fromId, next);
     remaining.set(edge.toId, (remaining.get(edge.toId) ?? 0) + 1);
   });
-  const queue = input.nodes
+  const queue = causalNodes
     .filter((node) => remaining.get(node.id) === 0)
     .sort(
       (a, b) =>
@@ -127,7 +143,7 @@ export const layoutInvestigation = async (
     }
   }
   const rankHeights = new Map<number, number>();
-  input.nodes.forEach((node) => {
+  causalNodes.forEach((node) => {
     const dimensions = size(node.dimensions, {
       width: CHAIN_NODE_WIDTH,
       height: CHAIN_NODE_HEIGHT,
@@ -147,7 +163,7 @@ export const layoutInvestigation = async (
       origin += rankHeights.get(level)! + vGap + CONTROL_BAND_HEIGHT;
     });
   const rankOrder = new Map<number, number>();
-  const geometries: LayoutNodeGeometry[] = input.nodes.map((node) => {
+  const geometries: LayoutNodeGeometry[] = causalNodes.map((node) => {
     const dimensions = size(node.dimensions, {
       width: CHAIN_NODE_WIDTH,
       height: CHAIN_NODE_HEIGHT,
@@ -170,28 +186,6 @@ export const layoutInvestigation = async (
     };
   });
   const byId = new Map(geometries.map((node) => [node.id, node]));
-
-  for (const action of input.actions ?? []) {
-    const anchor = byId.get(action.attachedToId);
-    const dimensions = size(action.dimensions, {
-      width: CHAIN_NODE_WIDTH,
-      height: CHAIN_NODE_HEIGHT,
-    });
-    const position = action.position ?? {
-      x:
-        (anchor?.rectangle.x ?? 0) +
-        (anchor?.rectangle.width ?? 0) +
-        ACTION_GUTTER,
-      y: anchor?.rectangle.y ?? 0,
-    };
-    const geometry: LayoutNodeGeometry = {
-      id: action.id,
-      role: "Action",
-      rectangle: { x: snap(position.x), y: snap(position.y), ...dimensions },
-    };
-    geometries.push(geometry);
-    byId.set(action.id, geometry);
-  }
 
   const controlsByRelationship = new Map(
     (input.controls ?? []).map((control) => [control.relationshipId, control]),
@@ -239,38 +233,61 @@ export const layoutInvestigation = async (
     });
   });
 
+  // Causal routing is deliberately complete before auxiliary projections exist.
   const causalRouting = routeCausalRelationships(causal, geometries);
-  const routed: RoutedRelationship[] = [...causalRouting.relationships];
-  for (const edge of input.relationships.filter(
-    (item) => item.kind === "Action",
-  )) {
-    const from = byId.get(edge.fromId);
-    const to = byId.get(edge.toId);
-    if (!from || !to) continue;
-    routed.push({
-      id: edge.id,
-      relationshipId: edge.id,
-      kind: edge.kind,
-      fromId: edge.fromId,
-      toId: edge.toId,
-      role: "Direct",
-      route: orthogonal(centerBottom(from.rectangle), centerTop(to.rectangle)),
+  const causalBounds = boundsOf(
+    geometries.filter((node) => node.role === "Semantic"),
+  );
+
+  const chronology = input.nodes
+    .filter((node) => chronologyIds.has(node.id))
+    .sort((a, b) => {
+      const ai = input.chronology?.find((item) => item.nodeId === a.id);
+      const bi = input.chronology?.find((item) => item.nodeId === b.id);
+      return (
+        (ai?.order ?? Date.parse(ai?.timestamp ?? "")) -
+          (bi?.order ?? Date.parse(bi?.timestamp ?? "")) ||
+        a.id.localeCompare(b.id)
+      );
     });
-  }
-  const left = Math.min(0, ...geometries.map((node) => node.rectangle.x));
-  const top = Math.min(0, ...geometries.map((node) => node.rectangle.y));
-  const right = Math.max(
-    0,
-    ...geometries.map((node) => node.rectangle.x + node.rectangle.width),
+  let chronologyY = causalBounds.y;
+  chronology.forEach((node) => {
+    const dimensions = size(node.dimensions, {
+      width: CHAIN_NODE_WIDTH,
+      height: CHAIN_NODE_HEIGHT,
+    });
+    const geometry: LayoutNodeGeometry = {
+      id: node.id,
+      role: "Semantic",
+      rectangle: {
+        x: snap(causalBounds.x + causalBounds.width + CHRONOLOGY_GUTTER),
+        y: snap(chronologyY),
+        ...dimensions,
+      },
+    };
+    chronologyY += dimensions.height + vGap;
+    geometries.push(geometry);
+  });
+
+  const actionGeometries = placeActionStacks(
+    input.actions ?? [],
+    geometries.filter((node) => node.role === "Semantic"),
+    causalBounds,
+    snap,
   );
-  const bottom = Math.max(
-    0,
-    ...geometries.map((node) => node.rectangle.y + node.rectangle.height),
-  );
+  geometries.push(...actionGeometries);
+  const routed: RoutedRelationship[] = [
+    ...causalRouting.relationships,
+    ...routeActionRelationships(
+      input.relationships.filter((item) => item.kind === "Action"),
+      geometries,
+    ),
+  ];
   return {
     nodes: geometries,
     relationships: routed,
     sharedSegments: causalRouting.sharedSegments,
-    bounds: { x: left, y: top, width: right - left, height: bottom - top },
+    bounds: boundsOf(geometries),
+    causalBounds,
   };
 };
