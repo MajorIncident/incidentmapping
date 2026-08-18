@@ -14,7 +14,7 @@ import {
   OBJECT_CLEARANCE,
   SIBLING_GAP,
   SUBTREE_GAP,
-  requiredControlBandForNextRank,
+  requiredRankInterval,
 } from "./geometry/spacing";
 import {
   centerAlignmentDelta,
@@ -334,11 +334,21 @@ export const layoutHierarchy = <Data>(
     ]);
   });
   for (let level = 0; level < maxDepth; level += 1) {
+    const intervalEdges = causalEdges.filter(
+      (edge) =>
+        (depth.get(edge.source) ?? 0) === level &&
+        (depth.get(edge.target) ?? 0) === level + 1,
+    );
+    const requiresRail = intervalEdges.some(
+      (edge) =>
+        (adjacency.get(edge.source)?.length ?? 0) > 1 ||
+        (incoming.get(edge.target) ?? 0) > 1,
+    );
     levelY[level + 1] =
       levelY[level] +
       levelHeights[level] +
-      VERTICAL_GAP +
-      requiredControlBandForNextRank(
+      requiredRankInterval(
+        requiresRail,
         controlHeightsByLevel.get(level + 1) ?? [],
       );
   }
@@ -605,6 +615,7 @@ export const layoutHierarchy = <Data>(
           .filter(
             (other) =>
               !moving.has(other.owner) &&
+              other.owner !== parentId &&
               !object.associated.has(other.owner) &&
               !other.associated.has(object.owner),
           )
@@ -619,7 +630,6 @@ export const layoutHierarchy = <Data>(
       );
     if (!safe) continue;
     shiftSubtree(childId, delta);
-    recenterAncestors(childId);
   }
 
   causalRight = Math.max(

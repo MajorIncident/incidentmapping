@@ -9,7 +9,7 @@ import {
   CAUSAL_ROW_GAP,
   CHRONOLOGY_GUTTER,
   SIBLING_GAP,
-  requiredControlBandForNextRank,
+  requiredRankInterval,
 } from "./geometry/spacing";
 import type {
   InvestigationLayoutInput,
@@ -104,7 +104,7 @@ export const layoutInvestigation = (
 ): LayoutResult => {
   const grid = options.gridSize ?? 8;
   const hGap = options.horizontalGap ?? SIBLING_GAP;
-  const vGap = options.verticalGap ?? CAUSAL_ROW_GAP;
+  const vGap = options.verticalGap;
   const snap = (value: number) => Math.round(value / grid) * grid;
   const chronologyIds = new Set(
     input.nodes
@@ -134,6 +134,12 @@ export const layoutInvestigation = (
     if (!next.includes(edge.toId)) next.push(edge.toId);
     children.set(edge.fromId, next);
     remaining.set(edge.toId, (remaining.get(edge.toId) ?? 0) + 1);
+  });
+  const outgoingDegree = new Map<string, number>();
+  const incomingDegree = new Map<string, number>();
+  causal.forEach((edge) => {
+    outgoingDegree.set(edge.fromId, (outgoingDegree.get(edge.fromId) ?? 0) + 1);
+    incomingDegree.set(edge.toId, (incomingDegree.get(edge.toId) ?? 0) + 1);
   });
   const queue = causalNodes
     .filter((node) => remaining.get(node.id) === 0)
@@ -179,17 +185,28 @@ export const layoutInvestigation = (
       control.dimensions?.height ?? CONTROL_NODE_HEIGHT,
     ]);
   });
+  const intervalBeforeRank = (targetLevel: number) => {
+    const intervalEdges = causal.filter(
+      (edge) =>
+        (rank.get(edge.fromId) ?? 0) === targetLevel - 1 &&
+        (rank.get(edge.toId) ?? 0) === targetLevel,
+    );
+    return requiredRankInterval(
+      intervalEdges.some(
+        (edge) =>
+          (outgoingDegree.get(edge.fromId) ?? 0) > 1 ||
+          (incomingDegree.get(edge.toId) ?? 0) > 1,
+      ),
+      controlHeightsByRank.get(targetLevel) ?? [],
+    );
+  };
   let origin = 0;
   [...rankHeights.keys()]
     .sort((a, b) => a - b)
     .forEach((level) => {
       rankOrigins.set(level, origin);
       origin +=
-        rankHeights.get(level)! +
-        vGap +
-        requiredControlBandForNextRank(
-          controlHeightsByRank.get(level + 1) ?? [],
-        );
+        rankHeights.get(level)! + (vGap ?? intervalBeforeRank(level + 1));
     });
   const rankOrder = new Map<number, number>();
   const prior = new Map(
@@ -286,10 +303,7 @@ export const layoutInvestigation = (
         (added.rectangle as { y: number }).y = snap(
           parent.rectangle.y +
             parent.rectangle.height +
-            vGap +
-            requiredControlBandForNextRank(
-              controlHeightsByRank.get(rank.get(addedId) ?? 0) ?? [],
-            ),
+            (vGap ?? intervalBeforeRank(rank.get(addedId) ?? 0)),
         );
     }
   }
@@ -458,7 +472,7 @@ export const layoutInvestigation = (
         ...dimensions,
       },
     };
-    chronologyY += dimensions.height + vGap;
+    chronologyY += dimensions.height + (vGap ?? CAUSAL_ROW_GAP);
     geometries.push(geometry);
   });
 

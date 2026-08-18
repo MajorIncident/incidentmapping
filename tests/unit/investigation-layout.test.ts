@@ -3,9 +3,9 @@ import { layoutInvestigation } from "../../src/features/layout/investigationLayo
 import type { InvestigationLayoutInput } from "../../src/features/layout/layoutModel";
 import {
   ACTION_GAP,
-  CAUSAL_ROW_GAP,
-  CONTROL_BAND_HEIGHT,
-  OBJECT_CLEARANCE,
+  CARD_COLLISION_CLEARANCE,
+  CONTROL_BEARING_INTERVAL,
+  DIRECT_CAUSAL_EDGE_GAP,
 } from "../../src/features/layout/geometry/spacing";
 import { loadLayoutFixture } from "../helpers/layout/fixtures";
 
@@ -51,8 +51,12 @@ describe("post-causal projections", () => {
     const nodes = ["one", "two", "three"].map(
       (id) => result.nodes.find((node) => node.id === id)!.rectangle,
     );
-    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(CAUSAL_ROW_GAP);
-    expect(nodes[2].y - nodes[1].y - nodes[1].height).toBe(CAUSAL_ROW_GAP);
+    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(
+      DIRECT_CAUSAL_EDGE_GAP,
+    );
+    expect(nodes[2].y - nodes[1].y - nodes[1].height).toBe(
+      DIRECT_CAUSAL_EDGE_GAP,
+    );
   });
 
   it("expands only the interval whose incoming edge has a Control", () => {
@@ -60,9 +64,11 @@ describe("post-causal projections", () => {
     const nodes = ["one", "two", "three"].map(
       (id) => result.nodes.find((node) => node.id === id)!.rectangle,
     );
-    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(CAUSAL_ROW_GAP);
+    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(
+      DIRECT_CAUSAL_EDGE_GAP,
+    );
     expect(nodes[2].y - nodes[1].y - nodes[1].height).toBe(
-      CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT,
+      CONTROL_BEARING_INTERVAL,
     );
   });
 
@@ -78,9 +84,9 @@ describe("post-causal projections", () => {
       )!.rectangle;
       return downstream.y - upstream.y - upstream.height;
     };
-    expect(interval(short)).toBe(CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT);
+    expect(interval(short)).toBe(CONTROL_BEARING_INTERVAL);
     expect(interval(tall)).toBeGreaterThanOrEqual(
-      CAUSAL_ROW_GAP + 260 + OBJECT_CLEARANCE,
+      260 + 2 * CARD_COLLISION_CLEARANCE,
     );
     const control = tall.nodes.find((node) => node.id === "control")!.rectangle;
     const upstream = tall.nodes.find((node) => node.id === "two")!.rectangle;

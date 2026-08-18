@@ -13,7 +13,7 @@ import {
   CAUSAL_ROW_GAP,
   OBJECT_CLEARANCE,
   SIBLING_GAP,
-  requiredControlBandForNextRank,
+  requiredRankInterval,
 } from "../geometry/spacing";
 import type {
   CausalRouteRole,
@@ -302,10 +302,20 @@ export const layoutWithElk = async (
         right = x + member.rectangle.width;
       });
       const nextLevel = level + 1;
+      const intervalEdges = causal.filter(
+        (edge) =>
+          (rank.get(edge.fromId) ?? 0) === level &&
+          (rank.get(edge.toId) ?? 0) === nextLevel,
+      );
+      const requiresRail = intervalEdges.some(
+        (edge) =>
+          (outgoing.get(edge.fromId) ?? 0) > 1 ||
+          (incoming.get(edge.toId) ?? 0) > 1,
+      );
       rankY +=
         Math.max(...members.map((member) => member.rectangle.height)) +
-        CAUSAL_ROW_GAP +
-        requiredControlBandForNextRank(
+        requiredRankInterval(
+          requiresRail,
           controlHeightsByRank.get(nextLevel) ?? [],
         );
     });
