@@ -31,6 +31,7 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
   const nodes = useAppStore((state) => state.nodes);
   const controls = useAppStore((state) => state.barriers);
   const actions = useAppStore((state) => state.actions);
+  const editorRequest = useAppStore((state) => state.editorFocusRequest);
   const attachments = useAppStore((state) => state.attachments);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
@@ -53,6 +54,7 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
   const addButton = useRef<HTMLButtonElement>(null);
   const linkButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
     type: "Note" as EvidenceType,
     title: "",
@@ -62,6 +64,26 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
     externalUrl: "",
     attachmentIds: [] as string[],
   });
+
+  useEffect(() => {
+    if (
+      editorRequest?.entityId !== target.id ||
+      editorRequest.section !== "Evidence"
+    )
+      return;
+    if (editorRequest.intent === "Create") {
+      setAdding(true);
+      setLinking(false);
+    } else {
+      setLinking(true);
+      setAdding(false);
+    }
+    actions.clearEditorFocusRequest(editorRequest.id);
+  }, [actions, editorRequest, target.id]);
+
+  useEffect(() => {
+    if (adding) requestAnimationFrame(() => titleInput.current?.focus());
+  }, [adding]);
 
   useEffect(() => {
     if (!linking) return;
@@ -309,7 +331,7 @@ export const EvidenceSection = ({ target }: { target: EvidenceTarget }) => {
           <label className="block text-xs font-semibold">
             Title
             <input
-              autoFocus
+              ref={titleInput}
               required
               className={input}
               value={draft.title}

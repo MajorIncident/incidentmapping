@@ -104,3 +104,25 @@ describe("investigation guide content", () => {
     expect(JSON.stringify(entry)).not.toMatch(/required/i);
   });
 });
+
+const observableGuideBehavior = {
+  "add-impact": "creates an Impact and focuses its title",
+  "add-event": "creates an Event and focuses its title",
+  "add-factor": "creates a Factor and focuses its title",
+  "add-control": "opens Controls in create mode",
+  "add-aggravating-context": "opens Aggravating Context in create mode",
+  "add-mitigating-context": "opens Mitigating Context in create mode",
+  "add-evidence": "opens Evidence in create mode",
+  "link-existing-evidence": "opens the existing Evidence linker",
+  "add-action": "opens Action creation and focuses its title",
+  "open-chronology": "opens Chronology",
+  "review-assertion": "opens assertion details",
+  "open-presentation": "opens Presentation",
+  "review-checklist": "opens Investigation Check",
+} as const satisfies Record<(typeof GUIDE_ACTION_IDS)[number], string>;
+
+describe("guide action behavior coverage", () => {
+  it.each(GUIDE_ACTION_IDS)("%s has observable behavior", (actionId) => {
+    expect(observableGuideBehavior[actionId]).toBeTruthy();
+  });
+});

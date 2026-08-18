@@ -25,6 +25,7 @@ import {
   setLearningGuideEnabled as persistLearningGuideEnabled,
 } from "../features/guidance/preferences";
 import type { GuideActionId } from "../content/investigationGuide";
+import { assertNever } from "../utils/assertNever";
 import { LearnMapDialog } from "../components/LearningGuide/LearnMapDialog";
 import { InvestigationCheck } from "../components/InvestigationCheck/InvestigationCheck";
 
@@ -120,66 +121,75 @@ export const App = (): JSX.Element => {
 
   const runGuideAction = (action: GuideActionId) => {
     const state = useAppStore.getState();
-    if (action === "open-chronology") {
-      setChronologyOpen(true);
-      return;
-    }
-    if (action === "open-presentation") {
-      setPresenting(true);
-      return;
-    }
-    if (action === "review-assertion") {
-      if (state.selectionId) {
-        setInspectorSection("More details");
-        setInspectorOpen(true);
-      }
-      return;
-    }
-    if (action === "add-action") {
-      setInspectorSection("Actions");
-      setInspectorOpen(true);
-      state.actions.addAction(state.selectionId ?? undefined);
-      return;
-    }
-    if (
-      action === "add-aggravating-context" ||
-      action === "add-mitigating-context"
-    ) {
+    const selectedId = state.selectionId;
+    const openEditor = (
+      section: Parameters<typeof state.actions.requestEditorSection>[1],
+      intent: "Open" | "Create" = "Open",
+    ) => {
+      if (!selectedId) return;
       setInspectorSection(
-        action === "add-aggravating-context"
+        section === "ContextAggravating"
           ? "Aggravating Context"
-          : "Mitigating Context",
+          : section === "ContextMitigating"
+            ? "Mitigating Context"
+            : section === "Control"
+              ? "Controls"
+              : section === "Action"
+                ? "Actions"
+                : section,
       );
       setInspectorOpen(true);
-      return;
-    }
-    if (action === "add-control") {
-      setInspectorSection("Controls");
-      setInspectorOpen(true);
-      return;
-    }
-    if (action === "link-existing-evidence") {
-      setInspectorSection("Evidence");
-      setInspectorOpen(true);
-      return;
-    }
-    const types = {
-      "add-impact": "Impact",
-      "add-event": "Event",
-      "add-factor": "Factor",
-    } as const;
-    if (action in types) {
-      setInspectorOpen(true);
-      state.actions.addSemanticNode(
-        types[action as keyof typeof types],
-        state.selectionId ?? undefined,
-      );
-      return;
-    }
-    if (action === "add-evidence" && state.selectionId) {
-      setInspectorSection("Evidence");
-      setInspectorOpen(true);
-      state.actions.addEvidence(state.selectionId, "New evidence");
+      state.actions.requestEditorSection(selectedId, section, intent);
+    };
+
+    switch (action) {
+      case "add-impact":
+        setInspectorOpen(true);
+        state.actions.addSemanticNode("Impact", selectedId ?? undefined);
+        return;
+      case "add-event":
+        setInspectorOpen(true);
+        state.actions.addSemanticNode("Event", selectedId ?? undefined);
+        return;
+      case "add-factor":
+        setInspectorOpen(true);
+        state.actions.addSemanticNode("Factor", selectedId ?? undefined);
+        return;
+      case "add-control":
+        openEditor("Control", "Create");
+        return;
+      case "add-aggravating-context":
+        openEditor("ContextAggravating", "Create");
+        return;
+      case "add-mitigating-context":
+        openEditor("ContextMitigating", "Create");
+        return;
+      case "add-evidence":
+        openEditor("Evidence", "Create");
+        return;
+      case "link-existing-evidence":
+        openEditor("Evidence", "Open");
+        return;
+      case "add-action":
+        openEditor("Action", "Create");
+        return;
+      case "open-chronology":
+        setChronologyOpen(true);
+        return;
+      case "review-assertion":
+        if (selectedId) {
+          setInspectorSection("More details");
+          setInspectorOpen(true);
+        }
+        return;
+      case "open-presentation":
+        setPresenting(true);
+        return;
+      case "review-checklist":
+        setInvestigationCheckOpen(true);
+        return;
+      default:
+        return assertNever(action);
     }
   };
   const exitStory = useCallback(() => setStory(null), []);
@@ -194,7 +204,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     // Description/control-purpose focus is an explicit request for Inspector
     // detail. The fresh-map title request remains an inline canvas edit.
-    if (editorFocusRequest && editorFocusRequest.field !== "title") {
+    if (editorFocusRequest && editorFocusRequest.section !== "Title") {
       setInspectorOpen(true);
     }
   }, [editorFocusRequest]);
