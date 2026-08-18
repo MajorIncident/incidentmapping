@@ -5,10 +5,11 @@ import type {
 } from "../../content/investigationGuide";
 import type { GuidanceMatch } from "../../features/guidance/selectors";
 import {
-  acknowledgeLearningGuide,
   dismissLearningTip,
-  hasAcknowledgedLearningGuide,
+  hasSeenLearningGuideIntroduction,
+  markLearningGuideIntroductionSeen,
 } from "../../features/guidance/preferences";
+import type { MapSession } from "../../state/useAppStore";
 
 const Blocks = ({ blocks }: { blocks: readonly GuideContentBlock[] }) => (
   <div className="learning-guide__blocks">
@@ -85,6 +86,7 @@ const Blocks = ({ blocks }: { blocks: readonly GuideContentBlock[] }) => (
 export type LearningGuideProps = {
   match: GuidanceMatch | null;
   enabled: boolean;
+  mapSession?: Readonly<MapSession>;
   onAction: (action: GuideActionId) => void;
   onDismissed?: () => void;
 };
@@ -92,14 +94,24 @@ export type LearningGuideProps = {
 export const LearningGuide = ({
   match,
   enabled,
+  mapSession,
   onAction,
   onDismissed,
 }: LearningGuideProps): JSX.Element | null => {
-  const [open, setOpen] = useState(() => !hasAcknowledgedLearningGuide());
+  const [firstUse] = useState(() => !hasSeenLearningGuideIntroduction());
+  const [open, setOpen] = useState(firstUse);
   const [mobile, setMobile] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const hasOpenedRef = useRef(open);
+
+  useEffect(() => {
+    if (firstUse && enabled && match) markLearningGuideIntroductionSeen();
+  }, [enabled, firstUse, match]);
+
+  useEffect(() => {
+    if (mapSession?.source === "New" && mapSession.fresh) setOpen(true);
+  }, [mapSession]);
 
   useEffect(() => {
     const query = window.matchMedia?.("(max-width: 767px)");
@@ -125,7 +137,6 @@ export const LearningGuide = ({
     setOpen(false);
   };
   const expand = () => {
-    acknowledgeLearningGuide();
     setOpen(true);
   };
   const content = (
@@ -149,6 +160,12 @@ export const LearningGuide = ({
           ×
         </button>
       </div>
+      {firstUse ? (
+        <p className="learning-guide__welcome">
+          Welcome to the Learning Guide. Step 1 is to describe the undesirable
+          outcome.
+        </p>
+      ) : null}
       <Blocks blocks={match.entry.content} />
       {match.entry.suggestedActions.length ? (
         <div className="learning-guide__actions" aria-label="Suggested actions">

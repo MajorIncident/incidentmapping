@@ -29,7 +29,8 @@ describe("investigation guidance", () => {
   it("handles missing/default fields without mutating the input", () => {
     const input: GuidanceInput = {};
     const result = selectInvestigationGuidance(input);
-    expect(result.primary?.context).toBe("empty-map");
+    expect(result.contexts).not.toContain("empty-map");
+    expect(result.primary?.mode).not.toBe("Onboarding");
     expect(result.stage).toBe("Getting Started");
     expect(input).toEqual({});
   });
@@ -63,7 +64,7 @@ describe("investigation guidance", () => {
     const result = selectInvestigationGuidance({
       nodes: [node("event", "Event")],
       selectedEntity: "event",
-      newlyCreated: true,
+      mapSession: { source: "New", fresh: true },
     });
     const event = result.matches.find(
       (match) => match.context === "event-selected",

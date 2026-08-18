@@ -57,20 +57,41 @@ describe("Learning Guide", () => {
     expect(onAction).toHaveBeenCalledWith("add-impact");
   });
 
-  it("collapses, expands, restores focus, and acknowledges first use for this session", async () => {
+  it("collapses, expands, restores focus, and persists first-use introduction", async () => {
     render(<LearningGuide match={match} enabled onAction={vi.fn()} />);
     fireEvent.click(
       screen.getByRole("button", { name: "Collapse Learning Guide" }),
     );
     const trigger = screen.getByRole("button", { name: "? Guide" });
     fireEvent.click(trigger);
-    expect(sessionStorage.getItem(learningGuideStorageKeys.acknowledged)).toBe(
-      "true",
-    );
+    expect(
+      localStorage.getItem(learningGuideStorageKeys.introductionSeen),
+    ).toBe("true");
     fireEvent.keyDown(screen.getByRole("complementary"), { key: "Escape" });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "? Guide" })).toHaveFocus(),
     );
+  });
+
+  it("starts later browser sessions compact but opens Step 1 for a new map", () => {
+    localStorage.setItem(learningGuideStorageKeys.introductionSeen, "true");
+    const { rerender } = render(
+      <LearningGuide match={match} enabled onAction={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "? Guide" })).toBeVisible();
+    expect(screen.queryByText(/Welcome to the Learning Guide/)).toBeNull();
+
+    rerender(
+      <LearningGuide
+        match={match}
+        enabled
+        mapSession={{ source: "New", fresh: true }}
+        onAction={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Start with Impact" }),
+    ).toBeVisible();
   });
 
   it("dismisses an individual tip only in session storage", () => {
@@ -110,7 +131,10 @@ describe("Learning Guide", () => {
   });
 
   it("keeps review guidance behind onboarding and selected-object coaching", () => {
-    const onboarding = selectInvestigationGuidance({ presentation: true });
+    const onboarding = selectInvestigationGuidance({
+      presentation: true,
+      mapSession: { source: "New", fresh: true },
+    });
     expect(onboarding.primary?.mode).toBe("Onboarding");
 
     const selection = selectInvestigationGuidance({

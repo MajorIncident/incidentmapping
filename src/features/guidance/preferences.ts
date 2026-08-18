@@ -1,7 +1,7 @@
 const GUIDE_ENABLED_KEY = "incidentmapping.learning-guide.enabled";
 const DISMISSED_TIPS_KEY = "incidentmapping.learning-guide.dismissed-tips";
-const ACKNOWLEDGED_KEY =
-  "incidentmapping.learning-guide.first-use-acknowledged";
+const INTRODUCTION_SEEN_KEY =
+  "incidentmapping.learning-guide.first-use-introduction-seen";
 
 const storage = (kind: "local" | "session"): Storage | null => {
   try {
@@ -48,19 +48,24 @@ export const dismissLearningTip = (id: string): void => {
   }
 };
 
-export const hasAcknowledgedLearningGuide = (): boolean =>
-  sessionGet(ACKNOWLEDGED_KEY) === "true";
-
-export const acknowledgeLearningGuide = (): void => {
+export const hasSeenLearningGuideIntroduction = (): boolean => {
   try {
-    storage("session")?.setItem(ACKNOWLEDGED_KEY, "true");
+    return storage("local")?.getItem(INTRODUCTION_SEEN_KEY) === "true";
   } catch {
-    // Session-only state is intentionally best effort.
+    return false;
+  }
+};
+
+export const markLearningGuideIntroductionSeen = (): void => {
+  try {
+    storage("local")?.setItem(INTRODUCTION_SEEN_KEY, "true");
+  } catch {
+    // Preferences remain usable when persistent storage is unavailable.
   }
 };
 
 export const learningGuideStorageKeys = {
   enabled: GUIDE_ENABLED_KEY,
   dismissed: DISMISSED_TIPS_KEY,
-  acknowledged: ACKNOWLEDGED_KEY,
+  introductionSeen: INTRODUCTION_SEEN_KEY,
 } as const;

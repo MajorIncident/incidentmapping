@@ -101,6 +101,37 @@ describe("useAppStore actions", () => {
     );
   });
 
+  it("tracks the ephemeral new/opened map lifecycle independently of history and serialization", () => {
+    const { actions } = useAppStore.getState();
+    actions.newMap();
+    expect(useAppStore.getState().mapSession).toEqual({
+      source: "New",
+      fresh: true,
+    });
+
+    const rootId = useAppStore.getState().nodes[0].id;
+    expect(actions.renameNode(rootId, "Service outage")).toBe(true);
+    expect(useAppStore.getState().mapSession.fresh).toBe(false);
+    expect(useAppStore.getState().history.past[0]).not.toHaveProperty(
+      "mapSession",
+    );
+    expect(actions.toMap()).not.toHaveProperty("mapSession");
+
+    actions.newMap();
+    expect(actions.addChild()).not.toBeNull();
+    expect(useAppStore.getState().mapSession.fresh).toBe(false);
+
+    actions.newMap();
+    actions.progressMapSession();
+    expect(useAppStore.getState().mapSession.fresh).toBe(false);
+
+    actions.loadMap(actions.toMap());
+    expect(useAppStore.getState().mapSession).toEqual({
+      source: "Opened",
+      fresh: false,
+    });
+  });
+
   it("creates a fresh selected root in edit mode without history", () => {
     const { actions } = useAppStore.getState();
     actions.addChild();

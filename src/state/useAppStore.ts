@@ -109,7 +109,14 @@ type EvidenceDraft = Omit<EvidenceItem, "id" | "attachmentIds"> & {
   attachmentIds?: string[];
 };
 
+export type MapSession = {
+  source: "New" | "Opened";
+  fresh: boolean;
+};
+
 type AppState = {
+  /** Ephemeral lifecycle state; deliberately omitted from maps and history. */
+  mapSession: MapSession;
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: RuntimeMetadata | undefined;
@@ -133,6 +140,7 @@ type AppState = {
   actions: {
     newMap: () => void;
     loadMap: (map: unknown) => void;
+    progressMapSession: () => void;
     toMap: () => MapData;
     addChainNode: (options?: { parentId?: string }) => void;
     addChild: (parentId?: string) => string | null;
@@ -584,6 +592,7 @@ export const createNewMapState = () => {
   const map = createNewMap();
   const rootId = map.nodes[0].id;
   return {
+    mapSession: { source: "New", fresh: true } as MapSession,
     nodes: mapNodesToReactNodes(map),
     edges: mapEdgesToReactEdges(map),
     metadata: map.metadata ? { ...map.metadata } : undefined,
@@ -626,6 +635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
+        mapSession: { source: "Opened", fresh: false },
         nodes: applyLayout(
           runtimeNodes,
           runtimeEdges,
@@ -675,6 +685,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         canRedo: false,
       }));
     },
+    progressMapSession: () =>
+      set((state) =>
+        state.mapSession.fresh
+          ? { mapSession: { ...state.mapSession, fresh: false } }
+          : {},
+      ),
     toMap: () => {
       const { nodes, edges, metadata, barriers, evidence, attachments } = get();
       return {
@@ -1393,6 +1409,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
           selectionId: newNodeId,
           editingId: newNodeId,
+          mapSession: state.mapSession.fresh
+            ? { ...state.mapSession, fresh: false }
+            : state.mapSession,
           layoutVersion: layoutChanged
             ? state.layoutVersion + 1
             : state.layoutVersion,
@@ -1409,6 +1428,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           metadata: candidate.metadata,
           selectionId: newNodeId,
           editingId: newNodeId,
+          mapSession: candidate.mapSession,
           layoutVersion: candidate.layoutVersion,
           viewportRequest: parentNode
             ? {
@@ -1732,6 +1752,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         );
         return {
           nodes: nextNodes,
+          mapSession:
+            state.mapSession.fresh &&
+            state.nodes.find((node) => node.id === id)?.data.title ===
+              "Undesirable outcome"
+              ? { ...state.mapSession, fresh: false }
+              : state.mapSession,
           history,
           canUndo: history.past.length > 0,
           canRedo: history.future.length > 0,

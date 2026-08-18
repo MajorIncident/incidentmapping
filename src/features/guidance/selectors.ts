@@ -4,6 +4,7 @@ import type {
 } from "../../content/investigationGuide";
 import { investigationGuide } from "../../content/investigationGuide";
 import type { PresentationLens } from "../presentation/selectors";
+import type { MapSession } from "../../state/useAppStore";
 
 export type GuidanceMode =
   | "Onboarding"
@@ -51,7 +52,7 @@ export type GuidanceInput = Readonly<{
   chronology?: boolean;
   activeLens?: PresentationLens | string | null;
   contextEditing?: boolean;
-  newlyCreated?: boolean;
+  mapSession?: Readonly<MapSession>;
   activeTask?: GuideContext | null;
 }>;
 
@@ -234,17 +235,8 @@ export const selectInvestigationGuidance = (
     add("context-editing", "Context is currently being edited.", "Task");
   if (input.chronology || input.activeLens === "Chronology")
     add("chronology", "Chronology is active.", "Task");
-  const fresh =
-    (!nodes.length && !input.actions?.length && !input.controls?.length) ||
-    input.newlyCreated;
-  if (fresh)
-    add(
-      input.newlyCreated ? "new-map" : "empty-map",
-      input.newlyCreated
-        ? "This map was newly created."
-        : "The map has no entities.",
-      "Onboarding",
-    );
+  if (input.mapSession?.source === "New" && input.mapSession.fresh)
+    add("new-map", "This map was newly created.", "Onboarding");
   const type = selected.node?.nodeType ?? selected.supplied?.nodeType;
   if (type) {
     const context = `${type.toLowerCase()}-selected` as GuideContext;
