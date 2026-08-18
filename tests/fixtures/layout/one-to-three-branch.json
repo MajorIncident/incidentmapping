@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "one-to-three-branch",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Source",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "branch-a",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Branch A",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "branch-b",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Branch B",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "branch-c",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Impact",
+      "title": "Branch C",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "branch-a"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "branch-b"
+    },
+    {
+      "id": "cause-3",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "branch-c"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}

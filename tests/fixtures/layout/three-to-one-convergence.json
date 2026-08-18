@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "three-to-one-convergence",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "cause-a",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Factor",
+      "title": "Cause A",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "cause-b",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Cause B",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "cause-c",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Cause C",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "outcome",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Impact",
+      "title": "Outcome",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "cause-a",
+      "toId": "outcome"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "cause-b",
+      "toId": "outcome"
+    },
+    {
+      "id": "cause-3",
+      "kind": "CauseEffectEdge",
+      "fromId": "cause-c",
+      "toId": "outcome"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}

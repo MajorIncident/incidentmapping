@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "multiple-actions",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Source",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "factor",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Factor",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "action-a",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Action",
+      "actionStatus": "Proposed",
+      "title": "Action A",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "action-b",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Action",
+      "actionStatus": "Proposed",
+      "title": "Action B",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "action-c",
+      "kind": "ChainNode",
+      "referenceId": "N-005",
+      "nodeType": "Action",
+      "actionStatus": "Proposed",
+      "title": "Action C",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "factor"
+    },
+    {
+      "id": "action-2",
+      "kind": "ActionEdge",
+      "fromId": "source",
+      "toId": "action-a"
+    },
+    {
+      "id": "action-3",
+      "kind": "ActionEdge",
+      "fromId": "source",
+      "toId": "action-b"
+    },
+    {
+      "id": "action-4",
+      "kind": "ActionEdge",
+      "fromId": "factor",
+      "toId": "action-c"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}
