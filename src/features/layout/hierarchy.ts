@@ -6,20 +6,29 @@ import {
   CONTROL_NODE_HEIGHT,
   CONTROL_NODE_WIDTH,
 } from "./dimensions";
+import {
+  ACTION_GAP,
+  ACTION_GUTTER,
+  CAUSAL_ROW_GAP,
+  CHRONOLOGY_GUTTER,
+  CONTROL_BAND_HEIGHT,
+  OBJECT_CLEARANCE,
+  SIBLING_GAP,
+  SUBTREE_GAP,
+} from "./geometry/spacing";
 
 export const GRID_SIZE = 8;
 
-export const HORIZONTAL_GAP = 32;
-export const VERTICAL_GAP = 64;
+export const HORIZONTAL_GAP = SIBLING_GAP;
+export const VERTICAL_GAP = CAUSAL_ROW_GAP;
 export const CONTROL_VERTICAL_MARGIN = 32;
 export const CONTROL_HORIZONTAL_MARGIN = 32;
-const TREE_GAP = 96;
 /** Space kept around cards and the lanes used to route their edges. */
-export const OBJECT_CLEARANCE = 32;
+export { OBJECT_CLEARANCE };
 /** Separates unconnected chronology from the causal forest. */
-export const CHRONOLOGY_LANE_GAP = TREE_GAP;
-export const ACTION_HORIZONTAL_GAP = 64;
-export const ACTION_VERTICAL_GAP = 24;
+export const CHRONOLOGY_LANE_GAP = CHRONOLOGY_GUTTER;
+export const ACTION_HORIZONTAL_GAP = ACTION_GUTTER;
+export const ACTION_VERTICAL_GAP = ACTION_GAP;
 
 export type HierarchyLayoutOptions = {
   showDetails: boolean;
@@ -172,31 +181,47 @@ export const layoutHierarchy = <Data>(
   // descendants safe while retaining stable edge order.
   const visited = new Set<string>();
   const forestChildren = new Map<string, string[]>();
-  const depth = new Map<string, number>();
+  // A rank belongs to the DAG, not to whichever parent happened to claim a
+  // node for horizontal placement. Kahn's traversal accounts for every
+  // incoming relationship, including diamonds and multiple Impact roots.
+  const depth = new Map(causalNodes.map((node) => [node.id, 0]));
+  const remainingIncoming = new Map(incoming);
+  const rankQueue = discoveredRoots.map((node) => node.id);
+  for (let cursor = 0; cursor < rankQueue.length; cursor += 1) {
+    const id = rankQueue[cursor];
+    for (const childId of adjacency.get(id) ?? []) {
+      depth.set(
+        childId,
+        Math.max(depth.get(childId) ?? 0, (depth.get(id) ?? 0) + 1),
+      );
+      const remaining = (remainingIncoming.get(childId) ?? 1) - 1;
+      remainingIncoming.set(childId, remaining);
+      if (remaining === 0) rankQueue.push(childId);
+    }
+  }
   const roots: string[] = [];
-  const walk = (id: string, level: number) => {
+  const walk = (id: string) => {
     if (visited.has(id)) return;
     visited.add(id);
-    depth.set(id, level);
     const claimed: string[] = [];
     for (const childId of adjacency.get(id) ?? []) {
       if (!visited.has(childId)) {
         claimed.push(childId);
-        walk(childId, level + 1);
+        walk(childId);
       }
     }
     forestChildren.set(id, claimed);
   };
   for (const root of discoveredRoots) {
     roots.push(root.id);
-    walk(root.id, 0);
+    walk(root.id);
   }
   // A disconnected cycle has no zero-incoming node, so promote its first
   // stable member to an additional root and continue until all nodes belong.
   for (const node of [...causalNodes].sort(stable)) {
     if (!visited.has(node.id)) {
       roots.push(node.id);
-      walk(node.id, 0);
+      walk(node.id);
     }
   }
 
@@ -300,9 +325,12 @@ export const layoutHierarchy = <Data>(
       levelY[level] +
       levelHeights[level] +
       VERTICAL_GAP +
-      (barrierLevelHeights.has(level)
-        ? barrierLevelHeights.get(level)! + CONTROL_VERTICAL_MARGIN
-        : 0);
+      Math.max(
+        CONTROL_BAND_HEIGHT,
+        barrierLevelHeights.has(level)
+          ? barrierLevelHeights.get(level)! + CONTROL_VERTICAL_MARGIN
+          : 0,
+      );
   }
 
   const positions = new Map<string, XYPosition>();
@@ -351,7 +379,7 @@ export const layoutHierarchy = <Data>(
   roots.forEach((id) => {
     place(id, treeLeft);
     causalRight = treeLeft + widths.get(id)!;
-    treeLeft = causalRight + TREE_GAP;
+    treeLeft = causalRight + SUBTREE_GAP;
   });
 
   type LayoutRectangle = {
@@ -472,13 +500,7 @@ export const layoutHierarchy = <Data>(
         id: `control:${barrier.id ?? index}`,
         owner: barrier.downstreamNodeId,
         associated: new Set([barrier.upstreamNodeId, barrier.downstreamNodeId]),
-        x:
-          (upstreamPosition.x +
-            upstreamSize.width / 2 +
-            downstreamPosition.x +
-            downstreamSize.width / 2) /
-            2 -
-          size.width / 2,
+        x: downstreamPosition.x + downstreamSize.width / 2 - size.width / 2,
         y:
           (upstreamPosition.y +
             upstreamSize.height / 2 +

@@ -1,5 +1,9 @@
 import { memo } from "react";
 import { BaseEdge, type EdgeProps, type EdgeTypes } from "reactflow";
+import {
+  BRANCH_RAIL_GAP,
+  EDGE_STUB,
+} from "../../features/layout/geometry/spacing";
 
 export type Point = { x: number; y: number };
 export type Rectangle = {
@@ -9,8 +13,8 @@ export type Rectangle = {
   width: number;
   height: number;
 };
-export const EDGE_CLEARANCE = 12;
-export const BRANCH_LANE_GAP = 10;
+export const EDGE_CLEARANCE = EDGE_STUB;
+export const BRANCH_LANE_GAP = BRANCH_RAIL_GAP;
 
 const inside = (p: Point, r: Rectangle) =>
   p.x > r.x && p.x < r.x + r.width && p.y > r.y && p.y < r.y + r.height;

@@ -148,6 +148,35 @@ describe("layoutHierarchy", () => {
     ).toBeGreaterThan(result.find((item) => item.id === "a")!.position.x);
   });
 
+  it("ranks a shared descendant from every incoming causal relationship", () => {
+    const cards = [
+      { ...node("impact-a"), height: 144, data: { nodeType: "Impact" } },
+      { ...node("impact-b"), height: 264, data: { nodeType: "Impact" } },
+      { ...node("short"), height: 128, data: { classification: "KeyFactor" } },
+      { ...node("long"), height: 312, data: { classification: "RootCause" } },
+      { ...node("shared"), height: 176 },
+    ];
+    const result = layoutHierarchy(
+      cards,
+      [
+        edge("impact-a", "short"),
+        edge("impact-b", "long"),
+        edge("short", "shared"),
+        edge("long", "shared"),
+      ],
+      false,
+    );
+    const byId = new Map(result.map((item) => [item.id, item]));
+
+    expect(byId.get("impact-a")!.position.y).toBe(
+      byId.get("impact-b")!.position.y,
+    );
+    expect(byId.get("short")!.position.y).toBe(byId.get("long")!.position.y);
+    expect(byId.get("shared")!.position.y).toBeGreaterThan(
+      byId.get("long")!.position.y + 312,
+    );
+  });
+
   it("places isolated timestamped Events in a stable chronological lane", () => {
     const input = [
       node("root", 16, 24),
@@ -338,14 +367,14 @@ describe("layoutHierarchy", () => {
     );
     expect(bounds).toEqual({
       event: { x: 1016, y: 0, width: 240, height: 176 },
-      "factor-1": { x: 0, y: 240, width: 240, height: 176 },
-      "action-1": { x: 304, y: 240, width: 240, height: 176 },
-      "factor-2": { x: 576, y: 240, width: 240, height: 176 },
-      "action-2": { x: 880, y: 240, width: 240, height: 176 },
-      "factor-3": { x: 1152, y: 240, width: 240, height: 176 },
-      "action-3": { x: 1456, y: 240, width: 240, height: 176 },
-      "factor-4": { x: 1728, y: 240, width: 240, height: 176 },
-      "action-4": { x: 2032, y: 240, width: 240, height: 176 },
+      "factor-1": { x: 0, y: 424, width: 240, height: 176 },
+      "action-1": { x: 304, y: 424, width: 240, height: 176 },
+      "factor-2": { x: 576, y: 424, width: 240, height: 176 },
+      "action-2": { x: 880, y: 424, width: 240, height: 176 },
+      "factor-3": { x: 1152, y: 424, width: 240, height: 176 },
+      "action-3": { x: 1456, y: 424, width: 240, height: 176 },
+      "factor-4": { x: 1728, y: 424, width: 240, height: 176 },
+      "action-4": { x: 2032, y: 424, width: 240, height: 176 },
     });
 
     const actions = result.filter(
