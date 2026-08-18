@@ -17,13 +17,13 @@ import {
   validateAttachmentFile,
 } from "../features/persistence/attachments";
 import {
-  applyHierarchyLayout,
   ACTION_HORIZONTAL_GAP,
   ACTION_VERTICAL_GAP,
   getNodeSize,
   snapPosition,
   VERTICAL_GAP,
 } from "../features/layout/hierarchy";
+import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
 
 export { GRID_SIZE } from "../features/layout/hierarchy";
 
