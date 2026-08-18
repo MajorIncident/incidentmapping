@@ -239,6 +239,41 @@ describe("post-causal projections", () => {
     }
   });
 
+  it("keeps an unequal-width one-to-one lane exact and idempotent", () => {
+    const input: InvestigationLayoutInput = {
+      nodes: [
+        {
+          id: "unrelated",
+          kind: "Factor",
+          dimensions: { width: 277, height: 144 },
+        },
+        {
+          id: "parent",
+          kind: "Event",
+          dimensions: { width: 251, height: 144 },
+        },
+        {
+          id: "child",
+          kind: "Impact",
+          dimensions: { width: 318, height: 144 },
+        },
+      ],
+      relationships: [
+        { id: "direct", kind: "Causal", fromId: "parent", toId: "child" },
+      ],
+    };
+    const once = layoutInvestigation(input, { mode: "ArrangeMap" });
+    const twice = layoutInvestigation(input, { mode: "ArrangeMap" });
+    const rectangle = (result: typeof once, id: string) =>
+      result.nodes.find((item) => item.id === id)!.rectangle;
+
+    expect(rectangle(once, "parent").x + 251 / 2).toBe(
+      rectangle(once, "child").x + 318 / 2,
+    );
+    expect(rectangle(twice, "unrelated")).toEqual(rectangle(once, "unrelated"));
+    expect(twice.nodes).toEqual(once.nodes);
+  });
+
   it("projects chronology-only Events beyond causal bounds", async () => {
     const result = await layoutInvestigation(
       {

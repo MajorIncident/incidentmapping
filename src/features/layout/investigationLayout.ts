@@ -27,6 +27,8 @@ import {
   placeActionStacks,
   routeActionRelationships,
 } from "./routing/actionRouting";
+import { centerAlignmentDelta, rectanglesOverlap } from "./geometry/alignment";
+import { OBJECT_CLEARANCE } from "./geometry/spacing";
 
 type PositionedSize = Readonly<{
   position: Point;
@@ -270,6 +272,77 @@ export const layoutInvestigation = (
     }
   }
   const byId = new Map(geometries.map((node) => [node.id, node]));
+
+  // ArrangeMap and measured relayouts enforce the same one-to-one lane as the
+  // React Flow hierarchy. Claim a deterministic forest, preserve merge lanes,
+  // and move complete child subtrees only when the translation stays clear of
+  // unrelated branches. Actions are projected afterwards from their shifted
+  // owner, so they receive the same correction.
+  if (options.mode === "ArrangeMap") {
+    const claimedChildren = new Map<string, string[]>();
+    const claimed = new Set<string>();
+    const claim = (id: string) => {
+      const owned: string[] = [];
+      for (const child of children.get(id) ?? []) {
+        if (claimed.has(child)) continue;
+        claimed.add(child);
+        owned.push(child);
+        claim(child);
+      }
+      claimedChildren.set(id, owned);
+    };
+    queue.forEach((id) => {
+      if (!claimed.has(id)) {
+        claimed.add(id);
+        claim(id);
+      }
+    });
+    causalNodes.forEach((node) => {
+      if (!claimed.has(node.id)) {
+        claimed.add(node.id);
+        claim(node.id);
+      }
+    });
+    const descendants = (id: string): Set<string> => {
+      const result = new Set([id]);
+      (claimedChildren.get(id) ?? []).forEach((child) =>
+        descendants(child).forEach((item) => result.add(item)),
+      );
+      return result;
+    };
+    for (const parentId of [...claimedChildren.keys()].reverse()) {
+      const owned = claimedChildren.get(parentId) ?? [];
+      if (owned.length !== 1) continue;
+      const childId = owned[0];
+      if (causal.filter((edge) => edge.toId === childId).length !== 1) continue;
+      const parent = byId.get(parentId);
+      const child = byId.get(childId);
+      if (!parent || !child) continue;
+      const delta = centerAlignmentDelta(parent.rectangle, child.rectangle);
+      if (!delta) continue;
+      const moving = descendants(childId);
+      const safe = geometries
+        .filter((geometry) => moving.has(geometry.id))
+        .every((geometry) =>
+          geometries
+            .filter((other) => !moving.has(other.id))
+            .every(
+              (other) =>
+                !rectanglesOverlap(
+                  { ...geometry.rectangle, x: geometry.rectangle.x + delta },
+                  other.rectangle,
+                  OBJECT_CLEARANCE,
+                ),
+            ),
+        );
+      if (!safe) continue;
+      geometries
+        .filter((geometry) => moving.has(geometry.id))
+        .forEach(
+          (geometry) => ((geometry.rectangle as { x: number }).x += delta),
+        );
+    }
+  }
 
   const controlsByRelationship = new Map(
     (input.controls ?? []).map((control) => [control.relationshipId, control]),
