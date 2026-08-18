@@ -24,11 +24,12 @@ export const GUIDE_CONTEXTS = [
   "missing-actions",
   "multiple-branches",
   "assertion-state",
-  "maturity-building-story",
-  "maturity-analyzing-causes",
-  "maturity-testing-findings",
-  "maturity-planning-actions",
-  "maturity-ready-to-review",
+  "maturity-getting-started",
+  "maturity-building-the-story",
+  "maturity-exploring-causes",
+  "maturity-developing-findings",
+  "maturity-planning-response",
+  "maturity-reviewing-the-investigation",
 ] as const;
 
 export type GuideContext = (typeof GUIDE_CONTEXTS)[number];
@@ -426,32 +427,38 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   ...(
     [
       [
-        "building-story",
+        "getting-started",
+        "Getting started",
+        "Orient the investigation around its impact and the first known work.",
+        ["impact"],
+      ],
+      [
+        "building-the-story",
         "Build the incident story",
         "Capture Impact, Events, and Factors.",
         ["impact", "event", "factor"],
       ],
       [
-        "analyzing-causes",
-        "Analyze the causes",
-        "Test Factors and identify the root cause finding.",
+        "exploring-causes",
+        "Explore causes",
+        "Explore Factors without requiring a single Root Cause label.",
         ["factor", "evidence"],
       ],
       [
-        "testing-findings",
-        "Test the findings",
+        "developing-findings",
+        "Develop findings",
         "Assess Controls and connect Evidence.",
         ["control", "evidence"],
       ],
       [
-        "planning-actions",
+        "planning-response",
         "Plan the response",
         "Connect specific Actions to supported findings.",
         ["action", "factor"],
       ],
       [
-        "ready-to-review",
-        "Ready for review",
+        "reviewing-the-investigation",
+        "Review the investigation",
         "Review the complete story without treating the checklist as proof.",
         ["impact", "evidence", "action"],
       ],

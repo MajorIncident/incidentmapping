@@ -30,7 +30,7 @@ describe("investigation guidance", () => {
     const input: GuidanceInput = {};
     const result = selectInvestigationGuidance(input);
     expect(result.primary?.context).toBe("empty-map");
-    expect(result.stage).toBe("Building Story");
+    expect(result.stage).toBe("Getting Started");
     expect(input).toEqual({});
   });
 
@@ -70,6 +70,7 @@ describe("investigation guidance", () => {
     );
     expect(event?.reason).toBe("The selected Event has no child Factors.");
     expect(result.primary?.entry.id).toBe("new-map");
+    expect(result.primary?.mode).toBe("Onboarding");
   });
 
   it("derives editing, view, branching, and assertion contexts", () => {
@@ -100,7 +101,7 @@ describe("investigation guidance", () => {
 
 describe("maturity and checklist derivation", () => {
   it.each([
-    [{}, "Building Story"],
+    [{}, "Getting Started"],
     [
       {
         ...core,
@@ -109,16 +110,16 @@ describe("maturity and checklist derivation", () => {
           factorSignificance: undefined,
         })),
       },
-      "Analyzing Causes",
+      "Exploring Causes",
     ],
-    [core, "Testing Findings"],
+    [core, "Exploring Causes"],
     [
       {
         ...core,
         controls: [{ id: "control" }],
         evidence: [{ id: "evidence" }],
       },
-      "Planning Actions",
+      "Developing Findings",
     ],
     [
       {
@@ -127,7 +128,7 @@ describe("maturity and checklist derivation", () => {
         controls: [{ id: "control" }],
         evidence: [{ id: "evidence" }],
       },
-      "Ready to Review",
+      "Reviewing the Investigation",
     ],
   ] as const)("derives %s as %s", (input, expected) => {
     expect(deriveInvestigationStage(input)).toBe(expected);
@@ -144,11 +145,38 @@ describe("maturity and checklist derivation", () => {
       "Root Cause",
       "Actions",
     ]);
-    expect(
-      checklist.find((item) => item.concept === "Root Cause")?.complete,
-    ).toBe(true);
+    expect(checklist.find((item) => item.concept === "Root Cause")?.state).toBe(
+      "Identified",
+    );
     expect(checklist.find((item) => item.concept === "Controls")?.reason).toBe(
-      "No Controls have been assessed.",
+      "None identified; consider relevant safeguards when useful.",
+    );
+  });
+
+  it("treats Root Cause as optional and never as a stage gate", () => {
+    const withoutRootCause: GuidanceInput = {
+      ...core,
+      nodes: [
+        node("impact", "Impact"),
+        node("event", "Event"),
+        node("factor", "Factor"),
+        node("action", "Action"),
+      ],
+      controls: [{ id: "control" }],
+    };
+    expect(deriveInvestigationStage(withoutRootCause)).toBe(
+      "Reviewing the Investigation",
+    );
+    expect(
+      deriveInvestigationChecklist(withoutRootCause).find(
+        (item) => item.concept === "Root Cause",
+      ),
+    ).toMatchObject({ state: "None identified" });
+    expect(
+      selectInvestigationGuidance(withoutRootCause).contexts,
+    ).not.toContain("missing-root-cause");
+    expect(selectInvestigationGuidance(withoutRootCause).primary?.mode).toBe(
+      "Review",
     );
   });
 });

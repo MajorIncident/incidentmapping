@@ -8,11 +8,13 @@ import {
   learningGuideStorageKeys,
   setLearningGuideEnabled,
 } from "../../src/features/guidance/preferences";
+import { selectInvestigationGuidance } from "../../src/features/guidance/selectors";
 
 const match = {
   entry: investigationGuide[0],
   context: "empty-map" as const,
   reason: "The map has no entities.",
+  mode: "Onboarding" as const,
 };
 
 describe("Learning Guide", () => {
@@ -105,5 +107,20 @@ describe("Learning Guide", () => {
 
     local.mockRestore();
     session.mockRestore();
+  });
+
+  it("keeps review guidance behind onboarding and selected-object coaching", () => {
+    const onboarding = selectInvestigationGuidance({ presentation: true });
+    expect(onboarding.primary?.mode).toBe("Onboarding");
+
+    const selection = selectInvestigationGuidance({
+      nodes: [{ id: "impact", nodeType: "Impact" }],
+      selectedEntity: "impact",
+      presentation: true,
+    });
+    expect(selection.primary?.mode).toBe("Selection");
+    expect(
+      selection.matches.find((item) => item.mode === "Review"),
+    ).toBeDefined();
   });
 });

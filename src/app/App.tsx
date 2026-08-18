@@ -26,10 +26,12 @@ import {
 } from "../features/guidance/preferences";
 import type { GuideActionId } from "../content/investigationGuide";
 import { LearnMapDialog } from "../components/LearningGuide/LearnMapDialog";
+import { InvestigationCheck } from "../components/InvestigationCheck/InvestigationCheck";
 
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [presenting, setPresenting] = useState(false);
+  const [investigationCheckOpen, setInvestigationCheckOpen] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
   const [chronologyOpen, setChronologyOpen] = useState(false);
@@ -290,6 +292,10 @@ export const App = (): JSX.Element => {
                 showDetails={showDetails}
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
+                  if (guidance.stage === "Reviewing the Investigation") {
+                    setInvestigationCheckOpen(true);
+                    return;
+                  }
                   useAppStore.getState().actions.select(null);
                   setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
@@ -297,6 +303,7 @@ export const App = (): JSX.Element => {
                   setPresentationLens("Overview");
                   setPresenting(true);
                 }}
+                onInvestigationCheck={() => setInvestigationCheckOpen(true)}
                 learningGuideEnabled={learningGuideEnabled}
                 onLearningGuideChange={(enabled) => {
                   setLearningGuideEnabled(enabled);
@@ -540,6 +547,13 @@ export const App = (): JSX.Element => {
                   </button>
                 </section>
               </div>
+            ) : null}
+            {investigationCheckOpen ? (
+              <InvestigationCheck
+                stage={guidance.stage}
+                items={guidance.checklist}
+                onClose={() => setInvestigationCheckOpen(false)}
+              />
             ) : null}
           </div>
         )}
