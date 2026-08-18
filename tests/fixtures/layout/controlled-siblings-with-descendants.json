@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "controlled-siblings-with-descendants",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 2,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Source",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "left",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Left",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "right",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Right",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "left-descendant",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Factor",
+      "title": "Left descendant",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "right-descendant",
+      "kind": "ChainNode",
+      "referenceId": "N-005",
+      "nodeType": "Factor",
+      "title": "Right descendant",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "left"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "right"
+    },
+    {
+      "id": "left-descendant-edge",
+      "kind": "CauseEffectEdge",
+      "fromId": "left",
+      "toId": "left-descendant"
+    },
+    {
+      "id": "right-descendant-edge",
+      "kind": "CauseEffectEdge",
+      "fromId": "right",
+      "toId": "right-descendant"
+    }
+  ],
+  "barriers": [
+    {
+      "id": "control-1",
+      "kind": "Barrier",
+      "referenceId": "C-001",
+      "upstreamNodeId": "source",
+      "downstreamNodeId": "left",
+      "description": "Control 1",
+      "status": "Effective",
+      "evidenceIds": []
+    },
+    {
+      "id": "control-2",
+      "kind": "Barrier",
+      "referenceId": "C-002",
+      "upstreamNodeId": "source",
+      "downstreamNodeId": "right",
+      "description": "Control 2",
+      "status": "Degraded",
+      "evidenceIds": []
+    }
+  ],
+  "evidence": [],
+  "attachments": []
+}

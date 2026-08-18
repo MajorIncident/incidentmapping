@@ -11,6 +11,7 @@ export const layoutFixtureNames = [
   "branch-merge-branch",
   "shared-impact-descendant",
   "multiple-controls",
+  "controlled-siblings-with-descendants",
   "multiple-actions",
 ] as const;
 export type LayoutFixtureName = (typeof layoutFixtureNames)[number];

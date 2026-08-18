@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { layoutInvestigation } from "../../src/features/layout/investigationLayout";
 import type { InvestigationLayoutInput } from "../../src/features/layout/layoutModel";
+import { loadLayoutFixture } from "../helpers/layout/fixtures";
 
 const base: InvestigationLayoutInput = {
   nodes: [
@@ -13,6 +14,65 @@ const base: InvestigationLayoutInput = {
 };
 
 describe("post-causal projections", () => {
+  it("routes controlled siblings on the semantic branch rail and vertically through each Control", () => {
+    const fixture = loadLayoutFixture("controlled-siblings-with-descendants");
+    const relationships = fixture.edges.map((edge) => ({
+      id: edge.id,
+      kind: "Causal" as const,
+      fromId: edge.fromId,
+      toId: edge.toId,
+    }));
+    const result = layoutInvestigation(
+      {
+        nodes: fixture.nodes.map((node) => ({
+          id: node.id,
+          kind: node.nodeType === "Action" ? "Factor" : node.nodeType,
+        })),
+        relationships,
+        controls: fixture.barriers.map((control) => ({
+          id: control.id,
+          kind: "Control" as const,
+          relationshipId: relationships.find(
+            (edge) =>
+              edge.fromId === control.upstreamNodeId &&
+              edge.toId === control.downstreamNodeId,
+          )!.id,
+          upstreamNodeId: control.upstreamNodeId,
+          downstreamNodeId: control.downstreamNodeId,
+        })),
+      },
+      { mode: "ArrangeMap" },
+    );
+    const controlled = result.relationships.filter((edge) =>
+      ["cause-1", "cause-2"].includes(edge.id),
+    );
+    expect(controlled).toHaveLength(2);
+    expect(
+      new Set(controlled.map((edge) => JSON.stringify(edge.route.slice(0, 2)))),
+    ).toHaveLength(1);
+    const rail = result.sharedSegments.find(
+      (segment) => segment.kind === "BranchRail",
+    )!;
+    expect(rail.relationshipIds).toEqual(["cause-1", "cause-2"]);
+    expect(rail.from.y).toBe(rail.to.y);
+    for (const edge of controlled) {
+      const control = result.nodes.find(
+        (node) => node.relationshipId === edge.id,
+      )!.rectangle;
+      const center = control.x + control.width / 2;
+      const top = edge.route.findIndex(
+        (point) => point.x === center && point.y === control.y,
+      );
+      const bottom = edge.route.findIndex(
+        (point) => point.x === center && point.y === control.y + control.height,
+      );
+      expect(top).toBeGreaterThan(0);
+      expect(bottom).toBe(top + 1);
+      expect(edge.route[top - 1].x).toBe(center);
+      expect(edge.route[bottom + 1].x).toBe(center);
+    }
+  });
+
   it("incrementally adds a Factor without moving prior geometry", async () => {
     const priorGeometry = [
       {
