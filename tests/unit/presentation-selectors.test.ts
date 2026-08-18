@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveHoverPresentation,
   selectLensPresentation,
   PRESENTATION_LENSES,
 } from "../../src/features/presentation/selectors";
@@ -120,6 +121,42 @@ describe("presentation lens selectors", () => {
         selectedId: "ev",
       }).emphasizedIds,
     ]).toEqual(["cause", "control"]);
+  });
+});
+
+describe("hover presentation selector", () => {
+  const causalEdges = [
+    { id: "parent", source: "impact", target: "cause" },
+    {
+      id: "action-edge",
+      source: "cause",
+      target: "action",
+      kind: "ActionEdge",
+    },
+  ];
+
+  it("limits Control hover to the Control, endpoints, and split relationship", () => {
+    const result = deriveHoverPresentation(
+      nodes,
+      causalEdges,
+      controls,
+      "control",
+    );
+    expect([...result.emphasizedIds]).toEqual(["control", "impact", "cause"]);
+    expect([...result.emphasizedEdges]).toEqual(["parent"]);
+  });
+
+  it("includes only a causal node's direct neighborhood and attachments", () => {
+    const result = deriveHoverPresentation(
+      nodes,
+      causalEdges,
+      controls,
+      "cause",
+    );
+    expect([...result.emphasizedIds]).toEqual(
+      expect.arrayContaining(["cause", "impact", "action", "control"]),
+    );
+    expect([...result.emphasizedEdges]).toEqual(["parent", "action-edge"]);
   });
 });
 

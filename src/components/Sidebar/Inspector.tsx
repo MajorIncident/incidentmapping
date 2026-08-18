@@ -435,11 +435,7 @@ export const Inspector = ({
           onSubmit={(event) => event.preventDefault()}
         >
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-slate-900">
-              Control between{" "}
-              {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
-              {downstreamNode?.data.title ?? barrier.downstreamNodeId}
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-900">Control</h3>
             <p className="text-xs text-slate-500">
               This control applies only to the selected connection.
             </p>
@@ -451,6 +447,38 @@ export const Inspector = ({
               </p>
             </details>
           </div>
+
+          <section
+            aria-labelledby="control-between-heading"
+            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+          >
+            <h4
+              id="control-between-heading"
+              className="text-xs font-bold uppercase tracking-wide text-slate-600"
+            >
+              Between
+            </h4>
+            <dl className="mt-2 grid gap-2 text-sm">
+              <div>
+                <dt className="text-xs text-slate-500">Upstream</dt>
+                <dd className="font-medium text-slate-800">
+                  {upstreamNode?.data.referenceId
+                    ? `${upstreamNode.data.referenceId} · `
+                    : ""}
+                  {upstreamNode?.data.title ?? barrier.upstreamNodeId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Downstream</dt>
+                <dd className="font-medium text-slate-800">
+                  {downstreamNode?.data.referenceId
+                    ? `${downstreamNode.data.referenceId} · `
+                    : ""}
+                  {downstreamNode?.data.title ?? barrier.downstreamNodeId}
+                </dd>
+              </div>
+            </dl>
+          </section>
 
           <AssertionStateField
             id="barrier-assertion-state"

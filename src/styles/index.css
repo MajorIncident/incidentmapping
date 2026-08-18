@@ -425,7 +425,11 @@ select:focus-visible {
 }
 
 .incident-edge--unrelated path.react-flow__edge-path {
-  opacity: 0.32;
+  opacity: 0.25;
+}
+
+.incident-edge--related path.react-flow__edge-path {
+  opacity: 1;
 }
 
 .incident-edge--related:not(.incident-edge--action) path.react-flow__edge-path {
@@ -700,10 +704,20 @@ select:focus-visible {
   @apply bg-slate-900 text-white;
 }
 .presentation-softened {
-  opacity: 0.32;
+  opacity: 0.25;
 }
 .presentation-emphasized {
   filter: drop-shadow(0 0 5px rgb(37 99 235 / 0.35));
+}
+.canvas-hover-unrelated {
+  opacity: 0.25 !important;
+}
+.canvas-hover-related {
+  opacity: 1 !important;
+}
+.canvas-hover-related .chain-node-card,
+.canvas-hover-related [data-testid="control-node"] {
+  opacity: 1 !important;
 }
 .story-panel {
   @apply fixed bottom-16 right-4 z-30 w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-700 shadow-xl backdrop-blur;

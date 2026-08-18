@@ -245,7 +245,7 @@ const ChainNodeComponent = ({
           ? "border-amber-400"
           : "";
     const related = graphRole?.isUnrelated
-      ? "opacity-60 saturate-[.7]"
+      ? "opacity-25 saturate-[.6]"
       : "opacity-100";
     const active = selected
       ? "ring-4 ring-sky-500 ring-offset-2 border-sky-700 shadow-lg"
@@ -703,7 +703,7 @@ const BarrierNodeComponent = ({
           : data.graphRole?.isOnSelectedPath
             ? "ring-2 ring-slate-300"
             : "ring-0"
-      } ${data.graphRole?.isUnrelated ? "opacity-60 saturate-[.7]" : "opacity-100"} ${treatments[data.status]}`}
+      } ${data.graphRole?.isUnrelated ? "opacity-25 saturate-[.6]" : "opacity-100"} ${treatments[data.status]}`}
       data-testid="control-node"
       data-read-only={data.readOnly || undefined}
       aria-label={`${reference} Control, ${role}, ${data.status}`}

@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   calculateControlPosition,
-  deriveGraphPresentation,
-  deriveRelationshipPresentation,
   splitEdgeAtControl,
   viewportAnimationDuration,
 } from "../../src/components/Canvas/Canvas";
+import {
+  deriveGraphPresentation,
+  deriveRelationshipPresentation,
+} from "../../src/features/presentation/selectors";
 
 describe("Control edge geometry", () => {
   it("centers a Control in the downstream relationship lane", () => {

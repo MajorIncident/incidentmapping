@@ -29,6 +29,205 @@ export type LensPresentation = {
   showChronology: boolean;
 };
 
+export type GraphRole = {
+  roots: Set<string>;
+  leaves: Set<string>;
+  upstream: Set<string>;
+  downstream: Set<string>;
+  selectedPath: Set<string>;
+  unrelated: Set<string>;
+};
+
+type PresentationNode = { id: string; nodeType?: ChainNodeData["nodeType"] };
+type PresentationControl = {
+  id: string;
+  upstreamNodeId: string;
+  downstreamNodeId: string;
+};
+type PresentationEdge = { source: string; target: string; kind?: string };
+
+/** Pure, complete traversal of the causal graph in both directions. */
+export const deriveGraphPresentation = (
+  nodeIds: string[],
+  edges: PresentationEdge[],
+  selectedId: string | null,
+): GraphRole => {
+  const ids = new Set(nodeIds);
+  const incoming = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  edges.forEach(({ source, target }) => {
+    if (ids.has(source) && ids.has(target)) {
+      outgoing.get(source)!.push(target);
+      incoming.get(target)!.push(source);
+    }
+  });
+  const walk = (start: string, graph: Map<string, string[]>) => {
+    const found = new Set<string>();
+    const pending = [...(graph.get(start) ?? [])];
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (found.has(id)) continue;
+      found.add(id);
+      pending.push(...(graph.get(id) ?? []));
+    }
+    return found;
+  };
+  const hasSelection = Boolean(selectedId && ids.has(selectedId));
+  const upstream = hasSelection
+    ? walk(selectedId!, incoming)
+    : new Set<string>();
+  const downstream = hasSelection
+    ? walk(selectedId!, outgoing)
+    : new Set<string>();
+  const selectedPath = new Set([...upstream, ...downstream]);
+  if (hasSelection) selectedPath.add(selectedId!);
+  return {
+    roots: new Set(nodeIds.filter((id) => incoming.get(id)?.length === 0)),
+    leaves: new Set(nodeIds.filter((id) => outgoing.get(id)?.length === 0)),
+    upstream,
+    downstream,
+    selectedPath,
+    unrelated: new Set(
+      hasSelection ? nodeIds.filter((id) => !selectedPath.has(id)) : [],
+    ),
+  };
+};
+
+/** Resolves node, Action, and Control selection to the whole review trace. */
+export const deriveRelationshipPresentation = (
+  nodes: PresentationNode[],
+  edges: PresentationEdge[],
+  controls: PresentationControl[],
+  selectedId: string | null,
+): GraphRole => {
+  const causalIds = nodes
+    .filter((node) => node.nodeType !== "Action")
+    .map((node) => node.id);
+  const causalEdges = edges.filter((edge) => edge.kind !== "ActionEdge");
+  const action = nodes.find(
+    (node) => node.id === selectedId && node.nodeType === "Action",
+  );
+  const control = controls.find((item) => item.id === selectedId);
+  const actionEdge =
+    action &&
+    edges.find(
+      (edge) => edge.kind === "ActionEdge" && edge.target === action.id,
+    );
+  const anchor = actionEdge?.source ?? (!control ? selectedId : null);
+  const role = deriveGraphPresentation(causalIds, causalEdges, anchor);
+  const selectedPath = new Set(role.selectedPath);
+  let upstream = role.upstream;
+  let downstream = role.downstream;
+  if (control) {
+    upstream = deriveGraphPresentation(
+      causalIds,
+      causalEdges,
+      control.upstreamNodeId,
+    ).upstream;
+    downstream = deriveGraphPresentation(
+      causalIds,
+      causalEdges,
+      control.downstreamNodeId,
+    ).downstream;
+    [
+      ...upstream,
+      control.upstreamNodeId,
+      control.downstreamNodeId,
+      ...downstream,
+    ].forEach((id) => selectedPath.add(id));
+    selectedPath.add(control.id);
+  }
+  if (action) selectedPath.add(action.id);
+  edges
+    .filter(
+      (edge) => edge.kind === "ActionEdge" && selectedPath.has(edge.source),
+    )
+    .forEach((edge) => selectedPath.add(edge.target));
+  controls
+    .filter(
+      (item) =>
+        selectedPath.has(item.upstreamNodeId) &&
+        selectedPath.has(item.downstreamNodeId),
+    )
+    .forEach((item) => selectedPath.add(item.id));
+  const allIds = [
+    ...nodes.map((node) => node.id),
+    ...controls.map((item) => item.id),
+  ];
+  const hasSelection = Boolean(control || anchor);
+  return {
+    ...role,
+    upstream,
+    downstream,
+    selectedPath,
+    unrelated: new Set(
+      hasSelection ? allIds.filter((id) => !selectedPath.has(id)) : [],
+    ),
+  };
+};
+
+export type HoverPresentation = {
+  emphasizedIds: Set<string>;
+  emphasizedEdges: Set<string>;
+};
+
+/** Direct, transient neighborhood used only for canvas hover styling. */
+export const deriveHoverPresentation = (
+  nodes: PresentationNode[],
+  edges: Array<PresentationEdge & { id: string }>,
+  controls: PresentationControl[],
+  hoveredId: string | null,
+): HoverPresentation => {
+  const emphasizedIds = new Set<string>();
+  const emphasizedEdges = new Set<string>();
+  if (!hoveredId) return { emphasizedIds, emphasizedEdges };
+  const control = controls.find((item) => item.id === hoveredId);
+  if (control) {
+    [control.id, control.upstreamNodeId, control.downstreamNodeId].forEach(
+      (id) => emphasizedIds.add(id),
+    );
+    edges
+      .filter(
+        (edge) =>
+          edge.kind !== "ActionEdge" &&
+          edge.source === control.upstreamNodeId &&
+          edge.target === control.downstreamNodeId,
+      )
+      .forEach((edge) => emphasizedEdges.add(edge.id));
+    return { emphasizedIds, emphasizedEdges };
+  }
+  if (
+    !nodes.some((node) => node.id === hoveredId && node.nodeType !== "Action")
+  )
+    return { emphasizedIds, emphasizedEdges };
+  emphasizedIds.add(hoveredId);
+  edges
+    .filter(
+      (edge) =>
+        edge.kind !== "ActionEdge" &&
+        (edge.source === hoveredId || edge.target === hoveredId),
+    )
+    .forEach((edge) => {
+      emphasizedEdges.add(edge.id);
+      emphasizedIds.add(edge.source);
+      emphasizedIds.add(edge.target);
+    });
+  edges
+    .filter((edge) => edge.kind === "ActionEdge" && edge.source === hoveredId)
+    .forEach((edge) => {
+      emphasizedEdges.add(edge.id);
+      emphasizedIds.add(edge.target);
+    });
+  controls
+    .filter(
+      (item) =>
+        item.upstreamNodeId === hoveredId ||
+        item.downstreamNodeId === hoveredId,
+    )
+    .forEach((item) => emphasizedIds.add(item.id));
+  return { emphasizedIds, emphasizedEdges };
+};
+
 type Input = {
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
