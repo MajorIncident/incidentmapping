@@ -73,7 +73,8 @@ const buttonClasses =
 type SectionProps = { children: React.ReactNode };
 type SecondarySectionProps = SectionProps & {
   title: string;
-  open?: boolean;
+  defaultOpen?: boolean;
+  openOnRequest?: boolean;
 };
 
 /** A keyboard-accessible disclosure boundary for fields that are not essential
@@ -81,27 +82,43 @@ type SecondarySectionProps = SectionProps & {
  * preserves expected mouse, Enter and Space behaviour without custom state. */
 export const SecondarySection = ({
   children,
+  defaultOpen = true,
+  openOnRequest = false,
   title,
-  open,
-}: SecondarySectionProps): JSX.Element => (
-  <details
-    className="group rounded-lg border border-slate-200 bg-slate-50 p-3"
-    open={open || undefined}
-  >
-    <summary
-      className="cursor-pointer text-sm font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent"
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        const details = event.currentTarget.parentElement;
-        if (details instanceof HTMLDetailsElement) details.open = !details.open;
-      }}
+}: SecondarySectionProps): JSX.Element => {
+  // React 18 has no `defaultOpen` DOM property for details. Initializing its
+  // native state in a callback ref provides the same uncontrolled semantics.
+  // The ref runs before child effects that focus requested fields and only
+  // changes when a new request arrives, so subsequent renders do not fight a
+  // user's choice to collapse the disclosure.
+  const detailsRef = useCallback(
+    (details: HTMLDetailsElement | null) => {
+      if (details) details.open = openOnRequest || defaultOpen;
+    },
+    [defaultOpen, openOnRequest],
+  );
+
+  return (
+    <details
+      ref={detailsRef}
+      className="group rounded-lg border border-slate-200 bg-slate-50 p-3"
     >
-      {title}
-    </summary>
-    <div className="mt-4 flex flex-col gap-4">{children}</div>
-  </details>
-);
+      <summary
+        className="cursor-pointer text-sm font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent"
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          const details = event.currentTarget.parentElement;
+          if (details instanceof HTMLDetailsElement)
+            details.open = !details.open;
+        }}
+      >
+        {title}
+      </summary>
+      <div className="mt-4 flex flex-col gap-4">{children}</div>
+    </details>
+  );
+};
 export const CoreFields = ({ children }: SectionProps): JSX.Element => (
   <>{children}</>
 );
@@ -656,7 +673,11 @@ export const Inspector = ({
     }
 
     return (
-      <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
+      <form
+        key={node.id}
+        className="flex flex-1 flex-col gap-5"
+        onSubmit={handleSubmit}
+      >
         {node.data.nodeType !== "Action" ? (
           <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-col gap-1">
@@ -924,7 +945,7 @@ export const Inspector = ({
 
         <SecondarySection
           title="Controls"
-          open={requestedEditorSection === "Controls"}
+          openOnRequest={requestedEditorSection === "Controls"}
         >
           {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
             <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -983,14 +1004,14 @@ export const Inspector = ({
 
         <SecondarySection
           title="Evidence"
-          open={requestedEditorSection === "Evidence"}
+          openOnRequest={requestedEditorSection === "Evidence"}
         >
           <EvidenceSection target={{ kind: "node", id: node.id }} />
         </SecondarySection>
 
         <SecondarySection
           title="More details"
-          open={requestedEditorSection === "More details"}
+          openOnRequest={requestedEditorSection === "More details"}
         >
           {node.data.nodeType === "Factor" ? (
             <AssertionStateField
@@ -1225,7 +1246,7 @@ export const Inspector = ({
           <>
             <SecondarySection
               title="Aggravating Context"
-              open={requestedEditorSection === "Aggravating Context"}
+              openOnRequest={requestedEditorSection === "Aggravating Context"}
             >
               <ContextEditor
                 target={node.id}
@@ -1236,7 +1257,7 @@ export const Inspector = ({
             </SecondarySection>
             <SecondarySection
               title="Mitigating Context"
-              open={requestedEditorSection === "Mitigating Context"}
+              openOnRequest={requestedEditorSection === "Mitigating Context"}
             >
               <ContextEditor
                 target={node.id}
@@ -1245,7 +1266,10 @@ export const Inspector = ({
                 lockedEffect="Mitigating"
               />
             </SecondarySection>
-            <SecondarySection title="Context">
+            <SecondarySection
+              title="Context"
+              openOnRequest={requestedEditorSection === "Context"}
+            >
               <ContextEditor
                 target={node.id}
                 items={node.data.contextItems ?? []}
@@ -1257,7 +1281,7 @@ export const Inspector = ({
         ) : node.data.nodeType === "Event" ? (
           <SecondarySection
             title="Context"
-            open={requestedEditorSection?.includes("Context")}
+            openOnRequest={requestedEditorSection?.includes("Context")}
           >
             <ContextEditor
               target={node.id}
@@ -1282,7 +1306,7 @@ export const Inspector = ({
 
         <SecondarySection
           title="Actions"
-          open={requestedEditorSection === "Actions"}
+          openOnRequest={requestedEditorSection === "Actions"}
         >
           {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
             <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">

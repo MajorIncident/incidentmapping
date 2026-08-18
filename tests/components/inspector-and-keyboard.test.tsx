@@ -76,23 +76,53 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.queryByRole("combobox", { name: "Action Type" })).toBeNull();
   });
 
-  it("keeps each entity's identifying fields primary and secondary fields collapsed", async () => {
+  it("opens applicable drawers for each newly selected entity without reopening them for edits", async () => {
+    const user = userEvent.setup();
     const nodeId = await renderSelectedNode();
 
     expect(screen.getByLabelText("Type")).toHaveValue("Event");
     expect(screen.getByLabelText("Event Phase")).toBeVisible();
     expect(screen.getByLabelText("Title")).toBeVisible();
     expect(screen.getByLabelText("Description")).toBeVisible();
-    expect(screen.getByText("Timing").closest("details")).not.toHaveAttribute(
+    const summaries = [
+      "Controls",
+      "Evidence",
+      "More details",
+      "Timing",
+      "Context",
+      "Actions",
+    ].map((title) =>
+      screen
+        .getAllByText(title)
+        .find((element) => element.tagName === "SUMMARY"),
+    );
+    expect(
+      summaries.every((summary) => summary?.closest("details")?.open),
+    ).toBe(true);
+
+    const timing = screen.getByText("Timing");
+    await user.click(timing);
+    expect(timing.closest("details")).not.toHaveAttribute("open");
+    await user.type(screen.getByLabelText("Title"), " updated");
+    expect(timing.closest("details")).not.toHaveAttribute("open");
+
+    act(() => {
+      const nextId = useAppStore.getState().actions.addChild(nodeId);
+      useAppStore.getState().actions.select(nextId);
+    });
+    expect(screen.getByText("Timing").closest("details")).toHaveAttribute(
       "open",
     );
 
-    act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
+    act(() => {
+      useAppStore.getState().actions.select(nodeId);
+      useAppStore.getState().actions.setNodeType(nodeId, "Factor");
+    });
     expect(screen.getByLabelText("Category")).toBeVisible();
     expect(screen.getByLabelText("Significance")).toBeVisible();
-    expect(
-      screen.getByText("More details").closest("details"),
-    ).not.toHaveAttribute("open");
+    expect(screen.getByText("More details").closest("details")).toHaveAttribute(
+      "open",
+    );
 
     act(() => useAppStore.getState().actions.setNodeType(nodeId, "Impact"));
     expect(screen.getByLabelText("Severity")).toBeVisible();
@@ -105,25 +135,59 @@ describe("Inspector and keyboard workflows", () => {
       const summary = screen
         .getAllByText(section)
         .find((element) => element.tagName === "SUMMARY");
-      expect(summary?.closest("details")).not.toHaveAttribute("open");
+      expect(summary?.closest("details")).toHaveAttribute("open");
     }
   });
 
-  it("expands secondary sections with keyboard and mouse", async () => {
+  it("allows every drawer to be collapsed and reopened", async () => {
     const user = userEvent.setup();
     await renderSelectedNode();
-    const timing = screen.getByText("Timing");
-    timing.focus();
-    await user.keyboard("{Enter}");
-    expect(timing.closest("details")).toHaveAttribute("open");
-
-    const evidence = screen
-      .getAllByText("Evidence")
-      .find((element) => element.tagName === "SUMMARY")!;
-    await user.click(evidence);
-    expect(evidence.closest("details")).toHaveAttribute("open");
-    expect(timing.closest("details")).toHaveAttribute("open");
+    const summaries = document.querySelectorAll<HTMLElement>(
+      "details.group > summary",
+    );
+    for (const summary of summaries) {
+      const details = summary.parentElement as HTMLDetailsElement;
+      expect(details.open).toBe(true);
+      await user.click(summary);
+      expect(details.open).toBe(false);
+      await user.click(summary);
+      expect(details.open).toBe(true);
+    }
   });
+
+  it.each(["Controls", "Evidence", "Context", "Actions"])(
+    "opens a closed %s drawer when it is targeted",
+    async (requestedSection) => {
+      const user = userEvent.setup();
+      const { actions } = useAppStore.getState();
+      act(() => {
+        const nodeId = actions.addChild();
+        actions.select(nodeId);
+      });
+      const { rerender } = render(
+        <ReactFlowProvider>
+          <Inspector />
+        </ReactFlowProvider>,
+      );
+      const summary = screen
+        .getAllByText(requestedSection)
+        .find((element) => element.tagName === "SUMMARY")!;
+      await user.click(summary);
+      expect(summary.closest("details")).not.toHaveAttribute("open");
+
+      // A request is a transition, rather than a controlled `open` value.
+      rerender(
+        <ReactFlowProvider>
+          <Inspector requestedSection={requestedSection} />
+        </ReactFlowProvider>,
+      );
+      const targeted = screen
+        .getAllByText(requestedSection)
+        .filter((element) => element.tagName === "SUMMARY")
+        .at(-1)!;
+      expect(targeted.closest("details")).toHaveAttribute("open");
+    },
+  );
 
   it("shows inspector fields for the selected node and updates metadata", async () => {
     const { actions } = useAppStore.getState();
@@ -406,11 +470,6 @@ describe("Inspector and keyboard workflows", () => {
       </ReactFlowProvider>,
     );
 
-    await userEvent.click(
-      screen
-        .getAllByText("Controls")
-        .find((element) => element.tagName === "SUMMARY")!,
-    );
     expect(screen.getByText("Add Control to branch")).toBeVisible();
     expect(screen.getByText(/Branch 1 of 2.*ld-one/)).toBeVisible();
     expect(screen.getByText(/Branch 2 of 2.*ld-two/)).toBeVisible();
@@ -484,11 +543,6 @@ describe("Inspector and keyboard workflows", () => {
       type: "SystemLog",
       title: "Witness account",
     });
-    await user.click(
-      screen
-        .getAllByText("Evidence")
-        .find((element) => element.tagName === "SUMMARY")!,
-    );
     expect(
       screen.getByText(/EV-001 · System Log · Witness account/),
     ).toBeVisible();
