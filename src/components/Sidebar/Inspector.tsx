@@ -435,7 +435,11 @@ export const Inspector = ({
           onSubmit={(event) => event.preventDefault()}
         >
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-slate-900">Control</h3>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Control between{" "}
+              {upstreamNode?.data.title ?? barrier.upstreamNodeId} and{" "}
+              {downstreamNode?.data.title ?? barrier.downstreamNodeId}
+            </h3>
             <p className="text-xs text-slate-500">
               This control applies only to the selected connection.
             </p>
