@@ -84,4 +84,57 @@ describe("App initial canvas", () => {
       "Immediate incident",
     );
   });
+
+  it("uses the real map session lifecycle for onboarding, but not opened maps", async () => {
+    useAppStore.getState().actions.newMap();
+    const fresh = render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Name the Impact" }),
+    ).toBeInTheDocument();
+    expect(useAppStore.getState().mapSession).toEqual({
+      source: "New",
+      fresh: true,
+    });
+    fresh.unmount();
+
+    useAppStore.getState().actions.loadMap({
+      schemaVersion: 5,
+      metadata: {
+        title: "Opened investigation",
+        contextItems: [],
+        nodeReferenceHighWaterMark: 1,
+        evidenceReferenceHighWaterMark: 0,
+        controlReferenceHighWaterMark: 0,
+        attachmentReferenceHighWaterMark: 0,
+      },
+      nodes: [
+        {
+          id: "opened-impact",
+          kind: "ChainNode",
+          referenceId: "N-001",
+          nodeType: "Impact",
+          title: "Known customer impact",
+          evidenceIds: [],
+          contextItems: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      edges: [],
+      barriers: [],
+      evidence: [],
+      attachments: [],
+    });
+    render(<App />);
+
+    await waitFor(() =>
+      expect(useAppStore.getState().mapSession).toEqual({
+        source: "Opened",
+        fresh: false,
+      }),
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Name the Impact" }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -19,7 +19,7 @@ test("creates, saves, and reopens a simple map", async ({ page }) => {
   await expect(page.getByText("Primary Event")).toBeVisible();
 
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   const downloadPromise = page.waitForEvent("download");
@@ -142,7 +142,7 @@ test("creating another child focuses the parent and complete sibling group", asy
   const parentBeforeFirstChild = await parent.boundingBox();
   expect(parentBeforeFirstChild).not.toBeNull();
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page.waitForTimeout(500);
   const parentAfterFirstChild = await parent.boundingBox();
@@ -163,7 +163,7 @@ test("creating another child focuses the parent and complete sibling group", asy
   );
   await parent.click();
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
 
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
@@ -201,10 +201,12 @@ test("organizes moved nodes and frames the complete graph", async ({
   const organize = page.getByRole("button", { name: "Organize all nodes" });
   await expect(organize).toBeDisabled();
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page
+    .getByRole("menuitem", { name: "Event — Another occurrence" })
+    .click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page
     .locator(".react-flow__node")
@@ -233,10 +235,12 @@ test("shows map semantics and highlights only a selected branch", async ({
   await page.goto("/");
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page
+    .getByRole("menuitem", { name: "Event — Another occurrence" })
+    .click();
   await page.getByRole("textbox", { name: "Node title" }).press("Enter");
   await expect(
     page.getByRole("heading", { name: "Untitled Map" }),
