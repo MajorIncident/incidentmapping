@@ -17,18 +17,21 @@ import {
 } from "../../state/useAppStore";
 import { selectContextGroups } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
-import { BRANCH_LANE_GAP, edgeTypes, routeIncidentEdge } from "./IncidentEdge";
+import { edgeTypes } from "./IncidentEdge";
 import {
   CHAIN_NODE_HEIGHT,
   CHAIN_NODE_WIDTH,
-  CONTROL_NODE_HEIGHT,
-  CONTROL_NODE_WIDTH,
 } from "../../features/layout/dimensions";
 import type { EvidenceItem } from "../../features/maps/schema";
 import {
   calculateControlPosition,
+  layoutInvestigation,
   splitEdgeAtControl,
 } from "../../features/layout/investigationLayout";
+import type {
+  LayoutGraph,
+  LayoutResult,
+} from "../../features/layout/layoutModel";
 import {
   deriveHoverPresentation,
   deriveRelationshipPresentation,
@@ -37,6 +40,22 @@ import {
 } from "../../features/presentation/selectors";
 // Compatibility exports for callers migrating to the layout-layer adapter.
 export { calculateControlPosition, splitEdgeAtControl };
+
+/** Thin React Flow adapter: routing geometry remains owned by the layout layer. */
+export const adaptLayoutEdgeData = <T extends Record<string, unknown>>(
+  data: T,
+  relationshipId: string,
+  layout: LayoutResult,
+) => ({
+  ...data,
+  originalEdgeId: relationshipId,
+  route: layout.relationships.find(
+    (relationship) => relationship.relationshipId === relationshipId,
+  )?.route,
+  sharedSegments: layout.sharedSegments.filter((segment) =>
+    segment.relationshipIds.includes(relationshipId),
+  ),
+});
 
 export const viewportAnimationDuration = (duration: number): number =>
   typeof window !== "undefined" &&
@@ -211,9 +230,95 @@ export const Canvas = ({
         },
         className: `${node.className ?? ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(node.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
       }));
-    const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
+    const actionIds = new Set(
+      presentedNodes
+        .filter((node) => node.data.nodeType === "Action")
+        .map((node) => node.id),
+    );
+    const actionAnchors = new Map(
+      visibleEdges
+        .filter((edge) => edge.data?.kind === "ActionEdge")
+        .map((edge) => [edge.target, edge.source]),
+    );
+    const dimensions = (node: Node<ChainNodeData>) => ({
+      width: node.width ?? CHAIN_NODE_WIDTH,
+      height: node.height ?? CHAIN_NODE_HEIGHT,
+    });
+    const layoutRelationships: LayoutGraph["relationships"] = visibleEdges.map(
+      (edge) => ({
+        id: edge.id,
+        kind: edge.data?.kind === "ActionEdge" ? "Action" : "Causal",
+        fromId: edge.source,
+        toId: edge.target,
+      }),
+    );
+    const layoutGraph: LayoutGraph = {
+      nodes: presentedNodes
+        .filter((node) => !actionIds.has(node.id))
+        .map((node) => ({
+          id: node.id,
+          kind:
+            node.data.nodeType === "Event" || node.data.nodeType === "Impact"
+              ? node.data.nodeType
+              : "Factor",
+          referenceId: node.data.referenceId,
+          position: node.position,
+          dimensions: dimensions(node),
+          eventDisplay: node.data.eventDisplay,
+        })),
+      actions: presentedNodes
+        .filter((node) => actionIds.has(node.id))
+        .map((node) => ({
+          id: node.id,
+          kind: "Action",
+          attachedToId: actionAnchors.get(node.id) ?? "",
+          referenceId: node.data.referenceId,
+          position: node.position,
+          dimensions: dimensions(node),
+        })),
+      relationships: layoutRelationships,
+      controls: barriers.flatMap((control) => {
+        const relationship = layoutRelationships.find(
+          (item) =>
+            item.kind === "Causal" &&
+            item.fromId === control.upstreamNodeId &&
+            item.toId === control.downstreamNodeId,
+        );
+        return relationship
+          ? [
+              {
+                id: control.id,
+                kind: "Control" as const,
+                relationshipId: relationship.id,
+                upstreamNodeId: control.upstreamNodeId,
+                downstreamNodeId: control.downstreamNodeId,
+                referenceId: control.referenceId,
+                dimensions: measuredControlDimensions[control.id],
+              },
+            ]
+          : [];
+      }),
+    };
+    const layout = layoutInvestigation(layoutGraph, {
+      mode: "Incremental",
+      priorGeometry: presentedNodes.map((node) => ({
+        id: node.id,
+        role: actionIds.has(node.id) ? "Action" : "Semantic",
+        rectangle: { ...node.position, ...dimensions(node) },
+      })),
+    });
+    const layoutNodes = new Map(layout.nodes.map((node) => [node.id, node]));
+    const positionedNodes = presentedNodes.map((node) => {
+      const geometry = layoutNodes.get(node.id);
+      return geometry
+        ? {
+            ...node,
+            position: { x: geometry.rectangle.x, y: geometry.rectangle.y },
+          }
+        : node;
+    });
     const barrierNodes: Node<BarrierNodeData>[] = [];
-    const flowEdges = visibleEdges.flatMap((edge) => {
+    const flowEdges = visibleEdges.map((edge) => {
       const presentationRole =
         edge.data?.kind !== "ActionEdge" &&
         presentation.selectedPath.has(edge.source) &&
@@ -231,23 +336,9 @@ export const Canvas = ({
           barrier.downstreamNodeId === edge.target,
       );
 
-      if (!matchingBarrier) {
-        return [presentedEdge];
-      }
+      if (!matchingBarrier) return presentedEdge;
 
-      const upstream = nodeLookup.get(edge.source);
-      const downstream = nodeLookup.get(edge.target);
-      if (!upstream || !downstream) {
-        return [presentedEdge];
-      }
-
-      const controlSize = measuredControlDimensions[matchingBarrier.id];
-      const controlWidth = controlSize?.width ?? CONTROL_NODE_WIDTH;
-      const controlHeight = controlSize?.height ?? CONTROL_NODE_HEIGHT;
-      const upstreamWidth = upstream.width ?? CHAIN_NODE_WIDTH;
-      const upstreamHeight = upstream.height ?? CHAIN_NODE_HEIGHT;
-      const downstreamWidth = downstream.width ?? CHAIN_NODE_WIDTH;
-      const downstreamHeight = downstream.height ?? CHAIN_NODE_HEIGHT;
+      const controlGeometry = layoutNodes.get(matchingBarrier.id);
 
       const barrierNode: Node<BarrierNodeData> = {
         id: matchingBarrier.id,
@@ -273,19 +364,9 @@ export const Canvas = ({
               : presentation.unrelated.has(matchingBarrier.id),
           },
         },
-        position: calculateControlPosition(
-          {
-            position: upstream.position,
-            width: upstreamWidth,
-            height: upstreamHeight,
-          },
-          {
-            position: downstream.position,
-            width: downstreamWidth,
-            height: downstreamHeight,
-          },
-          { width: controlWidth, height: controlHeight },
-        ),
+        position: controlGeometry
+          ? { x: controlGeometry.rectangle.x, y: controlGeometry.rectangle.y }
+          : { x: 0, y: 0 },
         draggable: false,
         selectable: true,
         selected: matchingBarrier.id === selectionId,
@@ -294,26 +375,9 @@ export const Canvas = ({
 
       barrierNodes.push(barrierNode);
 
-      return splitEdgeAtControl(presentedEdge, matchingBarrier.id);
+      return presentedEdge;
     });
 
-    const allRenderedNodes = [...presentedNodes, ...barrierNodes];
-    const obstacleRectangles = allRenderedNodes.map((node) => ({
-      id: node.id,
-      x: node.position.x,
-      y: node.position.y,
-      width:
-        node.width ??
-        (node.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH),
-      height:
-        node.height ??
-        (node.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT),
-    }));
-    const branches = new Map<string, typeof flowEdges>();
-    flowEdges.forEach((edge) => {
-      const key = `${edge.source}:${edge.data?.kind === "ActionEdge" ? "action" : "causal"}`;
-      branches.set(key, [...(branches.get(key) ?? []), edge]);
-    });
     const styledEdges = flowEdges.map((edge) => {
       const isAction = edge.data?.kind === "ActionEdge";
       const hoverRelated = hover.emphasizedEdges.has(
@@ -329,63 +393,15 @@ export const Canvas = ({
         ? !hoverRelated
         : Boolean(selectionId) && !highlighted;
       const visuallyRelated = hasHover ? hoverRelated : highlighted;
-      const source = allRenderedNodes.find((node) => node.id === edge.source);
-      const target = allRenderedNodes.find((node) => node.id === edge.target);
-      const obstacles = obstacleRectangles.filter(
-        (rectangle) =>
-          rectangle.id !== edge.source && rectangle.id !== edge.target,
-      );
-      const laneOffset =
-        ((branches
-          .get(`${edge.source}:${isAction ? "action" : "causal"}`)
-          ?.indexOf(edge) ?? 0) -
-          ((branches.get(`${edge.source}:${isAction ? "action" : "causal"}`)
-            ?.length ?? 1) -
-            1) /
-            2) *
-        BRANCH_LANE_GAP;
-      const sourceWidth =
-        source?.width ??
-        (source?.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH);
-      const sourceHeight =
-        source?.height ??
-        (source?.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT);
-      const targetWidth =
-        target?.width ??
-        (target?.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH);
-      const targetHeight =
-        target?.height ??
-        (target?.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT);
-      const route =
-        source && target
-          ? routeIncidentEdge(
-              isAction
-                ? {
-                    x: source.position.x + sourceWidth,
-                    y: source.position.y + sourceHeight / 2,
-                  }
-                : {
-                    x: source.position.x + sourceWidth / 2,
-                    y: source.position.y + sourceHeight,
-                  },
-              isAction
-                ? {
-                    x: target.position.x,
-                    y: target.position.y + targetHeight / 2,
-                  }
-                : {
-                    x: target.position.x + targetWidth / 2,
-                    y: target.position.y,
-                  },
-              { kind: isAction ? "action" : "causal", obstacles, laneOffset },
-            )
-          : undefined;
       return {
         ...edge,
         type: "incident",
         data: {
-          ...edge.data,
-          route,
+          ...adaptLayoutEdgeData(
+            edge.data ?? {},
+            edge.data?.originalEdgeId ?? edge.id,
+            layout,
+          ),
         },
         className: isAction
           ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${visuallyRelated ? " incident-edge--related" : ""}`
@@ -406,7 +422,7 @@ export const Canvas = ({
       };
     });
     return {
-      nodes: [...presentedNodes, ...barrierNodes],
+      nodes: [...positionedNodes, ...barrierNodes],
       renderedEdges: styledEdges,
     };
   }, [

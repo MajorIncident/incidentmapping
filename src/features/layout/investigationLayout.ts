@@ -94,10 +94,10 @@ const boundsOf = (nodes: readonly LayoutNodeGeometry[]): Rectangle => {
  * Creates a disposable graph: Controls become nodes, while branch and merge
  * junctions remain bends in route geometry. Nothing returned is a map entity.
  */
-export const layoutInvestigation = async (
+export const layoutInvestigation = (
   input: InvestigationLayoutInput,
   options: InvestigationLayoutOptions,
-): Promise<LayoutResult> => {
+): LayoutResult => {
   const grid = options.gridSize ?? 8;
   const hGap = options.horizontalGap ?? SIBLING_GAP;
   const vGap = options.verticalGap ?? CAUSAL_ROW_GAP;

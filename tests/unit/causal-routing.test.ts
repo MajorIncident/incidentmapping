@@ -60,6 +60,29 @@ describe("causal routing", () => {
     );
   });
 
+  it("gives a one-to-two branch one shared source stem and one horizontal rail", () => {
+    const result = routeCausalRelationships(
+      [
+        edge("left-edge", "source", "left"),
+        edge("right-edge", "source", "right"),
+      ],
+      [node("source", 100, 0), node("left", 0, 300), node("right", 240, 300)],
+    );
+    const sourceStems = new Set(
+      result.relationships.map(({ route }) =>
+        JSON.stringify([route[0], route[1]]),
+      ),
+    );
+    const branchRails = result.sharedSegments.filter(
+      (segment) => segment.kind === "BranchRail",
+    );
+
+    expect(sourceStems).toHaveLength(1);
+    expect(branchRails).toHaveLength(1);
+    expect(branchRails[0].from.y).toBe(branchRails[0].to.y);
+    expect(branchRails[0].relationshipIds).toEqual(["left-edge", "right-edge"]);
+  });
+
   it("keeps a direct route outside unrelated cards and their clearance", () => {
     const obstacle = node("control", 110, 125);
     const result = routeCausalRelationships(

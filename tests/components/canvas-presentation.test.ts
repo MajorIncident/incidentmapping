@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  adaptLayoutEdgeData,
   calculateControlPosition,
   splitEdgeAtControl,
   viewportAnimationDuration,
 } from "../../src/components/Canvas/Canvas";
+import { layoutInvestigation } from "../../src/features/layout/investigationLayout";
 import {
   deriveGraphPresentation,
   deriveRelationshipPresentation,
@@ -64,6 +66,40 @@ describe("Control edge geometry", () => {
       target: "target",
       targetHandle: "top",
     });
+  });
+});
+
+describe("Canvas layout presentation adapter", () => {
+  it("maps one branch rail and the common source stem from one layout result", () => {
+    const layout = layoutInvestigation(
+      {
+        nodes: [
+          { id: "source", kind: "Event", position: { x: 100, y: 0 } },
+          { id: "left", kind: "Factor", position: { x: 0, y: 300 } },
+          { id: "right", kind: "Factor", position: { x: 240, y: 300 } },
+        ],
+        relationships: [
+          { id: "left-edge", kind: "Causal", fromId: "source", toId: "left" },
+          { id: "right-edge", kind: "Causal", fromId: "source", toId: "right" },
+        ],
+      },
+      { mode: "Incremental" },
+    );
+    const left = adaptLayoutEdgeData({ selected: true }, "left-edge", layout);
+    const right = adaptLayoutEdgeData({ hovered: true }, "right-edge", layout);
+
+    expect(left.originalEdgeId).toBe("left-edge");
+    expect(right.originalEdgeId).toBe("right-edge");
+    expect(left.selected).toBe(true);
+    expect(right.hovered).toBe(true);
+    expect([left.route?.slice(0, 2), right.route?.slice(0, 2)]).toEqual([
+      left.route?.slice(0, 2),
+      left.route?.slice(0, 2),
+    ]);
+    expect(left.sharedSegments).toHaveLength(1);
+    expect(right.sharedSegments).toHaveLength(1);
+    expect(left.sharedSegments[0]).toBe(right.sharedSegments[0]);
+    expect(left.sharedSegments[0].from.y).toBe(left.sharedSegments[0].to.y);
   });
 });
 
