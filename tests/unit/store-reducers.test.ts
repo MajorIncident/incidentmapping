@@ -860,6 +860,29 @@ describe("useAppStore actions", () => {
     );
   });
 
+  it("preserves unaffected dragged geometry when a second Factor is added", () => {
+    const { actions } = useAppStore.getState();
+    const parent = actions.addChild() as string;
+    const first = actions.addSemanticNode("Factor", parent) as string;
+    actions.moveNode(parent, { x: 416, y: 96 });
+    actions.moveNode(first, { x: 136, y: 504 });
+    const before = new Map(
+      useAppStore.getState().nodes.map((node) => [node.id, node.position]),
+    );
+
+    const second = actions.addSemanticNode("Factor", parent) as string;
+    const after = useAppStore.getState();
+    expect(after.nodes.find((node) => node.id === parent)?.position).toEqual(
+      before.get(parent),
+    );
+    expect(after.nodes.find((node) => node.id === first)?.position).toEqual(
+      before.get(first),
+    );
+    expect(after.nodes.find((node) => node.id === second)?.position.y).toBe(
+      before.get(first)?.y,
+    );
+  });
+
   it("allocates evidence globally from reconciled metadata in one history entry", () => {
     const { actions } = useAppStore.getState();
     const firstNode = actions.addChild() as string;

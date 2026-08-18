@@ -81,24 +81,35 @@ export const toElkGraph = (
     controls.map((control) => [control.relationshipId, control]),
   );
   const projected: ProjectedEdge[] = [];
-  graph.relationships.forEach((relationship) => {
-    const control = controlsByRelationship.get(relationship.id);
-    const stops = [
-      relationship.fromId,
-      ...(control ? [control.id] : []),
-      relationship.toId,
-    ];
-    stops.slice(0, -1).forEach((fromId, index) => {
-      projected.push({
-        id:
-          stops.length === 2 ? relationship.id : `${relationship.id}:${index}`,
-        relationshipId: relationship.id,
-        kind: relationship.kind,
-        fromId,
-        toId: stops[index + 1],
+  graph.relationships
+    .map((relationship, index) => ({ relationship, index }))
+    .sort(
+      (a, b) =>
+        a.index - b.index ||
+        a.relationship.fromId.localeCompare(b.relationship.fromId) ||
+        a.relationship.toId.localeCompare(b.relationship.toId) ||
+        a.relationship.id.localeCompare(b.relationship.id),
+    )
+    .forEach(({ relationship }) => {
+      const control = controlsByRelationship.get(relationship.id);
+      const stops = [
+        relationship.fromId,
+        ...(control ? [control.id] : []),
+        relationship.toId,
+      ];
+      stops.slice(0, -1).forEach((fromId, index) => {
+        projected.push({
+          id:
+            stops.length === 2
+              ? relationship.id
+              : `${relationship.id}:${index}`,
+          relationshipId: relationship.id,
+          kind: relationship.kind,
+          fromId,
+          toId: stops[index + 1],
+        });
       });
     });
-  });
   controls
     .slice()
     .sort((left, right) =>
@@ -159,26 +170,36 @@ export const layoutWithElk = async (
     (graph.controls ?? []).map((item) => [item.id, item]),
   );
   const actions = new Set((graph.actions ?? []).map((item) => item.id));
-  const nodes: LayoutNodeGeometry[] = (result.children ?? []).map((node) => ({
-    id: node.id,
-    role: controls.has(node.id)
-      ? "Control"
-      : actions.has(node.id)
-        ? "Action"
-        : "Semantic",
-    ...(controls.has(node.id)
-      ? {
-          controlId: node.id,
-          relationshipId: controls.get(node.id)!.relationshipId,
-        }
-      : {}),
-    rectangle: {
-      x: node.x ?? 0,
-      y: node.y ?? 0,
-      width: node.width ?? 0,
-      height: node.height ?? 0,
-    },
-  }));
+  const engineNodes = new Map(
+    (result.children ?? []).map((node) => [node.id, node]),
+  );
+  const stableIds = [...translated.graph.children!].map((node) => node.id);
+  const nodes: LayoutNodeGeometry[] = stableIds.flatMap((id) => {
+    const node = engineNodes.get(id);
+    if (!node) return [];
+    return [
+      {
+        id: node.id,
+        role: controls.has(node.id)
+          ? "Control"
+          : actions.has(node.id)
+            ? "Action"
+            : "Semantic",
+        ...(controls.has(node.id)
+          ? {
+              controlId: node.id,
+              relationshipId: controls.get(node.id)!.relationshipId,
+            }
+          : {}),
+        rectangle: {
+          x: node.x ?? 0,
+          y: node.y ?? 0,
+          width: node.width ?? 0,
+          height: node.height ?? 0,
+        },
+      },
+    ];
+  });
   const causal = graph.relationships.filter((edge) => edge.kind === "Causal");
   const outgoing = new Map<string, number>();
   const incoming = new Map<string, number>();
@@ -337,8 +358,13 @@ export const layoutWithElk = async (
       });
   });
   const metadata = new Map(translated.edges.map((edge) => [edge.id, edge]));
-  const relationships: RoutedRelationship[] = (result.edges ?? []).flatMap(
-    (edge) => {
+  const engineEdges = new Map(
+    (result.edges ?? []).map((edge) => [edge.id, edge]),
+  );
+  const relationships: RoutedRelationship[] = translated.edges.flatMap(
+    (stableEdge) => {
+      const edge = engineEdges.get(stableEdge.id);
+      if (!edge) return [];
       const data = metadata.get(edge.id);
       if (!data) return [];
       const from = geometryById.get(data.fromId);

@@ -151,7 +151,12 @@ type AppState = {
   canvasDetail: CanvasDetail;
   layoutVersion: number;
   measuredControlDimensions: Record<string, { width: number; height: number }>;
-  viewportRequest: { id: number; nodeIds: string[] } | null;
+  viewportRequest: {
+    id: number;
+    nodeIds: string[];
+    /** Arrange requests prefer this readable core when auxiliary gutters are too wide. */
+    causalNodeIds?: string[];
+  } | null;
   editorFocusRequest: EditorRequest | null;
   contextEditing: boolean;
   history: HistoryState;
@@ -503,6 +508,57 @@ const applyLayout = (
       ),
     ),
   });
+};
+
+/** Place one new causal card without rewriting geometry established by dragging. */
+const placeIncrementalNode = (
+  nodes: Node<ChainNodeData>[],
+  newNodeId: string,
+  parentId: string | null,
+  siblingId: string | null,
+  canvasDetail: CanvasDetail,
+): Node<ChainNodeData>[] => {
+  const added = nodes.find((node) => node.id === newNodeId);
+  const anchor = nodes.find((node) => node.id === (siblingId ?? parentId));
+  if (!added || !anchor) return nodes;
+  const addedSize = getNodeSize(added, canvasDetail);
+  const anchorSize = getNodeSize(anchor, canvasDetail);
+  const y = siblingId
+    ? anchor.position.y
+    : anchor.position.y +
+      anchorSize.height +
+      VERTICAL_GAP +
+      CONTROL_BAND_HEIGHT;
+  const atRank = nodes.filter(
+    (node) => node.id !== newNodeId && Math.abs(node.position.y - y) < 8,
+  );
+  const candidates = [
+    anchor.position.x + anchorSize.width + ACTION_HORIZONTAL_GAP,
+    anchor.position.x - addedSize.width - ACTION_HORIZONTAL_GAP,
+  ];
+  const clear = (x: number) =>
+    atRank.every((node) => {
+      const width = getNodeSize(node, canvasDetail).width;
+      return (
+        x + addedSize.width + ACTION_HORIZONTAL_GAP <= node.position.x ||
+        x >= node.position.x + width + ACTION_HORIZONTAL_GAP
+      );
+    });
+  const x =
+    candidates.find(clear) ??
+    Math.max(
+      0,
+      ...atRank.map(
+        (node) =>
+          node.position.x +
+          getNodeSize(node, canvasDetail).width +
+          ACTION_HORIZONTAL_GAP,
+      ),
+    );
+  const position = snapPosition({ x, y });
+  return nodes.map((node) =>
+    node.id === newNodeId ? { ...node, position } : node,
+  );
 };
 
 const quantizeDimension = (
@@ -1550,10 +1606,25 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
-        const firstChild = Boolean(parentNode && outgoingChildCount === 0);
-        const { nodes: laidOutNodes, changed: layoutChanged } = firstChild
-          ? { nodes: nextNodes, changed: false }
-          : applyLayout(nextNodes, nextEdges, state.canvasDetail);
+        const laidOutNodes = parentNode
+          ? placeIncrementalNode(
+              nextNodes,
+              newNodeId,
+              parentNode.id,
+              outgoingChildCount > 0
+                ? (nextEdges.find(
+                    (edge) =>
+                      edge.source === parentNode.id &&
+                      edge.target !== newNodeId &&
+                      edge.data?.kind !== "ActionEdge",
+                  )?.target ?? null)
+                : null,
+              state.canvasDetail,
+            )
+          : nextNodes;
+        const layoutChanged = laidOutNodes.some(
+          (node, index) => node !== nextNodes[index],
+        );
         const candidate = {
           ...state,
           nodes: laidOutNodes,
@@ -1748,10 +1819,15 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
-        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
+        const laidOutNodes = placeIncrementalNode(
           nextNodes,
-          nextEdges,
+          newNodeId,
+          parentId,
+          targetSiblingId,
           state.canvasDetail,
+        );
+        const layoutChanged = laidOutNodes.some(
+          (node, index) => node !== nextNodes[index],
         );
         const candidate = {
           ...state,
@@ -2274,6 +2350,13 @@ export const useAppStore = create<AppState>((set, get) => ({
               viewportRequest: {
                 id: (state.viewportRequest?.id ?? 0) + 1,
                 nodeIds: nodes.map((node) => node.id),
+                causalNodeIds: nodes
+                  .filter(
+                    (node) =>
+                      node.data.nodeType !== "Action" &&
+                      node.data.eventDisplay !== "ChronologyOnly",
+                  )
+                  .map((node) => node.id),
               },
             };
           });

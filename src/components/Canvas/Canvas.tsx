@@ -491,10 +491,43 @@ export const Canvas = ({
         .getNodes()
         .filter((node) => requestedIds.has(node.id));
       if (requestedNodes.length > 0) {
-        void reactFlow.fitBounds(getNodesBounds(requestedNodes), {
-          padding: 0.25,
-          duration: viewportAnimationDuration(400),
-        });
+        let fittedNodes = requestedNodes;
+        if (viewportRequest.causalNodeIds?.length && canvasRef.current) {
+          const allBounds = getNodesBounds(requestedNodes);
+          const available = canvasRef.current.getBoundingClientRect();
+          const whitespaceFactor = 0.8;
+          const allZoom = Math.min(
+            (available.width * whitespaceFactor) / Math.max(1, allBounds.width),
+            (available.height * whitespaceFactor) /
+              Math.max(1, allBounds.height),
+          );
+          if (allZoom < 0.65) {
+            const causalIds = new Set(viewportRequest.causalNodeIds);
+            fittedNodes = requestedNodes.filter((node) =>
+              causalIds.has(node.id),
+            );
+          }
+        }
+        const fittedBounds = getNodesBounds(fittedNodes);
+        const available = canvasRef.current?.getBoundingClientRect();
+        const readableZoom = available
+          ? Math.min(
+              (available.width * 0.8) / Math.max(1, fittedBounds.width),
+              (available.height * 0.8) / Math.max(1, fittedBounds.height),
+            )
+          : 1;
+        if (readableZoom < 0.65) {
+          void reactFlow.setCenter(
+            fittedBounds.x + fittedBounds.width / 2,
+            fittedBounds.y + fittedBounds.height / 2,
+            { zoom: 0.65, duration: viewportAnimationDuration(400) },
+          );
+        } else {
+          void reactFlow.fitBounds(fittedBounds, {
+            padding: 0.25,
+            duration: viewportAnimationDuration(400),
+          });
+        }
         setTimeout(
           () => clearViewportRequest(viewportRequest.id),
           viewportAnimationDuration(400),

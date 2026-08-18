@@ -163,21 +163,40 @@ export const layoutInvestigation = async (
       origin += rankHeights.get(level)! + vGap + CONTROL_BAND_HEIGHT;
     });
   const rankOrder = new Map<number, number>();
+  const prior = new Map(
+    (options.priorGeometry ?? []).map((geometry) => [geometry.id, geometry]),
+  );
+  const addedId =
+    options.structuralChange?.kind === "AddNode"
+      ? options.structuralChange.nodeId
+      : undefined;
   const geometries: LayoutNodeGeometry[] = causalNodes.map((node) => {
-    const dimensions = size(node.dimensions, {
-      width: CHAIN_NODE_WIDTH,
-      height: CHAIN_NODE_HEIGHT,
-    });
+    const previous = prior.get(node.id);
+    const dimensions =
+      options.mode === "Incremental" && previous && node.id !== addedId
+        ? {
+            width: previous.rectangle.width,
+            height: previous.rectangle.height,
+          }
+        : size(node.dimensions, {
+            width: CHAIN_NODE_WIDTH,
+            height: CHAIN_NODE_HEIGHT,
+          });
     const level = rank.get(node.id) ?? 0;
     const order = rankOrder.get(level) ?? 0;
     rankOrder.set(level, order + 1);
     const preferred = node.layoutHints?.preferredPosition ?? node.position;
     const position = {
       x:
-        options.mode === "Incremental" && preferred
-          ? preferred.x
-          : order * (dimensions.width + hGap),
-      y: rankOrigins.get(level) ?? 0,
+        options.mode === "Incremental" && previous && node.id !== addedId
+          ? previous.rectangle.x
+          : options.mode === "Incremental" && preferred
+            ? preferred.x
+            : order * (dimensions.width + hGap),
+      y:
+        options.mode === "Incremental" && previous && node.id !== addedId
+          ? previous.rectangle.y
+          : (rankOrigins.get(level) ?? 0),
     };
     return {
       id: node.id,
@@ -185,6 +204,55 @@ export const layoutInvestigation = async (
       rectangle: { x: snap(position.x), y: snap(position.y), ...dimensions },
     };
   });
+  if (options.mode === "Incremental" && addedId) {
+    const added = geometries.find((geometry) => geometry.id === addedId);
+    if (added) {
+      const change = options.structuralChange;
+      const parent =
+        change?.kind === "AddNode"
+          ? prior.get(change.parentId ?? "")
+          : undefined;
+      const sibling =
+        change?.kind === "AddNode"
+          ? prior.get(change.siblingId ?? "")
+          : undefined;
+      const peers = geometries.filter(
+        (geometry) =>
+          geometry.id !== addedId &&
+          Math.abs(geometry.rectangle.y - added.rectangle.y) < grid,
+      );
+      const anchor = sibling ?? parent;
+      const candidates = anchor
+        ? [
+            anchor.rectangle.x + anchor.rectangle.width + hGap,
+            anchor.rectangle.x - added.rectangle.width - hGap,
+          ]
+        : [added.rectangle.x];
+      const clear = (x: number) =>
+        peers.every(
+          (peer) =>
+            x + added.rectangle.width + hGap <= peer.rectangle.x ||
+            x >= peer.rectangle.x + peer.rectangle.width + hGap,
+        );
+      const x =
+        candidates.find(clear) ??
+        Math.max(
+          0,
+          ...peers.map(
+            (peer) => peer.rectangle.x + peer.rectangle.width + hGap,
+          ),
+        );
+      (added.rectangle as { x: number; y: number }).x = snap(x);
+      if (sibling) (added.rectangle as { y: number }).y = sibling.rectangle.y;
+      else if (parent)
+        (added.rectangle as { y: number }).y = snap(
+          parent.rectangle.y +
+            parent.rectangle.height +
+            vGap +
+            CONTROL_BAND_HEIGHT,
+        );
+    }
+  }
   const byId = new Map(geometries.map((node) => [node.id, node]));
 
   const controlsByRelationship = new Map(

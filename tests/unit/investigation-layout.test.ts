@@ -13,6 +13,48 @@ const base: InvestigationLayoutInput = {
 };
 
 describe("post-causal projections", () => {
+  it("incrementally adds a Factor without moving prior geometry", async () => {
+    const priorGeometry = [
+      {
+        id: "root",
+        role: "Semantic" as const,
+        rectangle: { x: 320, y: 80, width: 280, height: 160 },
+      },
+      {
+        id: "effect",
+        role: "Semantic" as const,
+        rectangle: { x: 320, y: 520, width: 280, height: 160 },
+      },
+    ];
+    const result = await layoutInvestigation(
+      {
+        nodes: [...base.nodes, { id: "factor", kind: "Factor" }],
+        relationships: [
+          ...base.relationships,
+          { id: "factor-edge", kind: "Causal", fromId: "root", toId: "factor" },
+        ],
+      },
+      {
+        mode: "Incremental",
+        priorGeometry,
+        structuralChange: {
+          kind: "AddNode",
+          nodeId: "factor",
+          parentId: "root",
+        },
+      },
+    );
+
+    for (const previous of priorGeometry) {
+      expect(
+        result.nodes.find((node) => node.id === previous.id)?.rectangle,
+      ).toEqual(previous.rectangle);
+    }
+    expect(
+      result.nodes.find((node) => node.id === "factor")!.rectangle.y,
+    ).toBeGreaterThan(priorGeometry[0].rectangle.y);
+  });
+
   it("places Actions to the right of their source", async () => {
     const result = await layoutInvestigation(
       {

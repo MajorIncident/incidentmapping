@@ -129,8 +129,21 @@ export type InvestigationLayoutInput = Readonly<{
 export type LayoutGraph = InvestigationLayoutInput;
 
 export type LayoutMode = "Incremental" | "ArrangeMap";
+export type StructuralChange = Readonly<
+  | {
+      kind: "AddNode";
+      nodeId: LayoutId;
+      parentId?: LayoutId;
+      siblingId?: LayoutId;
+    }
+  | { kind: "AddRelationship" | "RemoveRelationship"; relationshipId: LayoutId }
+>;
 export type InvestigationLayoutOptions = Readonly<{
   mode: LayoutMode;
+  /** Geometry from the currently displayed map. Incremental layout treats it as authoritative. */
+  priorGeometry?: readonly LayoutNodeGeometry[];
+  /** The edit which caused this layout request. Required for targeted incremental placement. */
+  structuralChange?: StructuralChange;
   gridSize?: number;
   horizontalGap?: number;
   verticalGap?: number;
