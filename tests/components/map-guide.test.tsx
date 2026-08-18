@@ -48,13 +48,20 @@ describe("Learning Guide", () => {
       screen.getByRole("complementary", { name: "Learning Guide" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("heading", { name: "Start with Impact" }),
+      screen.getByRole("heading", { name: "STEP 1 · START HERE" }),
     ).toBeVisible();
-    expect(screen.getByText(/Context: empty map/i)).toBeVisible();
-    expect(screen.getByText("More detail")).toBeVisible();
-    expect(screen.getByText("Why this tip?")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Add Impact" }));
-    expect(onAction).toHaveBeenCalledWith("add-impact");
+    expect(
+      screen.getByRole("heading", { name: "Name the Impact" }),
+    ).toBeVisible();
+    expect(screen.getByText("What outcome or consequence resulted?"));
+    for (const example of ["Injury", "Service interruption", "Financial loss"])
+      expect(screen.getByText(example)).toBeVisible();
+    expect(
+      screen.getByText("Describe the outcome, not the cause."),
+    ).toBeVisible();
+    expect(screen.queryByText(/Context:|Current signal:/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add Impact/i })).toBeNull();
+    expect(onAction).not.toHaveBeenCalled();
   });
 
   it("collapses, expands, restores focus, and persists first-use introduction", async () => {
@@ -90,8 +97,43 @@ describe("Learning Guide", () => {
       />,
     );
     expect(
-      screen.getByRole("heading", { name: "Start with Impact" }),
+      screen.getByRole("heading", { name: "STEP 1 · START HERE" }),
     ).toBeVisible();
+  });
+
+  it("automatically follows committed titles and exposes both Step 3 choices", () => {
+    const impact = {
+      id: "impact",
+      nodeType: "Impact" as const,
+      title: "Injury",
+    };
+    const step2 = selectInvestigationGuidance({
+      nodes: [impact],
+      selectedEntity: "impact",
+      mapSession: { source: "New", fresh: false },
+    });
+    expect(step2.primary?.entry.title).toBe("STEP 2 · WHAT HAPPENED?");
+    expect(step2.primary?.entry.suggestedActions[0].label).toBe("+ Add Event");
+
+    const draft = {
+      id: "event",
+      nodeType: "Event" as const,
+      title: "New Event",
+    };
+    const whileEditing = selectInvestigationGuidance({
+      nodes: [impact, draft],
+      selectedEntity: "event",
+    });
+    expect(whileEditing.primary?.entry.title).toBe("STEP 2 · WHAT HAPPENED?");
+
+    const committed = selectInvestigationGuidance({
+      nodes: [impact, { ...draft, title: "Alarm activated" }],
+      selectedEntity: "event",
+    });
+    expect(committed.primary?.entry.title).toBe("STEP 3 · ASK WHY");
+    expect(
+      committed.primary?.entry.suggestedActions.map(({ label }) => label),
+    ).toEqual(["+ Event", "+ Factor"]);
   });
 
   it("dismisses an individual tip only in session storage", () => {

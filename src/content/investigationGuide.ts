@@ -15,13 +15,7 @@ export const GUIDE_CONTEXTS = [
   "context-editing",
   "chronology",
   "presentation",
-  "missing-impact",
-  "missing-events",
-  "missing-factors",
-  "missing-controls",
-  "missing-evidence",
-  "missing-root-cause",
-  "missing-actions",
+  "first-event-draft",
   "multiple-branches",
   "assertion-state",
   "maturity-getting-started",
@@ -131,37 +125,35 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   makeEntry({
     id: "new-map",
     contexts: ["empty-map", "new-map"],
-    title: "Start with Impact",
-    content: [body(concept("impact").shortDefinition), question("impact")],
-    detail: [
-      { type: "heading", level: 3, text: "Begin at the outcome" },
-      body(concept("impact").definition),
-      example("impact"),
-      diagram(["Impact"], [], "One Impact begins the investigation map."),
-      {
-        type: "suggested-action",
-        actionId: "add-impact",
-        text: "Add the outcome first.",
-      },
+    title: "STEP 1 · START HERE",
+    content: [
+      { type: "heading", level: 3, text: "Name the Impact" },
+      question("impact"),
+      ...concept("impact").examples.map(
+        (text): GuideContentBlock => ({
+          type: "example",
+          label: "Example",
+          text,
+        }),
+      ),
+      { type: "rule", text: "Describe the outcome, not the cause." },
     ],
-    suggestedActions: [action("add-impact", "Add Impact")],
+    suggestedActions: [],
     relatedConcepts: ["impact"],
     priority: 100,
     why: "the map is empty or newly created.",
   }),
   makeEntry({
     id: "selected-impact",
-    contexts: ["impact-selected"],
-    title: "Clarify this Impact",
-    content: [question("impact"), example("impact", 1)],
-    detail: [
-      body(concept("impact").definition),
+    contexts: ["impact-selected", "first-event-draft"],
+    title: "STEP 2 · WHAT HAPPENED?",
+    content: [
       {
-        type: "rule",
-        text: "Record the outcome here; record what occurred as Events.",
+        type: "question",
+        text: "What happened immediately before the outcome?",
       },
     ],
-    suggestedActions: [action("add-event", "Add Event")],
+    suggestedActions: [action("add-event", "+ Add Event")],
     relatedConcepts: ["impact", "event"],
     priority: 60,
     why: "an Impact is selected.",
@@ -169,24 +161,19 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   makeEntry({
     id: "selected-event",
     contexts: ["event-selected"],
-    title: "Place the Event",
+    title: "STEP 3 · ASK WHY",
     content: [
-      question("event"),
+      { type: "question", text: "Why did this happen?" },
       diagram(
-        ["Impact", "Event"],
-        ["←"],
-        "An Event connects causally toward an Impact.",
+        ["Event — something happened", "Factor — a condition existed"],
+        ["or"],
+        "Choose Event when something happened. Choose Factor when a condition existed.",
       ),
     ],
-    detail: [
-      body(concept("event").definition),
-      example("event"),
-      {
-        type: "rule",
-        text: "Sequence and timing alone do not prove causation.",
-      },
+    suggestedActions: [
+      action("add-event", "+ Event"),
+      action("add-factor", "+ Factor"),
     ],
-    suggestedActions: [action("add-factor", "Add Factor")],
     relatedConcepts: ["event", "factor"],
     priority: 62,
     why: "an Event is selected.",
@@ -222,26 +209,22 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   makeEntry({
     id: "selected-factor",
     contexts: ["factor-selected"],
-    title: "Test the causal claim",
-    content: [question("factor")],
-    detail: [
-      body(concept("factor").definition),
-      example("factor"),
-      {
-        type: "suggested-action",
-        actionId: "add-evidence",
-        text: "Attach information that supports or challenges the claim.",
-      },
+    title: "ASK WHY",
+    content: [
+      { type: "question", text: "Why did this condition exist?" },
+      body(
+        "Continue the line of inquiry when another contributing condition is useful.",
+      ),
     ],
-    suggestedActions: [action("add-evidence", "Add Evidence")],
-    relatedConcepts: ["factor", "evidence"],
+    suggestedActions: [action("add-factor", "+ Factor")],
+    relatedConcepts: ["factor"],
     priority: 60,
     why: "a Factor is selected.",
   }),
   makeEntry({
     id: "selected-control",
     contexts: ["control-selected"],
-    title: "Assess the intended safeguard",
+    title: "CHECK THE SAFEGUARD",
     content: [question("control")],
     detail: [
       body(concept("control").definition),
@@ -304,8 +287,8 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   }),
   makeEntry({
     id: "create-evidence",
-    contexts: ["evidence-selected", "missing-evidence"],
-    title: "Connect Evidence to a finding",
+    contexts: ["evidence-selected"],
+    title: "SUPPORT THE FINDING",
     content: [
       {
         type: "warning",
@@ -333,7 +316,7 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   makeEntry({
     id: "selected-action",
     contexts: ["action-selected"],
-    title: "Make the response specific",
+    title: "PLAN THE RESPONSE",
     content: [question("action")],
     detail: [
       body(concept("action").definition),
