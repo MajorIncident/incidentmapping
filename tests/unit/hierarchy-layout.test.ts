@@ -7,6 +7,10 @@ import {
   CONTROL_NODE_HEIGHT,
   CONTROL_NODE_WIDTH,
 } from "../../src/features/layout/dimensions";
+import {
+  CAUSAL_ROW_GAP,
+  CONTROL_BAND_HEIGHT,
+} from "../../src/features/layout/geometry/spacing";
 
 const node = (id: string, x = 0, y = 0): Node => ({
   id,
@@ -43,24 +47,18 @@ const intersects = (left: Rectangle, right: Rectangle) =>
   left.y < right.y + right.height &&
   left.y + left.height > right.y;
 const controlRectangle = (
-  upstream: Node,
+  _upstream: Node,
   downstream: Node,
   width = CONTROL_NODE_WIDTH,
   height = CONTROL_NODE_HEIGHT,
 ): Rectangle => ({
   x:
-    (upstream.position.x +
-      (upstream.width ?? CHAIN_NODE_WIDTH) / 2 +
-      downstream.position.x +
-      (downstream.width ?? CHAIN_NODE_WIDTH) / 2) /
-      2 -
+    downstream.position.x +
+    (downstream.width ?? CHAIN_NODE_WIDTH) / 2 -
     width / 2,
   y:
-    (upstream.position.y +
-      (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
-      downstream.position.y +
-      (downstream.height ?? CHAIN_NODE_HEIGHT) / 2) /
-      2 -
+    downstream.position.y -
+    (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
     height / 2,
   width,
   height,
@@ -146,6 +144,35 @@ describe("layoutHierarchy", () => {
     expect(
       result.find((item) => item.id === "orphan")!.position.x,
     ).toBeGreaterThan(result.find((item) => item.id === "a")!.position.x);
+  });
+
+  it("ranks a shared descendant from every incoming causal relationship", () => {
+    const cards = [
+      { ...node("impact-a"), height: 144, data: { nodeType: "Impact" } },
+      { ...node("impact-b"), height: 264, data: { nodeType: "Impact" } },
+      { ...node("short"), height: 128, data: { classification: "KeyFactor" } },
+      { ...node("long"), height: 312, data: { classification: "RootCause" } },
+      { ...node("shared"), height: 176 },
+    ];
+    const result = layoutHierarchy(
+      cards,
+      [
+        edge("impact-a", "short"),
+        edge("impact-b", "long"),
+        edge("short", "shared"),
+        edge("long", "shared"),
+      ],
+      false,
+    );
+    const byId = new Map(result.map((item) => [item.id, item]));
+
+    expect(byId.get("impact-a")!.position.y).toBe(
+      byId.get("impact-b")!.position.y,
+    );
+    expect(byId.get("short")!.position.y).toBe(byId.get("long")!.position.y);
+    expect(byId.get("shared")!.position.y).toBeGreaterThan(
+      byId.get("long")!.position.y + 312,
+    );
   });
 
   it("places isolated timestamped Events in a stable chronological lane", () => {
@@ -338,14 +365,14 @@ describe("layoutHierarchy", () => {
     );
     expect(bounds).toEqual({
       event: { x: 1016, y: 0, width: 240, height: 176 },
-      "factor-1": { x: 0, y: 240, width: 240, height: 176 },
-      "action-1": { x: 304, y: 240, width: 240, height: 176 },
-      "factor-2": { x: 576, y: 240, width: 240, height: 176 },
-      "action-2": { x: 880, y: 240, width: 240, height: 176 },
-      "factor-3": { x: 1152, y: 240, width: 240, height: 176 },
-      "action-3": { x: 1456, y: 240, width: 240, height: 176 },
-      "factor-4": { x: 1728, y: 240, width: 240, height: 176 },
-      "action-4": { x: 2032, y: 240, width: 240, height: 176 },
+      "factor-1": { x: 0, y: 424, width: 240, height: 176 },
+      "action-1": { x: 304, y: 424, width: 240, height: 176 },
+      "factor-2": { x: 576, y: 424, width: 240, height: 176 },
+      "action-2": { x: 880, y: 424, width: 240, height: 176 },
+      "factor-3": { x: 1152, y: 424, width: 240, height: 176 },
+      "action-3": { x: 1456, y: 424, width: 240, height: 176 },
+      "factor-4": { x: 1728, y: 424, width: 240, height: 176 },
+      "action-4": { x: 2032, y: 424, width: 240, height: 176 },
     });
 
     const actions = result.filter(

@@ -9,6 +9,10 @@ import {
   type HierarchyLayoutOptions,
 } from "../../../src/features/layout/hierarchy";
 import type { LayoutTopology } from "./topology";
+import {
+  CAUSAL_ROW_GAP,
+  CONTROL_BAND_HEIGHT,
+} from "../../../src/features/layout/geometry/spacing";
 
 export type RoutedEdge = Edge & { points?: readonly XYPosition[] };
 export type LayoutOutput = { nodes: Node[]; edges: RoutedEdge[] };
@@ -132,22 +136,15 @@ const measure = (
     const upstream = byId.get(control.upstreamNodeId);
     const downstream = byId.get(control.downstreamNodeId);
     if (!upstream || !downstream) return;
-    const upstreamSize = getNodeSize(upstream, false);
     const downstreamSize = getNodeSize(downstream, false);
     controlCoordinates[control.id] = {
       x:
-        (upstream.position.x +
-          upstreamSize.width / 2 +
-          downstream.position.x +
-          downstreamSize.width / 2) /
-          2 -
+        downstream.position.x +
+        downstreamSize.width / 2 -
         CONTROL_NODE_WIDTH / 2,
       y:
-        (upstream.position.y +
-          upstreamSize.height / 2 +
-          downstream.position.y +
-          downstreamSize.height / 2) /
-          2 -
+        downstream.position.y -
+        (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
         CONTROL_NODE_HEIGHT / 2,
     };
     placedControls += 1;

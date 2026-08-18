@@ -8,7 +8,7 @@ import {
 } from "../../src/components/Canvas/Canvas";
 
 describe("Control edge geometry", () => {
-  it("centers a Control between unequal endpoint handle coordinates", () => {
+  it("centers a Control in the downstream relationship lane", () => {
     const source = {
       position: { x: 40, y: 20 },
       width: 180,
@@ -36,11 +36,10 @@ describe("Control edge geometry", () => {
     };
 
     expect(center).toEqual({
-      x: (sourceBottom.x + targetTop.x) / 2,
-      y: (sourceBottom.y + targetTop.y) / 2,
+      x: targetTop.x,
+      y: targetTop.y - (64 + 184) / 2,
     });
-    expect(center.x).toBeGreaterThan(sourceBottom.x);
-    expect(center.x).toBeLessThan(targetTop.x);
+    expect(center.x).not.toBe(sourceBottom.x);
     expect(center.y).toBeGreaterThan(sourceBottom.y);
     expect(center.y).toBeLessThan(targetTop.y);
   });
