@@ -107,8 +107,7 @@ describe("Canvas layout presentation adapter", () => {
       left.route?.slice(0, 2),
     ]);
     expect(left.sharedSegments).toHaveLength(1);
-    expect(right.sharedSegments).toHaveLength(1);
-    expect(left.sharedSegments[0]).toBe(right.sharedSegments[0]);
+    expect(right.sharedSegments).toHaveLength(0);
     expect(left.sharedSegments[0].from.y).toBe(left.sharedSegments[0].to.y);
   });
 });

@@ -59,8 +59,13 @@ export const adaptLayoutEdgeData = <T extends Record<string, unknown>>(
     ...data,
     originalEdgeId: relationshipId,
     route: routed?.route,
-    sharedSegments: layout.sharedSegments.filter((segment) =>
-      segment.relationshipIds.includes(relationshipId),
+    // Shared ink has one renderer owner. Other member relationships retain the
+    // segment membership for interaction in the layout result, but do not
+    // append another copy of the same SVG path.
+    sharedSegments: layout.sharedSegments.filter(
+      (segment) =>
+        segment.relationshipIds[0] === relationshipId &&
+        !rendererEdgeId.endsWith("-downstream"),
     ),
   };
 };

@@ -55,13 +55,23 @@ export type CausalRoutingResult = Readonly<{
   sharedSegments: readonly SharedRouteSegment[];
 }>;
 
-/** Routes the semantic graph. Control state is intentionally absent from this API. */
+export type CausalRouteControl = Readonly<{
+  relationshipId: string;
+  controlId: string;
+  rectangle: LayoutNodeGeometry["rectangle"];
+}>;
+
+/** Routes semantic relationships, optionally projecting Controls as ordered waypoints. */
 export const routeCausalRelationships = (
   relationships: readonly CausalRelationship[],
   nodes: readonly LayoutNodeGeometry[],
+  controls: readonly CausalRouteControl[] = [],
 ): CausalRoutingResult => {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const roles = classifyCausalRelationships(relationships);
+  const controlsByRelationship = new Map(
+    controls.map((control) => [control.relationshipId, control]),
+  );
   const endpoints = relationships.flatMap((edge): RoutingEndpoint[] => {
     const source = byId.get(edge.fromId)?.rectangle;
     const target = byId.get(edge.toId)?.rectangle;
@@ -132,14 +142,46 @@ export const routeCausalRelationships = (
           node.id !== endpoint.sourceId && node.id !== endpoint.targetId,
       )
       .map((node) => inflateRectangle(node.rectangle, OBJECT_CLEARANCE));
-    // Rails describe shared ink, but the ordered per-relationship route still
-    // has to use the visibility graph: a straight projection between rail
-    // junctions can pass through a tall sibling card.
-    const middle: OrthogonalRoute = routeOrthogonally(
-      startStub,
-      endStub,
-      obstacles,
-    );
+    const branchRail = branchRails.get(endpoint.sourceId);
+    const mergeRail = mergeRails.get(endpoint.targetId);
+    const control = controlsByRelationship.get(endpoint.relationshipId);
+    const controlTop = control && {
+      x: control.rectangle.x + control.rectangle.width / 2,
+      y: control.rectangle.y,
+    };
+    const controlBottom = control && {
+      x: controlTop!.x,
+      y: control.rectangle.y + control.rectangle.height,
+    };
+    // Degree and rail selection belong to the semantic edge. Controls are
+    // merely ordered waypoints on that route, never synthetic graph members.
+    const waypoints = [
+      ...(branchRail
+        ? [
+            { x: endpoint.source.x, y: branchRail.y },
+            { x: controlTop?.x ?? endpoint.target.x, y: branchRail.y },
+          ]
+        : []),
+      ...(!branchRail && controlTop
+        ? [
+            { x: endpoint.source.x, y: controlTop.y - EDGE_STUB },
+            { x: controlTop.x, y: controlTop.y - EDGE_STUB },
+          ]
+        : []),
+      ...(controlTop ? [controlTop, controlBottom!] : []),
+      ...(mergeRail
+        ? [
+            { x: controlBottom?.x ?? endpoint.source.x, y: mergeRail.y },
+            { x: endpoint.target.x, y: mergeRail.y },
+          ]
+        : []),
+      ...(!mergeRail && controlBottom
+        ? [{ x: controlBottom.x, y: endStub.y }, endStub]
+        : []),
+    ];
+    const middle: OrthogonalRoute = waypoints.length
+      ? ([startStub, ...waypoints, endStub] as unknown as OrthogonalRoute)
+      : routeOrthogonally(startStub, endStub, obstacles);
     return {
       id: endpoint.relationshipId,
       relationshipId: endpoint.relationshipId,
@@ -147,11 +189,19 @@ export const routeCausalRelationships = (
       fromId: endpoint.sourceId,
       toId: endpoint.targetId,
       role: roles.get(endpoint.relationshipId)!,
-      route: simplifyOrthogonalRoute([
-        endpoint.source,
-        ...middle,
-        endpoint.target,
-      ]),
+      // Preserve explicit Control port points even when they are collinear;
+      // adapters use those boundaries to derive the two handle-facing pieces.
+      route: control
+        ? ([
+            endpoint.source,
+            ...middle,
+            endpoint.target,
+          ] as unknown as OrthogonalRoute)
+        : simplifyOrthogonalRoute([
+            endpoint.source,
+            ...middle,
+            endpoint.target,
+          ]),
     };
   });
   return {

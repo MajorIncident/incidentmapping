@@ -320,8 +320,19 @@ export const layoutInvestigation = (
     });
   });
 
-  // Causal routing is deliberately complete before auxiliary projections exist.
-  const causalRouting = routeCausalRelationships(causal, geometries);
+  // Classify and group only persisted semantic relationships. Control geometry
+  // is supplied as a waypoint projection on its owning relationship.
+  const causalRouting = routeCausalRelationships(
+    causal,
+    geometries,
+    geometries
+      .filter((node) => node.role === "Control")
+      .map((node) => ({
+        relationshipId: node.relationshipId!,
+        controlId: node.controlId!,
+        rectangle: node.rectangle,
+      })),
+  );
   const causalBounds = boundsOf(
     geometries.filter((node) => node.role === "Semantic"),
   );
@@ -367,34 +378,54 @@ export const layoutInvestigation = (
     (relationship): RoutedRelationship[] => {
       const control = controlsByRelationship.get(relationship.relationshipId);
       if (!control) return [relationship];
-      const split = routeCausalRelationships(
-        [
-          {
-            id: `${relationship.id}-${control.id}-upstream`,
-            kind: "Causal",
-            fromId: relationship.fromId,
-            toId: control.id,
-          },
-          {
-            id: `${relationship.id}-${control.id}-downstream`,
-            kind: "Causal",
-            fromId: control.id,
-            toId: relationship.toId,
-          },
-        ],
-        geometries,
+      const controlGeometry = byId.get(control.id)!;
+      const centerX =
+        controlGeometry.rectangle.x + controlGeometry.rectangle.width / 2;
+      const topIndex = relationship.route.findIndex(
+        (point) =>
+          point.x === centerX && point.y === controlGeometry.rectangle.y,
       );
+      const bottomIndex = relationship.route.findIndex(
+        (point) =>
+          point.x === centerX &&
+          point.y ===
+            controlGeometry.rectangle.y + controlGeometry.rectangle.height,
+      );
+      const projection = (
+        id: string,
+        fromId: string,
+        toId: string,
+        route: RoutedRelationship["route"],
+      ): RoutedRelationship => ({
+        ...relationship,
+        id,
+        fromId,
+        toId,
+        route,
+      });
       // Keep the canonical semantic relationship in the public result. Layout
       // consumers use its stable id and semantic endpoints (for example when
       // relating a Control back to its owner). The additional routes are
       // ephemeral renderer projections for the two visible sides of a Control.
       return [
         relationship,
-        ...split.relationships.map((segment) => ({
-          ...segment,
-          relationshipId: relationship.relationshipId,
-          role: relationship.role,
-        })),
+        projection(
+          `${relationship.id}-${control.id}-upstream`,
+          relationship.fromId,
+          control.id,
+          relationship.route.slice(
+            0,
+            topIndex + 1,
+          ) as unknown as RoutedRelationship["route"],
+        ),
+        projection(
+          `${relationship.id}-${control.id}-downstream`,
+          control.id,
+          relationship.toId,
+          relationship.route.slice(
+            bottomIndex,
+          ) as unknown as RoutedRelationship["route"],
+        ),
       ];
     },
   );
