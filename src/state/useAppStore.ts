@@ -143,6 +143,10 @@ type AppState = {
     progressMapSession: () => void;
     toMap: () => MapData;
     addChainNode: (options?: { parentId?: string }) => void;
+    addSemanticNode: (
+      nodeType: ChainNode["nodeType"],
+      parentId?: string,
+    ) => string | null;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
     addAction: (sourceId?: string) => string | null;
@@ -1332,7 +1336,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         : false,
     removeEvidence: (nodeId, evidenceId) =>
       get().actions.unlinkEvidenceFromNode(nodeId, evidenceId),
-    addChild: (parentId) => {
+    addSemanticNode: (nodeType, parentId) => {
+      if (nodeType === "Action") return get().actions.addAction(parentId);
       const initialParentId = parentId ?? get().selectionId ?? undefined;
       const newNodeId = createId("node");
       const prevSnapshot = snapshotFromState(get());
@@ -1347,11 +1352,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           type: "ChainNode",
           position: { x: 0, y: 0 },
           data: {
-            title: "New Event",
+            title: `New ${nodeType}`,
             referenceId: `N-${String((state.metadata?.nodeReferenceHighWaterMark ?? 0) + 1).padStart(3, "0")}`,
-            nodeType: "Event",
-            eventDisplay: "Map",
-            eventPhase: "Incident",
+            nodeType,
+            ...(nodeType === "Event"
+              ? {
+                  eventDisplay: "Map" as const,
+                  eventPhase: "Incident" as const,
+                }
+              : {}),
             evidenceItems: [],
             evidenceIds: [],
             contextItems: [],
@@ -1453,6 +1462,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
+    addChild: (parentId) => get().actions.addSemanticNode("Event", parentId),
     addAction: (sourceId) => {
       const targetSourceId = sourceId ?? get().selectionId ?? undefined;
       if (!targetSourceId) return null;

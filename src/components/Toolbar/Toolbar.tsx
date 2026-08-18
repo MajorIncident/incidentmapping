@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
+import type { ChainNode } from "../../features/maps/schema";
 import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
-  onAddChainNode: () => void;
-  canAddBelow: boolean;
+  onAddSemanticNode: (nodeType: ChainNode["nodeType"]) => void;
+  selectedNodeType?: ChainNode["nodeType"];
   onDeleteSelection: () => void;
   canDelete: boolean;
   onUndo: () => void;
@@ -168,17 +169,38 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
       </span>
     </nav>
     <nav className="flex items-center gap-2" aria-label="Editing commands">
-      <button
-        type="button"
-        className={`${buttonBase} command-button--primary`}
-        onClick={props.onAddChainNode}
-        disabled={!props.canAddBelow}
-        aria-label="Add Below"
-        title="Add Below (Enter)"
-      >
-        <Icon name="add" />
-        <span>Add Below</span>
-      </button>
+      <Menu label="+ Add" icon="add">
+        {props.selectedNodeType === "Impact" ? (
+          <Item icon="add" onClick={() => props.onAddSemanticNode("Event")}>
+            Event — What happened?
+          </Item>
+        ) : null}
+        {props.selectedNodeType === "Event" ? (
+          <>
+            <Item icon="add" onClick={() => props.onAddSemanticNode("Event")}>
+              Event — Another occurrence
+            </Item>
+            <Item icon="add" onClick={() => props.onAddSemanticNode("Factor")}>
+              Factor — A condition explaining why
+            </Item>
+          </>
+        ) : null}
+        {props.selectedNodeType === "Factor" ? (
+          <>
+            <Item icon="add" onClick={() => props.onAddSemanticNode("Factor")}>
+              Factor — Ask why again
+            </Item>
+            <Item icon="add" onClick={() => props.onAddSemanticNode("Action")}>
+              Action — Address this finding
+            </Item>
+          </>
+        ) : null}
+        {!props.selectedNodeType || props.selectedNodeType === "Action" ? (
+          <Item icon="add" disabled>
+            Select an Impact, Event, or Factor
+          </Item>
+        ) : null}
+      </Menu>
       <button
         type="button"
         className={buttonBase}

@@ -165,6 +165,28 @@ describe("useAppStore actions", () => {
     expect(useAppStore.getState().nodes[0].id).not.toBe(root.id);
   });
 
+  it("creates causal entities with their intended semantic type in one history step", () => {
+    const { actions } = useAppStore.getState();
+    actions.newMap();
+    const rootId = useAppStore.getState().selectionId!;
+
+    const factorId = actions.addSemanticNode("Factor", rootId)!;
+    const state = useAppStore.getState();
+    expect(
+      state.nodes.find((node) => node.id === factorId)?.data,
+    ).toMatchObject({ title: "New Factor", nodeType: "Factor" });
+    expect(state.selectionId).toBe(factorId);
+    expect(state.editingId).toBe(factorId);
+    expect(state.editorFocusRequest).toMatchObject({
+      entityId: factorId,
+      field: "title",
+    });
+    expect(state.history.past).toHaveLength(1);
+
+    actions.undo();
+    expect(useAppStore.getState().nodes).toHaveLength(1);
+  });
+
   it("supports add → rename → move → delete flow", () => {
     const { actions } = useAppStore.getState();
 
