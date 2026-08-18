@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { useAppStore } from "../../src/state/useAppStore";
 
 const expectCleanRoot = (state: ReturnType<typeof useAppStore.getState>) => {
+  expect(state.mapSession).toEqual({ source: "New", fresh: true });
   expect(state.nodes).toHaveLength(1);
   expect(state.edges).toEqual([]);
   expect(state.nodes[0].data).toMatchObject({

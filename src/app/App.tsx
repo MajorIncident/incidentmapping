@@ -72,6 +72,7 @@ export const App = (): JSX.Element => {
   const evidence = useAppStore((state) => state.evidence);
   const edges = useAppStore((state) => state.edges);
   const attachments = useAppStore((state) => state.attachments);
+  const mapSession = useAppStore((state) => state.mapSession);
   const contextItems = useAppStore(
     (state) => state.metadata?.contextItems ?? [],
   );
@@ -96,6 +97,7 @@ export const App = (): JSX.Element => {
         presentation: presenting,
         chronology: chronologyOpen,
         activeLens: presentationLens,
+        mapSession,
       }),
     [
       barriers,
@@ -103,6 +105,7 @@ export const App = (): JSX.Element => {
       edges,
       evidence,
       nodes,
+      mapSession,
       presentationLens,
       presenting,
       selectionId,
@@ -329,6 +332,7 @@ export const App = (): JSX.Element => {
                   <LearningGuide
                     match={guideMatch}
                     enabled={learningGuideEnabled}
+                    mapSession={mapSession}
                     onAction={runGuideAction}
                     onDismissed={() => setGuideRevision((value) => value + 1)}
                   />
