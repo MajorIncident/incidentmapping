@@ -6,6 +6,7 @@ import {
   CONTROL_NODE_HEIGHT,
   CONTROL_NODE_WIDTH,
 } from "../dimensions";
+import { centerAlignmentDelta } from "../geometry/alignment";
 import {
   ACTION_GAP,
   ACTION_GUTTER,
@@ -51,7 +52,7 @@ const compareHints = (
 type ProjectedEdge = {
   id: string;
   relationshipId: string;
-  kind: "Causal" | "Action";
+  kind: "Causal";
   fromId: string;
   toId: string;
 };
@@ -62,14 +63,15 @@ export const toElkGraph = (
   horizontalGap = SIBLING_GAP,
   verticalGap = CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT,
 ): { graph: ElkNode; edges: readonly ProjectedEdge[] } => {
-  const actions = graph.actions ?? [];
   const controls = graph.controls ?? [];
-  const allNodes = [...graph.nodes, ...actions].sort((left, right) =>
-    compareHints(
-      hint(left.position?.x, left.referenceId, left.id),
-      hint(right.position?.x, right.referenceId, right.id),
-    ),
-  );
+  const allNodes = graph.nodes
+    .slice()
+    .sort((left, right) =>
+      compareHints(
+        hint(left.position?.x, left.referenceId, left.id),
+        hint(right.position?.x, right.referenceId, right.id),
+      ),
+    );
   const children: ElkNode[] = allNodes.map((node) => ({
     id: node.id,
     width: node.dimensions?.width ?? CHAIN_NODE_WIDTH,
@@ -82,6 +84,7 @@ export const toElkGraph = (
   );
   const projected: ProjectedEdge[] = [];
   graph.relationships
+    .filter((relationship) => relationship.kind === "Causal")
     .map((relationship, index) => ({ relationship, index }))
     .sort(
       (a, b) =>
@@ -169,7 +172,6 @@ export const layoutWithElk = async (
   const controls = new Map(
     (graph.controls ?? []).map((item) => [item.id, item]),
   );
-  const actions = new Set((graph.actions ?? []).map((item) => item.id));
   const engineNodes = new Map(
     (result.children ?? []).map((node) => [node.id, node]),
   );
@@ -180,11 +182,7 @@ export const layoutWithElk = async (
     return [
       {
         id: node.id,
-        role: controls.has(node.id)
-          ? "Control"
-          : actions.has(node.id)
-            ? "Action"
-            : "Semantic",
+        role: controls.has(node.id) ? "Control" : "Semantic",
         ...(controls.has(node.id)
           ? {
               controlId: node.id,
@@ -200,6 +198,21 @@ export const layoutWithElk = async (
       },
     ];
   });
+  // Actions are deliberately absent from the ELK input. Materialise their
+  // geometry only after the causal graph has been laid out, so an auxiliary
+  // card can never perturb its anchor or the causal layers around it.
+  (graph.actions ?? []).forEach((action) =>
+    nodes.push({
+      id: action.id,
+      role: "Action",
+      rectangle: {
+        x: 0,
+        y: 0,
+        width: action.dimensions?.width ?? CHAIN_NODE_WIDTH,
+        height: action.dimensions?.height ?? CHAIN_NODE_HEIGHT,
+      },
+    }),
+  );
   const causal = graph.relationships.filter((edge) => edge.kind === "Causal");
   const outgoing = new Map<string, number>();
   const incoming = new Map<string, number>();
@@ -286,6 +299,23 @@ export const layoutWithElk = async (
         CAUSAL_ROW_GAP +
         CONTROL_BAND_HEIGHT;
     });
+
+  // Preserve ELK's ordering for branches and merges, but make an unambiguous
+  // straight causal chain share one horizontal centre. Parents are visited
+  // before children, making alignment deterministic for chains of any length.
+  queue.forEach((childId) => {
+    const parentEdges = causal.filter((edge) => edge.toId === childId);
+    if (parentEdges.length !== 1) return;
+    const parentId = parentEdges[0].fromId;
+    if ((outgoing.get(parentId) ?? 0) !== 1) return;
+    const parent = geometryById.get(parentId);
+    const child = geometryById.get(childId);
+    if (!parent || !child) return;
+    (child.rectangle as { x: number }).x += centerAlignmentDelta(
+      parent.rectangle,
+      child.rectangle,
+    );
+  });
 
   // Controls occupy the fixed band immediately before their downstream rank.
   // A stable sub-lane offset prevents controls sharing a target lane from
