@@ -1,12 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../../src/app/App";
 import { sampleMap } from "../../src/features/maps/fixtures";
@@ -101,7 +94,7 @@ const detailedMap: MapData = {
   ],
 };
 
-describe("presentation mode", () => {
+describe("presentation mode 2.0", () => {
   beforeAll(() => {
     vi.stubGlobal(
       "DOMMatrixReadOnly",
@@ -130,9 +123,9 @@ describe("presentation mode", () => {
     );
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
       function (this: Element) {
-        const isNode = this.classList.contains("react-flow__node");
-        const width = isNode ? 220 : 1000;
-        const height = isNode ? 100 : 800;
+        const node = this.classList.contains("react-flow__node");
+        const width = node ? 220 : 1000;
+        const height = node ? 100 : 800;
         return {
           x: 0,
           y: 0,
@@ -151,354 +144,71 @@ describe("presentation mode", () => {
       offsetHeight: { configurable: true, get: () => 100 },
     });
   });
-
   beforeEach(() =>
-    act(() => useAppStore.getState().actions.loadMap(sampleMap)),
+    act(() => useAppStore.getState().actions.loadMap(detailedMap)),
   );
 
-  it("removes editing chrome while retaining review context", async () => {
+  it("enters Guided Briefing with minimal chrome and no lens toolbar", async () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-
+    expect(screen.getByLabelText("Guided Briefing")).toBeVisible();
+    expect(screen.getByText("GUIDED BRIEFING")).toBeVisible();
+    expect(screen.getByText("THE BRIEF")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Next/ })).toBeVisible();
     expect(
-      screen.queryByRole("navigation", { name: "Editing commands" }),
+      screen.queryByRole("tablist", { name: /lens/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("complementary", { name: "Inspector" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Incident header")).toBeVisible();
-    const legend = screen.getByLabelText("Presentation legend");
-    expect(legend).toBeVisible();
-    expect(legend.querySelectorAll("button")).toHaveLength(2);
-    expect(
-      within(legend).getByRole("button", { name: "How to read the map" }),
-    ).toBeVisible();
-    expect(legend.querySelectorAll("a, [role], [tabindex]")).toHaveLength(0);
-    expect(screen.getByRole("heading", { name: "Nodes" })).toBeInTheDocument();
-    expect(legend).toHaveTextContent("Event");
-    expect(legend).toHaveTextContent("Control");
-    expect(legend).not.toHaveTextContent("Impact");
-    expect(legend).not.toHaveTextContent("Root Cause");
-    expect(legend).not.toHaveTextContent("Failed");
-    expect(screen.getByRole("button", { name: /Legend/ })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    const handles = document.querySelectorAll(".react-flow__handle");
-    expect(handles.length).toBeGreaterThan(0);
-    handles.forEach((handle) => {
-      expect(handle).toHaveClass("presentation-handle");
-      expect(handle).toHaveAttribute("data-presentation-handle", "true");
-      expect(handle).toHaveAttribute("aria-hidden", "true");
-      expect(handle).toHaveAttribute("tabindex", "-1");
-    });
-
-    await waitFor(() =>
-      expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
-    );
-    expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
-    fireEvent.click(document.querySelector(".react-flow__node-Barrier")!);
-    const relatedSegments = document.querySelectorAll(
-      ".react-flow__edge.incident-edge--related:not(.incident-edge--action)",
-    );
-    expect(relatedSegments).toHaveLength(2);
-    relatedSegments.forEach((segment) => {
-      expect(segment).not.toHaveClass("incident-edge--unrelated");
-      expect(segment.querySelector(".react-flow__edge-path")).toHaveStyle({
-        stroke: "#475569",
-      });
-    });
-    expect(document.querySelectorAll("marker")).toHaveLength(0);
-  });
-
-  it("enters presentation directly for an investigation at the review stage", async () => {
-    const reviewingMap: MapData = {
-      ...detailedMap,
-      nodes: detailedMap.nodes.map((node) =>
-        node.id === "root"
-          ? { ...node, nodeType: "Impact", eventDisplay: undefined }
-          : node.id === "child"
-            ? { ...node, nodeType: "Factor", eventDisplay: undefined }
-            : node,
-      ),
-    };
-    act(() => useAppStore.getState().actions.loadMap(reviewingMap));
-    render(<App />);
-
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-
-    expect(
-      screen.queryByRole("dialog", { name: "Investigation Check" }),
+      screen.queryByRole("button", { name: "Chronology" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Exit Presentation/i }),
-    ).toBeVisible();
-  });
-
-  it("discloses only classifications present on the map by keyboard", async () => {
-    const classifiedMap: MapData = {
-      ...actionMap,
-      nodes: actionMap.nodes.map((node) =>
-        node.id === "root"
-          ? { ...node, eventPhase: "Detection" as const }
-          : node.id === "action"
-            ? { ...node, actionType: "Corrective" as const }
-            : node,
-      ),
-      barriers: [
-        {
-          id: "classified-control",
-          kind: "Barrier",
-          upstreamNodeId: "root",
-          downstreamNodeId: "child",
-          description: "Alarm",
-          status: "Failed",
-          referenceId: "C-001",
-          controlRole: "Detective",
-          evidenceIds: [],
-        },
-      ],
-    };
-    act(() => useAppStore.getState().actions.loadMap(classifiedMap));
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-
-    const toggle = screen.getByRole("button", { name: /Legend/ });
-    toggle.focus();
-    await userEvent.keyboard("{Enter}");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("heading", { name: "Event Phase" })).toBeVisible();
-    expect(
-      screen.getByRole("heading", { name: "Control Role and Status" }),
-    ).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Action Type" })).toBeVisible();
-    const legend = screen.getByLabelText("Presentation legend");
-    for (const value of ["Detection", "Detective", "Failed", "Corrective"])
-      expect(legend).toHaveTextContent(value);
-    for (const unused of ["Recovery", "Effective", "Immediate"])
-      expect(legend).not.toHaveTextContent(unused);
-    expect(
-      legend.querySelectorAll("li button, li a, li [tabindex]"),
-    ).toHaveLength(0);
-
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("keeps both causal edge segments rendered around a Control", async () => {
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-
-    expect(document.querySelectorAll(".react-flow__node-Barrier")).toHaveLength(
-      1,
-    );
-    await waitFor(() =>
-      expect(document.querySelectorAll(".react-flow__edge")).toHaveLength(2),
-    );
-    expect(document.querySelectorAll(".react-flow__edge-path")).toHaveLength(2);
-  });
-
-  it("centers a rendered Control between endpoint centers", async () => {
-    render(<App />);
-
-    const renderedNodes = await waitFor(() => {
-      const elements = ["root", "child", "barrier-root-child"].map((id) =>
-        document.querySelector<HTMLElement>(
-          `.react-flow__node[data-id="${id}"]`,
-        ),
-      );
-      expect(elements.every(Boolean)).toBe(true);
-      return elements as HTMLElement[];
-    });
-    const coordinates = renderedNodes.map((element) => {
-      const match = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(
-        element.style.transform,
-      );
-      expect(match).not.toBeNull();
-      return { x: Number(match![1]), y: Number(match![2]) };
-    });
-    const [upstream, downstream, control] = coordinates;
-
-    const state = useAppStore.getState();
-    const upstreamSize = state.nodes.find((node) => node.id === "root")!;
-    const downstreamSize = state.nodes.find((node) => node.id === "child")!;
-    const controlSize = state.measuredControlDimensions["barrier-root-child"];
-    expect(control.x + controlSize.width / 2).toBe(
-      downstream.x + downstreamSize.width! / 2,
-    );
-    expect(control.y + controlSize.height / 2).toBe(
-      (upstream.y + upstreamSize.height! + downstream.y) / 2,
-    );
-  });
-
-  it("keeps the horizontal ActionEdge rendered", async () => {
-    act(() => useAppStore.getState().actions.loadMap(actionMap));
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-
-    const actionEdge = await waitFor(() => {
-      const edge = document.querySelector(
-        ".react-flow__edge.incident-edge--action",
-      );
-      expect(edge).toBeInTheDocument();
-      return edge;
-    });
-    expect(
-      actionEdge?.querySelector(".react-flow__edge-path"),
-    ).toBeInTheDocument();
-    expect(document.querySelectorAll("marker")).toHaveLength(0);
-    expect(actionEdge).toHaveClass("incident-edge--action");
-    expect(actionEdge?.querySelector(".react-flow__edge-path")).toHaveStyle({
-      stroke: "#94a3b8",
-      strokeDasharray: "5 5",
-    });
-  });
-
-  it("dismisses its ephemeral hint and selects review elements without opening the Inspector", async () => {
-    act(() => useAppStore.getState().actions.loadMap(actionMap));
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-    expect(screen.getByText("Review the investigation")).toBeVisible();
-
-    fireEvent.click(screen.getByText("Prevent recurrence"));
-    expect(
-      screen.queryByText("Review the investigation"),
+      screen.queryByRole("button", { name: "Show Details" }),
     ).not.toBeInTheDocument();
-    expect(useAppStore.getState().selectionId).toBe("action");
-    expect(
-      screen.queryByRole("complementary", { name: "Inspector" }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(document.querySelector(".react-flow__pane")!);
-    expect(useAppStore.getState().selectionId).toBeNull();
   });
 
-  it("exits by button and Escape without changing map data or history", async () => {
+  it("advances with Next and arrow keys and opens chronology automatically", async () => {
     render(<App />);
-    await waitFor(() =>
-      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
-    );
-    const beforeMap = useAppStore.getState().actions.toMap();
-    const beforeHistory = useAppStore.getState().history;
-    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Present map" })).toBeVisible();
-    expect(useAppStore.getState().actions.toMap()).toEqual(beforeMap);
-    expect(useAppStore.getState().history).toEqual(beforeHistory);
-    expect(useAppStore.getState().selectionId).toBeNull();
-
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
     await userEvent.click(
-      screen.getByRole("button", { name: /Exit Presentation/i }),
+      within(screen.getByLabelText("Guided Briefing")).getByRole("button", {
+        name: /Next/,
+      }),
     );
-    expect(screen.getByRole("button", { name: "Present map" })).toBeVisible();
+    expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Chronology" })).toBeVisible();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
+    expect(screen.getByText("· 2 of 2")).toBeVisible();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await screen.findByText("WHY DID IT HAPPEN?")).toBeVisible();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(await screen.findByText("WHAT HAPPENED?")).toBeVisible();
+    expect(screen.getByText("· 2 of 2")).toBeVisible();
   });
 
-  it("opens, selects from, and closes Chronology without persistence or history mutations", async () => {
-    const chronologyMap: MapData = {
-      ...sampleMap,
-      nodes: sampleMap.nodes.map((node, index) => ({
-        ...node,
-        timestamp: `2026-08-16T0${index + 8}:00:00Z`,
-        eventPhase: index === 0 ? "Incident" : "Detection",
-      })),
-    };
-    act(() => {
-      useAppStore.getState().actions.loadMap(chronologyMap);
-      useAppStore.getState().actions.setMapTitle("Airport investigation");
-      useAppStore.getState().actions.undo();
-    });
+  it("moves advanced lenses into Explore and resumes the briefing", async () => {
     render(<App />);
-    await waitFor(() =>
-      expect(
-        useAppStore.getState().measuredControlDimensions["barrier-root-child"],
-      ).toBeDefined(),
-    );
-    await waitFor(() =>
-      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
-    );
-    const before = useAppStore.getState();
-    const serialized = before.actions.toMap();
-    const history = structuredClone(before.history);
-    const availability = { canUndo: before.canUndo, canRedo: before.canRedo };
-
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
-    await userEvent.click(screen.getByRole("button", { name: "Chronology" }));
-    expect(screen.getByRole("heading", { name: "Incident" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Detection" })).toBeVisible();
-    const chronology = screen.getByRole("complementary", {
-      name: "Chronology",
-    });
+    await userEvent.click(screen.getByRole("button", { name: "Explore Map" }));
+    const view = screen.getByRole("combobox", { name: "Presentation view" });
+    expect(within(view).getAllByRole("option")).toHaveLength(6);
+    await userEvent.selectOptions(view, "Controls");
+    expect(view).toHaveValue("Controls");
     await userEvent.click(
-      within(chronology).getByRole("button", { name: /Follow-up Event/ }),
+      screen.getByRole("button", { name: /Return to Briefing/ }),
     );
-    expect(useAppStore.getState().selectionId).toBe("child");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Close chronology" }),
-    );
-
-    const after = useAppStore.getState();
-    expect(after.actions.toMap()).toEqual(serialized);
-    expect(after.history).toEqual(history);
-    expect({ canUndo: after.canUndo, canRedo: after.canRedo }).toEqual(
-      availability,
-    );
+    expect(screen.getByLabelText("Guided Briefing")).toBeVisible();
   });
 
-  it.each([true, false])(
-    "starts compact without changing editor detail visibility (%s)",
-    async (editorShowDetails) => {
-      act(() => {
-        useAppStore.getState().actions.loadMap(detailedMap);
-        useAppStore.getState().actions.setShowDetails(editorShowDetails);
-      });
-      render(<App />);
-
-      await userEvent.click(
-        screen.getByRole("button", { name: "Present map" }),
-      );
-      // Presentation mode changes the rendered React Flow node data. Await UI
-      // transitions after user events instead of asserting against stale cards.
-      const detailsButton = await screen.findByRole("button", {
-        name: "Show Details",
-      });
-      expect(detailsButton).toHaveAttribute("aria-pressed", "false");
-      expect(screen.queryByTestId("node-details")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Detailed evidence line"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Detailed consequence"),
-      ).not.toBeInTheDocument();
-      // A Control's purpose is part of its required Compact summary. This is
-      // card content, not a package-warning modal leaking into presentation.
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-      expect(screen.getByText("Control purpose details")).toBeVisible();
-      expect(
-        screen.queryByText("Control failure details"),
-      ).not.toBeInTheDocument();
-      expect(screen.getAllByLabelText("1 evidence items")).toHaveLength(2);
-      expect(screen.getByText("Safety team")).toBeVisible();
-      expect(screen.getByText("Planned")).toBeVisible();
-      expect(screen.getByText(/Due Mar 4, 2025/)).toBeVisible();
-      expect(screen.getByTestId("control-node")).toHaveTextContent("Failed");
-
-      await userEvent.click(detailsButton);
-      expect(
-        await screen.findByRole("button", { name: "Hide Details" }),
-      ).toHaveAttribute("aria-pressed", "true");
-      expect(await screen.findByText("Detailed evidence line")).toBeVisible();
-      expect(await screen.findByText("Detailed consequence")).toBeVisible();
-      expect(await screen.findByText("Control purpose details")).toBeVisible();
-      expect(await screen.findByText("Control failure details")).toBeVisible();
-
-      await userEvent.click(
-        screen.getByRole("button", { name: /Exit Presentation/i }),
-      );
-      expect(useAppStore.getState().canvasDetail === "Expanded").toBe(
-        editorShowDetails,
-      );
-    },
-  );
+  it("keeps presentation ephemeral when exiting", async () => {
+    const before = useAppStore.getState().nodes.map((node) => node.data.title);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+    await userEvent.click(screen.getByRole("button", { name: "Exit" }));
+    expect(screen.queryByLabelText("Guided Briefing")).not.toBeInTheDocument();
+    expect(useAppStore.getState().nodes.map((node) => node.data.title)).toEqual(
+      before,
+    );
+  });
 });

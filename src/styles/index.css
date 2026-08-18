@@ -718,6 +718,150 @@ select:focus-visible {
 .presentation-emphasized {
   filter: drop-shadow(0 0 5px rgb(37 99 235 / 0.35));
 }
+.presentation-active {
+  z-index: 10 !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.presentation-active .chain-node-card,
+.presentation-active [data-testid="control-node"] {
+  box-shadow:
+    0 0 0 2px white,
+    0 0 0 6px #075985,
+    0 12px 28px rgb(15 23 42 / 0.2) !important;
+  transition: box-shadow 280ms ease-out;
+}
+.presentation-related {
+  opacity: 1 !important;
+  filter: saturate(1) !important;
+}
+.presentation-related .chain-node-card,
+.presentation-related [data-testid="control-node"] {
+  box-shadow: 0 0 0 2px #64748b !important;
+}
+.presentation-background {
+  opacity: 0.16 !important;
+  filter: grayscale(0.85) saturate(0.2) !important;
+}
+.incident-edge--related .react-flow__edge-path {
+  stroke: #075985 !important;
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+.incident-edge--unrelated .react-flow__edge-path {
+  stroke-width: 1px !important;
+  opacity: 0.14 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .presentation-active .chain-node-card,
+  .presentation-active [data-testid="control-node"] {
+    transition: none;
+  }
+}
+.briefing-panel {
+  @apply fixed bottom-5 right-5 z-30 flex max-h-[calc(100vh-7rem)] w-[min(27rem,calc(100vw-2rem))] flex-col overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-5 text-sm text-slate-700 shadow-2xl backdrop-blur;
+}
+.briefing-panel__header {
+  @apply flex items-start justify-between gap-3;
+}
+.briefing-panel__header div {
+  @apply flex flex-col;
+}
+.briefing-panel__header span {
+  @apply text-xs font-bold tracking-widest text-sky-800;
+}
+.briefing-panel__header strong {
+  @apply mt-1 text-lg text-slate-950;
+}
+.briefing-progress {
+  @apply my-4 grid grid-cols-6 gap-1 text-center text-[10px] text-slate-400;
+}
+.briefing-progress span {
+  @apply border-t-2 border-slate-200 pt-1;
+}
+.briefing-progress .is-complete {
+  @apply border-sky-700 text-slate-600;
+}
+.briefing-progress .is-current {
+  @apply border-sky-800 font-bold text-sky-900;
+}
+.briefing-panel__chapter {
+  @apply text-xs font-bold tracking-wider text-sky-800;
+}
+.briefing-panel h2 {
+  @apply mt-1 text-2xl font-bold leading-tight text-slate-950 outline-none;
+}
+.briefing-panel dl {
+  @apply mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1;
+}
+.briefing-panel dt {
+  @apply font-semibold text-slate-500;
+}
+.briefing-points {
+  @apply mt-4 space-y-2 border-l-2 border-slate-200 pl-4;
+}
+.briefing-status {
+  @apply mt-3 rounded-lg bg-slate-100 p-2 font-bold uppercase tracking-wide text-slate-800;
+}
+.briefing-status small {
+  @apply ml-2 font-normal normal-case tracking-normal text-slate-600;
+}
+.briefing-support {
+  @apply mt-4 min-h-11 rounded-lg border border-sky-700 bg-sky-50 px-3 font-semibold text-sky-900;
+}
+.briefing-panel__actions {
+  @apply mt-5 grid grid-cols-2 gap-2;
+}
+.briefing-panel__actions button {
+  @apply min-h-12 rounded-lg bg-slate-900 px-3 font-semibold text-white disabled:opacity-30;
+}
+.briefing-panel footer {
+  @apply mt-3 flex justify-between border-t border-slate-200 pt-3;
+}
+.briefing-panel footer button {
+  @apply min-h-11 px-2 font-semibold text-slate-700;
+}
+.support-drawer {
+  @apply fixed inset-y-0 right-0 z-40 w-[min(27rem,100vw)] overflow-y-auto border-l border-slate-200 bg-white p-5 text-sm shadow-2xl;
+}
+.support-drawer header {
+  @apply flex items-start justify-between;
+}
+.support-drawer header span {
+  @apply text-xs font-bold tracking-widest text-sky-800;
+}
+.support-drawer h2 {
+  @apply text-xl font-bold text-slate-950;
+}
+.support-drawer header button {
+  @apply min-h-11 min-w-11 text-2xl;
+}
+.support-drawer > p {
+  @apply my-4 text-slate-600;
+}
+.support-drawer li {
+  @apply mb-3 flex flex-col rounded-lg border border-slate-200 p-3;
+}
+.support-assertion {
+  @apply rounded-lg bg-slate-100;
+}
+.explore-controls {
+  @apply fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-white/95 p-2 text-sm shadow-xl;
+}
+.explore-controls > button,
+.explore-controls summary,
+.explore-controls select {
+  @apply min-h-11 rounded-lg border border-slate-300 bg-white px-3 font-semibold;
+}
+.explore-controls label {
+  @apply flex items-center gap-2 font-semibold;
+}
+.explore-controls details {
+  @apply relative;
+}
+.explore-controls details div {
+  @apply absolute bottom-12 right-0 flex w-48 flex-col rounded-lg border bg-white p-2 shadow-xl;
+}
 .canvas-hover-unrelated {
   opacity: 0.25 !important;
 }
@@ -759,6 +903,13 @@ select:focus-visible {
   @apply mt-3 inline-flex min-h-11 items-center rounded-lg text-blue-700 underline;
 }
 @media (max-width: 767px) {
+  .briefing-panel {
+    @apply inset-x-0 bottom-0 max-h-[48vh] w-full rounded-b-none;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .explore-controls {
+    @apply bottom-0 w-full justify-center rounded-b-none;
+  }
   .story-panel {
     @apply inset-x-0 bottom-0 w-full rounded-b-none;
     max-height: 42vh;

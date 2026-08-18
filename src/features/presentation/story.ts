@@ -41,6 +41,7 @@ export type StoryControl = {
   failureDetails?: string;
   controlRole?: string;
   evidenceIds?: string[];
+  assertionState?: string;
 };
 
 export type StoryInput = {

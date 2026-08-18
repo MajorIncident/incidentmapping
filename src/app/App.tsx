@@ -11,19 +11,17 @@ import {
   type CanvasDetail,
 } from "../features/layout/hierarchy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
 import {
   canAddBelowSelection,
   selectEligibleControlRelationships,
 } from "../state/selectors";
 import { ControlBranchChooser } from "../components/Sidebar/ControlBranchChooser";
-import { CaseSummary } from "../components/Presentation/CaseSummary";
-import { LensPicker } from "../components/Presentation/LensPicker";
 import { type PresentationLens } from "../features/presentation/selectors";
-import { selectCaseSummary } from "../features/presentation/caseSummary";
-import { deriveStorySequence } from "../features/presentation/story";
-import { StoryPanel } from "../components/Presentation/StoryPanel";
+import { derivePresentationStory } from "../features/presentation/presentationStory";
+import { BriefingPanel } from "../components/Presentation/BriefingPanel";
+import { SupportDrawer } from "../components/Presentation/SupportDrawer";
+import { ExploreControls } from "../components/Presentation/ExploreControls";
 import { LearningGuide } from "../components/LearningGuide/LearningGuide";
 import { selectInvestigationGuidance } from "../features/guidance/selectors";
 import {
@@ -44,14 +42,19 @@ export const App = (): JSX.Element => {
   const previousCanvasDetailRef = useRef<CanvasDetail | null>(null);
   const [investigationCheckOpen, setInvestigationCheckOpen] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
-  const [presentationHintOpen, setPresentationHintOpen] = useState(false);
+  const [presentationExperience, setPresentationExperience] = useState<
+    "Guided" | "Explore"
+  >("Guided");
+  const [briefingPosition, setBriefingPosition] = useState({
+    chapter: 0,
+    step: 0,
+  });
+  const [supportOpen, setSupportOpen] = useState(false);
   const [chronologyOpen, setChronologyOpen] = useState(false);
   const [chronologyMobile, setChronologyMobile] = useState(false);
   const [showTimelineEvents, setShowTimelineEvents] = useState(false);
   const [presentationLens, setPresentationLens] =
     useState<PresentationLens>("Overview");
-  const [summaryOpen, setSummaryOpen] = useState(true);
-  const [timelineAnnouncement, setTimelineAnnouncement] = useState("");
   const [learningGuideEnabled, setLearningGuideEnabled] = useState(
     getLearningGuideEnabled,
   );
@@ -59,10 +62,6 @@ export const App = (): JSX.Element => {
   const [helpTopic, setHelpTopic] = useState<
     "map" | "basics" | "shortcuts" | "about" | null
   >(null);
-  const [story, setStory] = useState<{
-    startId: string | null;
-    index: number;
-  } | null>(null);
   const deleteSelection = useAppStore((state) => state.actions.deleteSelection);
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
@@ -89,19 +88,44 @@ export const App = (): JSX.Element => {
       selectEligibleControlRelationships(selectionId, nodes, edges, barriers),
     [barriers, edges, nodes, selectionId],
   );
-  const contextItems = useAppStore(
-    (state) => state.metadata?.contextItems ?? [],
-  );
-  const summary = selectCaseSummary(nodes, barriers, evidence, contextItems);
-  const storySequence = useMemo(
+  const presentationStory = useMemo(
     () =>
-      deriveStorySequence(
-        { nodes, edges, controls: barriers, evidence, attachments },
-        story?.startId,
-      ),
-    [attachments, barriers, edges, evidence, nodes, story?.startId],
+      derivePresentationStory({
+        nodes,
+        edges,
+        controls: barriers,
+        evidence,
+        attachments,
+      }),
+    [attachments, barriers, edges, evidence, nodes],
   );
-  const storyStep = story ? storySequence.steps[story.index] : undefined;
+  const briefingChapter = presentationStory.chapters[briefingPosition.chapter];
+  const briefingStep = briefingChapter.steps[briefingPosition.step];
+  const advanceBriefing = useCallback(
+    (delta: -1 | 1) =>
+      setBriefingPosition((current) => {
+        const chapter = presentationStory.chapters[current.chapter];
+        if (delta === 1 && current.step < chapter.steps.length - 1)
+          return { ...current, step: current.step + 1 };
+        if (delta === -1 && current.step > 0)
+          return { ...current, step: current.step - 1 };
+        const nextChapter = Math.max(
+          0,
+          Math.min(
+            presentationStory.chapters.length - 1,
+            current.chapter + delta,
+          ),
+        );
+        return {
+          chapter: nextChapter,
+          step:
+            delta === -1
+              ? presentationStory.chapters[nextChapter].steps.length - 1
+              : 0,
+        };
+      }),
+    [presentationStory],
+  );
   const guidance = useMemo(
     () =>
       selectInvestigationGuidance({
@@ -222,12 +246,10 @@ export const App = (): JSX.Element => {
         return assertNever(action);
     }
   };
-  const exitStory = useCallback(() => setStory(null), []);
   const exitPresentation = useCallback(() => {
     select(null);
-    setPresentationHintOpen(false);
     setChronologyOpen(false);
-    setStory(null);
+    setSupportOpen(false);
     setPresenting(false);
     if (previousCanvasDetailRef.current !== null) {
       setCanvasDetail(previousCanvasDetailRef.current);
@@ -279,21 +301,12 @@ export const App = (): JSX.Element => {
         (target.isContentEditable ||
           ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
       if (
-        story &&
+        presentationExperience === "Guided" &&
         !editable &&
-        ["ArrowLeft", "ArrowRight"].includes(event.key)
+        ["ArrowLeft", "ArrowRight", " "].includes(event.key)
       ) {
         event.preventDefault();
-        setStory(
-          (value) =>
-            value && {
-              ...value,
-              index:
-                event.key === "ArrowLeft"
-                  ? Math.max(0, value.index - 1)
-                  : Math.min(storySequence.steps.length - 1, value.index + 1),
-            },
-        );
+        advanceBriefing(event.key === "ArrowLeft" ? -1 : 1);
         return;
       }
       if (event.key !== "Escape") {
@@ -308,9 +321,9 @@ export const App = (): JSX.Element => {
         return;
       }
       if (event.defaultPrevented) return;
-      if (story) {
+      if (supportOpen) {
         event.preventDefault();
-        exitStory();
+        setSupportOpen(false);
         return;
       }
       if (chronologyOpen) {
@@ -327,26 +340,26 @@ export const App = (): JSX.Element => {
   }, [
     chronologyOpen,
     exitPresentation,
-    exitStory,
+    advanceBriefing,
+    presentationExperience,
     presenting,
-    story,
-    storySequence.steps.length,
+    supportOpen,
   ]);
 
   useEffect(() => {
-    if (!story) return;
-    if (!storySequence.steps.length) {
-      setStory(null);
-      return;
-    }
-    if (story.index >= storySequence.steps.length) {
-      setStory(
-        (value) => value && { ...value, index: storySequence.steps.length - 1 },
-      );
-      return;
-    }
-    select(storySequence.steps[story.index].entityId);
-  }, [select, story, storySequence.steps]);
+    if (!presenting || presentationExperience !== "Guided") return;
+    select(briefingStep.primaryEntityId ?? null);
+    const occurrence = briefingChapter.id === "Occurrence";
+    setChronologyOpen(occurrence);
+    setShowTimelineEvents(occurrence);
+    setPresentationLens(occurrence ? "Chronology" : "Overview");
+  }, [
+    briefingChapter.id,
+    briefingStep.primaryEntityId,
+    presentationExperience,
+    presenting,
+    select,
+  ]);
 
   return (
     <ReactFlowProvider>
@@ -389,7 +402,9 @@ export const App = (): JSX.Element => {
                   previousCanvasDetailRef.current = canvasDetail;
                   setCanvasDetail("Compact");
                   setPresentationShowDetails(false);
-                  setPresentationHintOpen(true);
+                  setPresentationExperience("Guided");
+                  setBriefingPosition({ chapter: 0, step: 0 });
+                  setSupportOpen(false);
                   setChronologyOpen(false);
                   setPresentationLens("Overview");
                   setPresenting(true);
@@ -409,12 +424,21 @@ export const App = (): JSX.Element => {
                 <Canvas
                   presenting={presenting}
                   presentationShowDetails={presentationShowDetails}
-                  onPresentationInteract={() => setPresentationHintOpen(false)}
+                  onPresentationInteract={() => undefined}
                   onInspect={() => setInspectorOpen(true)}
                   showTimelineEvents={showTimelineEvents}
                   presentationLens={presentationLens}
                   evidence={evidence}
-                  storyFocusIds={storyStep?.focusIds}
+                  storyFocusIds={
+                    presenting && presentationExperience === "Guided"
+                      ? briefingStep.focusIds
+                      : undefined
+                  }
+                  presentationActiveId={
+                    presenting && presentationExperience === "Guided"
+                      ? briefingStep.primaryEntityId
+                      : selectionId
+                  }
                 />
                 {!presenting ? (
                   <LearningGuide
@@ -467,173 +491,72 @@ export const App = (): JSX.Element => {
             </div>
             {presenting ? (
               <>
-                {presentationHintOpen ? (
-                  <aside
-                    className="presentation-hint"
-                    aria-label="Presentation help"
-                  >
-                    <h2>Review the investigation</h2>
-                    <p>
-                      Select a node, control or action to highlight its
-                      relationship to the incident.
-                    </p>
-                    <p>Click empty space to show the full map.</p>
-                    <button
-                      type="button"
-                      aria-label="Dismiss presentation help"
-                      onClick={() => setPresentationHintOpen(false)}
-                    >
-                      ×
-                    </button>
-                  </aside>
-                ) : null}
-                <Legend onLearnMap={() => setHelpTopic("map")} />
-                {summaryOpen ? (
-                  <CaseSummary
-                    summary={summary}
-                    mobile={chronologyMobile}
-                    onClose={
-                      chronologyMobile ? () => setSummaryOpen(false) : undefined
-                    }
-                    onSelect={(id) => {
-                      select(id);
-                      setPresentationHintOpen(false);
-                    }}
-                  />
-                ) : null}
-                {chronologyOpen || presentationLens === "Chronology" ? (
-                  <Chronology
-                    nodes={useAppStore.getState().nodes}
-                    selectedId={selectionId}
-                    mobile={chronologyMobile}
-                    onClose={() => setChronologyOpen(false)}
-                    onSelect={(id) => {
-                      const timelineOnly =
-                        useAppStore
-                          .getState()
-                          .nodes.find((node) => node.id === id)?.data
-                          .eventDisplay === "ChronologyOnly";
-                      if (timelineOnly && !showTimelineEvents) {
-                        setShowTimelineEvents(true);
-                        setTimelineAnnouncement(
-                          "Timeline Event revealed and focused in the auxiliary lane.",
-                        );
-                      } else
-                        setTimelineAnnouncement("Event focused on the map.");
-                      select(id);
-                      setPresentationHintOpen(false);
-                      if (chronologyMobile) setChronologyOpen(false);
-                    }}
-                  />
-                ) : null}
-                <div className="presentation-actions">
-                  <LensPicker
-                    value={presentationLens}
-                    onChange={(lens) => {
-                      setPresentationLens(lens);
-                      setTimelineAnnouncement(`${lens} view selected.`);
-                      setPresentationHintOpen(false);
-                    }}
-                  />
-                  {!story ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const selected = nodes.find(
-                          (node) => node.id === selectionId,
-                        );
-                        const startId =
-                          selected?.data.nodeType === "Factor" &&
-                          ["KeyFactor", "RootCause"].includes(
-                            selected.data.factorSignificance ?? "",
-                          )
-                            ? selected.id
-                            : null;
-                        const sequence = deriveStorySequence(
-                          {
-                            nodes,
-                            edges,
-                            controls: barriers,
-                            evidence,
-                            attachments,
-                          },
-                          startId,
-                        );
-                        if (sequence.steps.length)
-                          setStory({ startId, index: 0 });
+                {presentationExperience === "Guided" ? (
+                  <>
+                    {briefingChapter.id === "Occurrence" ? (
+                      <Chronology
+                        nodes={nodes}
+                        selectedId={selectionId}
+                        mobile={chronologyMobile}
+                        onClose={() => {}}
+                        onSelect={(id) => select(id)}
+                      />
+                    ) : null}
+                    <BriefingPanel
+                      chapter={briefingChapter}
+                      step={briefingStep}
+                      chapterIndex={briefingPosition.chapter}
+                      stepIndex={briefingPosition.step}
+                      chapterCount={presentationStory.chapters.length}
+                      onPrevious={() => advanceBriefing(-1)}
+                      onNext={() => advanceBriefing(1)}
+                      onExplore={() => {
+                        setPresentationExperience("Explore");
+                        setChronologyOpen(false);
                       }}
-                      disabled={storySequence.steps.length === 0}
-                    >
-                      Start Story From Selection
-                    </button>
-                  ) : null}
-                  {!summaryOpen ? (
-                    <button type="button" onClick={() => setSummaryOpen(true)}>
-                      Case Summary
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    aria-pressed={chronologyOpen}
-                    aria-haspopup={chronologyMobile ? "dialog" : undefined}
-                    onClick={() => setChronologyOpen((visible) => !visible)}
-                  >
-                    Chronology
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={showTimelineEvents}
-                    onClick={() => setShowTimelineEvents((visible) => !visible)}
-                  >
-                    {showTimelineEvents
-                      ? "Hide Timeline Events"
-                      : "Show Timeline Events"}
-                  </button>
-                  <span className="sr-only" aria-live="polite">
-                    {timelineAnnouncement}
-                  </span>
-                  <button
-                    type="button"
-                    aria-pressed={presentationShowDetails}
-                    onClick={() =>
-                      setPresentationShowDetails((visible) => !visible)
-                    }
-                  >
-                    {presentationShowDetails ? "Hide Details" : "Show Details"}
-                  </button>
-                  <button type="button" onClick={exitPresentation}>
-                    Exit Presentation <span aria-hidden="true">Esc</span>
-                  </button>
-                </div>
-                {story && storyStep ? (
-                  <StoryPanel
-                    step={storyStep}
-                    index={story.index}
-                    count={storySequence.steps.length}
-                    onPrevious={() =>
-                      setStory(
-                        (value) =>
-                          value && {
-                            ...value,
-                            index: Math.max(0, value.index - 1),
-                          },
-                      )
-                    }
-                    onNext={() =>
-                      setStory(
-                        (value) =>
-                          value && {
-                            ...value,
-                            index: Math.min(
-                              storySequence.steps.length - 1,
-                              value.index + 1,
-                            ),
-                          },
-                      )
-                    }
-                    onExit={exitStory}
-                  />
-                ) : null}
+                      onExit={exitPresentation}
+                      onSupport={() => setSupportOpen(true)}
+                    />
+                    {supportOpen ? (
+                      <SupportDrawer
+                        evidence={evidence.filter((item) =>
+                          briefingStep.evidenceIds?.includes(item.id),
+                        )}
+                        assertionState={
+                          briefingStep.node?.data.assertionState ??
+                          briefingStep.control?.assertionState
+                        }
+                        onClose={() => setSupportOpen(false)}
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <ExploreControls
+                      lens={presentationLens}
+                      onLens={setPresentationLens}
+                      onReturn={() => setPresentationExperience("Guided")}
+                      onExit={exitPresentation}
+                      showDetails={presentationShowDetails}
+                      showTimeline={showTimelineEvents}
+                      onDetails={() =>
+                        setPresentationShowDetails((value) => !value)
+                      }
+                      onTimeline={() =>
+                        setShowTimelineEvents((value) => !value)
+                      }
+                    />
+                    {presentationLens === "Chronology" ? (
+                      <Chronology
+                        nodes={nodes}
+                        selectedId={selectionId}
+                        mobile={chronologyMobile}
+                        onClose={() => setPresentationLens("Overview")}
+                        onSelect={select}
+                      />
+                    ) : null}
+                  </>
+                )}
               </>
             ) : (
               <Footer />
