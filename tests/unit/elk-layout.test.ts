@@ -106,6 +106,73 @@ const crossingCount = (
 };
 
 describe("ELK fixture prototype", () => {
+  it("keeps a straight causal chain aligned when an Action is present", async () => {
+    const causalGraph: LayoutGraph = {
+      nodes: [
+        { id: "impact", kind: "Impact" },
+        { id: "event", kind: "Event" },
+        { id: "factor", kind: "Factor" },
+      ],
+      relationships: [
+        {
+          id: "impact-event",
+          kind: "Causal",
+          fromId: "impact",
+          toId: "event",
+        },
+        {
+          id: "event-factor",
+          kind: "Causal",
+          fromId: "event",
+          toId: "factor",
+        },
+      ],
+    };
+    const graphWithAction: LayoutGraph = {
+      ...causalGraph,
+      actions: [
+        {
+          id: "factor-action",
+          kind: "Action",
+          attachedToId: "factor",
+        },
+      ],
+      relationships: [
+        ...causalGraph.relationships,
+        {
+          id: "factor-action-edge",
+          kind: "Action",
+          fromId: "factor",
+          toId: "factor-action",
+        },
+      ],
+    };
+
+    const withoutAction = await layoutWithElk(causalGraph);
+    const first = await layoutWithElk(graphWithAction);
+    const second = await layoutWithElk(graphWithAction);
+    const semanticGeometry = (result: typeof first) =>
+      result.nodes
+        .filter((node) => node.role === "Semantic")
+        .map((node) => ({ id: node.id, rectangle: node.rectangle }));
+    const centers = (result: typeof first) =>
+      semanticGeometry(result).map(
+        (node) => node.rectangle.x + node.rectangle.width / 2,
+      );
+    const factor = first.nodes.find((node) => node.id === "factor")!;
+    const action = first.nodes.find((node) => node.id === "factor-action")!;
+
+    expect(new Set(centers(withoutAction)).size).toBe(1);
+    expect(new Set(centers(first)).size).toBe(1);
+    expect(semanticGeometry(first)).toEqual(semanticGeometry(withoutAction));
+    expect(action.rectangle.x).toBeGreaterThan(
+      factor.rectangle.x + factor.rectangle.width,
+    );
+    expect(JSON.stringify(semanticGeometry(first))).toBe(
+      JSON.stringify(semanticGeometry(second)),
+    );
+  });
+
   it.each(layoutFixtureNames)(
     "captures deterministic metrics for %s",
     async (name) => {
