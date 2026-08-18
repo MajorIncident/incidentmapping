@@ -192,6 +192,39 @@ export const Inspector = ({
   const [barrierDescription, setBarrierDescription] = useState("");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const barrierDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const sectionRequest =
+    editorFocusRequest?.entityId === selectionId ? editorFocusRequest : null;
+  const requestedEditorSection =
+    requestedSection ??
+    (sectionRequest?.section === "ContextAggravating"
+      ? "Aggravating Context"
+      : sectionRequest?.section === "ContextMitigating"
+        ? "Mitigating Context"
+        : sectionRequest?.section === "Context"
+          ? "Context"
+          : sectionRequest?.section === "Evidence"
+            ? "Evidence"
+            : sectionRequest?.section === "Control"
+              ? "Controls"
+              : sectionRequest?.section === "Action"
+                ? "Actions"
+                : undefined);
+
+  useEffect(() => {
+    if (!sectionRequest) return;
+    if (
+      sectionRequest.section === "Action" &&
+      sectionRequest.intent === "Create"
+    ) {
+      const created = addAction(sectionRequest.entityId);
+      if (!created) clearEditorFocusRequest(sectionRequest.id);
+      return;
+    }
+    // Inspector itself owns opening section-level Control requests. Child editors
+    // consume Evidence and Context requests after their controls are mounted.
+    if (sectionRequest.section === "Control" && !sectionRequest.field)
+      clearEditorFocusRequest(sectionRequest.id);
+  }, [addAction, clearEditorFocusRequest, sectionRequest]);
 
   useEffect(() => {
     if (node) {
@@ -872,7 +905,7 @@ export const Inspector = ({
 
         <SecondarySection
           title="Controls"
-          open={requestedSection === "Controls"}
+          open={requestedEditorSection === "Controls"}
         >
           {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
             <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -933,14 +966,14 @@ export const Inspector = ({
 
         <SecondarySection
           title="Evidence"
-          open={requestedSection === "Evidence"}
+          open={requestedEditorSection === "Evidence"}
         >
           <EvidenceSection target={{ kind: "node", id: node.id }} />
         </SecondarySection>
 
         <SecondarySection
           title="More details"
-          open={requestedSection === "More details"}
+          open={requestedEditorSection === "More details"}
         >
           {node.data.nodeType === "Factor" ? (
             <AssertionStateField
@@ -1175,7 +1208,7 @@ export const Inspector = ({
           <>
             <SecondarySection
               title="Aggravating Context"
-              open={requestedSection === "Aggravating Context"}
+              open={requestedEditorSection === "Aggravating Context"}
             >
               <ContextEditor
                 target={node.id}
@@ -1186,7 +1219,7 @@ export const Inspector = ({
             </SecondarySection>
             <SecondarySection
               title="Mitigating Context"
-              open={requestedSection === "Mitigating Context"}
+              open={requestedEditorSection === "Mitigating Context"}
             >
               <ContextEditor
                 target={node.id}
@@ -1207,7 +1240,7 @@ export const Inspector = ({
         ) : node.data.nodeType === "Event" ? (
           <SecondarySection
             title="Context"
-            open={requestedSection?.includes("Context")}
+            open={requestedEditorSection?.includes("Context")}
           >
             <ContextEditor
               target={node.id}
@@ -1230,7 +1263,10 @@ export const Inspector = ({
           </SecondarySection>
         ) : null}
 
-        <SecondarySection title="Actions" open={requestedSection === "Actions"}>
+        <SecondarySection
+          title="Actions"
+          open={requestedEditorSection === "Actions"}
+        >
           {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
             <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
               <button
@@ -1302,7 +1338,7 @@ export const Inspector = ({
     node,
     ownerValue,
     removeBarrier,
-    requestedSection,
+    requestedEditorSection,
     setFactorCategory,
     setFactorAssertionState,
     setFactorSignificance,

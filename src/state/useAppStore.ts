@@ -114,6 +114,25 @@ export type MapSession = {
   fresh: boolean;
 };
 
+export type EditorSection =
+  | "Title"
+  | "ContextAggravating"
+  | "ContextMitigating"
+  | "Context"
+  | "Evidence"
+  | "Control"
+  | "Action";
+export type EditorIntent = "Open" | "Create";
+
+export type EditorRequest = {
+  id: number;
+  entityId: string;
+  section: EditorSection;
+  intent?: EditorIntent;
+  /** Transitional detail for the existing inline title/description focus flow. */
+  field?: "title" | "description" | "barrier-description";
+};
+
 type AppState = {
   /** Ephemeral lifecycle state; deliberately omitted from maps and history. */
   mapSession: MapSession;
@@ -129,11 +148,7 @@ type AppState = {
   layoutVersion: number;
   measuredControlDimensions: Record<string, { width: number; height: number }>;
   viewportRequest: { id: number; nodeIds: string[] } | null;
-  editorFocusRequest: {
-    id: number;
-    entityId: string;
-    field: "title" | "description" | "barrier-description";
-  } | null;
+  editorFocusRequest: EditorRequest | null;
   history: HistoryState;
   canUndo: boolean;
   canRedo: boolean;
@@ -272,6 +287,11 @@ type AppState = {
     requestEditorFocus: (
       entityId: string,
       field: "title" | "description" | "barrier-description",
+    ) => void;
+    requestEditorSection: (
+      entityId: string,
+      section: EditorSection,
+      intent?: EditorIntent,
     ) => void;
     clearEditorFocusRequest: (id: number) => void;
   };
@@ -613,6 +633,7 @@ export const createNewMapState = () => {
       id: nextEditorFocusRequestId++,
       entityId: rootId,
       field: "title" as const,
+      section: "Title" as const,
     },
     history: createEmptyHistory(),
     canUndo: false,
@@ -1454,6 +1475,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             id: nextEditorFocusRequestId++,
             entityId: newNodeId,
             field: "title",
+            section: "Title",
           },
           history,
           canUndo: history.past.length > 0,
@@ -1530,6 +1552,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             id: nextEditorFocusRequestId++,
             entityId: actionId,
             field: "title" as const,
+            section: "Title" as const,
           },
           history,
           canUndo: true,
@@ -1647,6 +1670,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             id: nextEditorFocusRequestId++,
             entityId: newNodeId,
             field: "title",
+            section: "Title",
           },
           history,
           canUndo: history.past.length > 0,
@@ -1704,6 +1728,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             id: nextEditorFocusRequestId++,
             entityId: barrierId,
             field: "barrier-description",
+            section: "Control",
           },
         } satisfies AppState;
         const nextSnapshot = snapshotFromState(candidate);
@@ -2297,7 +2322,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     requestEditorFocus: (entityId, field) => {
       set({
-        editorFocusRequest: { id: nextEditorFocusRequestId++, entityId, field },
+        editorFocusRequest: {
+          id: nextEditorFocusRequestId++,
+          entityId,
+          field,
+          section: field === "barrier-description" ? "Control" : "Title",
+        },
+      });
+    },
+    requestEditorSection: (entityId, section, intent) => {
+      set({
+        editorFocusRequest: {
+          id: nextEditorFocusRequestId++,
+          entityId,
+          section,
+          intent,
+        },
       });
     },
     clearEditorFocusRequest: (id) => {

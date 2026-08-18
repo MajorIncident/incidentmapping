@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   contextEffectDefinitions,
   type ContextDisplayMode,
@@ -28,6 +28,7 @@ export const ContextEditor = ({
 }: Props): JSX.Element => {
   const uid = useId().replace(/:/g, "");
   const actions = useAppStore((state) => state.actions);
+  const editorRequest = useAppStore((state) => state.editorFocusRequest);
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [displayMode, setDisplayMode] = useState<ContextDisplayMode>("Text");
@@ -44,6 +45,25 @@ export const ContextEditor = ({
   const creationEffect = lockedEffect ?? selectedEffect;
   const definition =
     contextEffectDefinitions[effect ?? lockedEffect ?? "Neutral"];
+
+  useEffect(() => {
+    const requestedEffect =
+      editorRequest?.section === "ContextAggravating"
+        ? "Aggravating"
+        : editorRequest?.section === "ContextMitigating"
+          ? "Mitigating"
+          : editorRequest?.section === "Context"
+            ? "Neutral"
+            : null;
+    if (
+      editorRequest?.entityId !== target ||
+      editorRequest.intent !== "Create" ||
+      requestedEffect !== creationEffect
+    )
+      return;
+    newLabelRef.current?.focus();
+    actions.clearEditorFocusRequest(editorRequest.id);
+  }, [actions, creationEffect, editorRequest, target]);
 
   const addItem = () => {
     if (!label.trim() || !value.trim()) return setError(true);
