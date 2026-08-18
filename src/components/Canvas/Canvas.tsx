@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -30,18 +30,11 @@ import {
   splitEdgeAtControl,
 } from "../../features/layout/investigationLayout";
 import {
+  deriveHoverPresentation,
+  deriveRelationshipPresentation,
   selectLensPresentation,
   type PresentationLens,
 } from "../../features/presentation/selectors";
-export type GraphRole = {
-  roots: Set<string>;
-  leaves: Set<string>;
-  upstream: Set<string>;
-  downstream: Set<string>;
-  selectedPath: Set<string>;
-  unrelated: Set<string>;
-};
-
 // Compatibility exports for callers migrating to the layout-layer adapter.
 export { calculateControlPosition, splitEdgeAtControl };
 
@@ -51,148 +44,6 @@ export const viewportAnimationDuration = (duration: number): number =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ? 0
     : duration;
-
-/** Derives transient visual state from the directed graph; nothing is persisted. */
-export const deriveGraphPresentation = (
-  nodeIds: string[],
-  edges: Array<{ source: string; target: string }>,
-  selectedId: string | null,
-): GraphRole => {
-  const ids = new Set(nodeIds);
-  const incoming = new Map(nodeIds.map((id) => [id, [] as string[]]));
-  const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
-  edges.forEach(({ source, target }) => {
-    if (ids.has(source) && ids.has(target)) {
-      outgoing.get(source)?.push(target);
-      incoming.get(target)?.push(source);
-    }
-  });
-  const walk = (start: string, graph: Map<string, string[]>) => {
-    const found = new Set<string>();
-    const pending = [...(graph.get(start) ?? [])];
-    while (pending.length) {
-      const id = pending.pop()!;
-      if (found.has(id)) continue;
-      found.add(id);
-      pending.push(...(graph.get(id) ?? []));
-    }
-    return found;
-  };
-  const hasSelection = Boolean(selectedId && ids.has(selectedId));
-  const upstream = hasSelection
-    ? walk(selectedId!, incoming)
-    : new Set<string>();
-  const downstream = hasSelection
-    ? walk(selectedId!, outgoing)
-    : new Set<string>();
-  const selectedPath = new Set([...upstream, ...downstream]);
-  if (hasSelection) selectedPath.add(selectedId!);
-  return {
-    roots: new Set(nodeIds.filter((id) => incoming.get(id)?.length === 0)),
-    leaves: new Set(nodeIds.filter((id) => outgoing.get(id)?.length === 0)),
-    upstream,
-    downstream,
-    selectedPath,
-    unrelated: new Set(
-      hasSelection ? nodeIds.filter((id) => !selectedPath.has(id)) : [],
-    ),
-  };
-};
-
-type PresentationNode = { id: string; nodeType?: ChainNodeData["nodeType"] };
-type PresentationBarrier = {
-  id: string;
-  upstreamNodeId: string;
-  downstreamNodeId: string;
-};
-
-/** Resolves causal, Action, and Control selections onto one review relationship. */
-export const deriveRelationshipPresentation = (
-  nodes: PresentationNode[],
-  edges: Array<{ source: string; target: string; kind?: string }>,
-  barriers: PresentationBarrier[],
-  selectedId: string | null,
-): GraphRole => {
-  const causalIds = nodes
-    .filter((node) => node.nodeType !== "Action")
-    .map((node) => node.id);
-  const causalEdges = edges.filter((edge) => edge.kind !== "ActionEdge");
-  const action = nodes.find(
-    (node) => node.id === selectedId && node.nodeType === "Action",
-  );
-  const control = barriers.find((barrier) => barrier.id === selectedId);
-  const actionEdge = action
-    ? edges.find(
-        (edge) => edge.kind === "ActionEdge" && edge.target === action.id,
-      )
-    : undefined;
-  const anchors = actionEdge
-    ? [actionEdge.source]
-    : selectedId
-      ? [selectedId]
-      : [];
-  const roles = control
-    ? []
-    : anchors.map((anchor) =>
-        deriveGraphPresentation(causalIds, causalEdges, anchor),
-      );
-  const selectedPath = new Set(roles.flatMap((role) => [...role.selectedPath]));
-  let controlUpstream = new Set<string>();
-  let controlDownstream = new Set<string>();
-  if (control) {
-    const upstreamRole = deriveGraphPresentation(
-      causalIds,
-      causalEdges,
-      control.upstreamNodeId,
-    );
-    const downstreamRole = deriveGraphPresentation(
-      causalIds,
-      causalEdges,
-      control.downstreamNodeId,
-    );
-    controlUpstream = upstreamRole.upstream;
-    controlDownstream = downstreamRole.downstream;
-    controlUpstream.forEach((id) => selectedPath.add(id));
-    selectedPath.add(control.upstreamNodeId);
-    selectedPath.add(control.downstreamNodeId);
-    controlDownstream.forEach((id) => selectedPath.add(id));
-  }
-  if (action) selectedPath.add(action.id);
-  if (control) selectedPath.add(control.id);
-  // Actions attached to the selected relationship remain part of its context.
-  edges
-    .filter(
-      (edge) => edge.kind === "ActionEdge" && selectedPath.has(edge.source),
-    )
-    .forEach((edge) => selectedPath.add(edge.target));
-  barriers
-    .filter(
-      (barrier) =>
-        selectedPath.has(barrier.upstreamNodeId) &&
-        selectedPath.has(barrier.downstreamNodeId),
-    )
-    .forEach((barrier) => selectedPath.add(barrier.id));
-  const allIds = [
-    ...nodes.map((node) => node.id),
-    ...barriers.map((b) => b.id),
-  ];
-  const defaultRole = deriveGraphPresentation(causalIds, causalEdges, null);
-  const hasSelection = Boolean(control || anchors.length > 0);
-  return {
-    roots: roles[0]?.roots ?? defaultRole.roots,
-    leaves: roles[0]?.leaves ?? defaultRole.leaves,
-    upstream: control
-      ? controlUpstream
-      : new Set(roles.flatMap((role) => [...role.upstream])),
-    downstream: control
-      ? controlDownstream
-      : new Set(roles.flatMap((role) => [...role.downstream])),
-    selectedPath,
-    unrelated: new Set(
-      hasSelection ? allIds.filter((id) => !selectedPath.has(id)) : [],
-    ),
-  };
-};
 
 export const Canvas = ({
   onInspect,
@@ -229,6 +80,7 @@ export const Canvas = ({
   const reactFlow = useReactFlow();
   const nodesInitialized = useNodesInitialized();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const measurementFrame = useRef(0);
   const submitMeasurements = useCallback(
     (measuredNodes: Node[]) => {
@@ -324,6 +176,21 @@ export const Canvas = ({
       barriers,
       selectionId,
     );
+    const hover = deriveHoverPresentation(
+      visibleChainNodes.map((node) => ({
+        id: node.id,
+        nodeType: node.data.nodeType,
+      })),
+      visibleEdges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        kind: edge.data?.kind,
+      })),
+      barriers,
+      hoveredId,
+    );
+    const hasHover = Boolean(hoveredId);
     const presentedNodes = visibleChainNodes
       .filter((node) => lensPresentation.visibleIds.has(node.id))
       .map((node) => ({
@@ -342,7 +209,7 @@ export const Canvas = ({
           readOnly: presenting,
           viewShowDetails: presentationShowDetails,
         },
-        className: `${node.className ?? ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}`,
+        className: `${node.className ?? ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(node.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
       }));
     const nodeLookup = new Map(presentedNodes.map((node) => [node.id, node]));
     const barrierNodes: Node<BarrierNodeData>[] = [];
@@ -355,7 +222,7 @@ export const Canvas = ({
           : undefined;
       const presentedEdge = {
         ...edge,
-        data: { ...edge.data, presentationRole },
+        data: { ...edge.data, presentationRole, originalEdgeId: edge.id },
       };
       const matchingBarrier = barriers.find(
         (barrier) =>
@@ -421,7 +288,8 @@ export const Canvas = ({
         ),
         draggable: false,
         selectable: true,
-        className: `${lensPresentation.emphasizedIds.has(matchingBarrier.id) ? "presentation-emphasized" : ""}${lensPresentation.softenedIds.has(matchingBarrier.id) ? " presentation-softened" : ""}`,
+        selected: matchingBarrier.id === selectionId,
+        className: `${lensPresentation.emphasizedIds.has(matchingBarrier.id) ? "presentation-emphasized" : ""}${lensPresentation.softenedIds.has(matchingBarrier.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(matchingBarrier.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
       };
 
       barrierNodes.push(barrierNode);
@@ -448,13 +316,19 @@ export const Canvas = ({
     });
     const styledEdges = flowEdges.map((edge) => {
       const isAction = edge.data?.kind === "ActionEdge";
+      const hoverRelated = hover.emphasizedEdges.has(
+        edge.data?.originalEdgeId ?? edge.id,
+      );
       const related = edge.data?.presentationRole === "related";
       const highlighted =
         related ||
         (isAction &&
           presentation.selectedPath.has(edge.source) &&
           presentation.selectedPath.has(edge.target));
-      const unrelated = Boolean(selectionId) && !highlighted;
+      const unrelated = hasHover
+        ? !hoverRelated
+        : Boolean(selectionId) && !highlighted;
+      const visuallyRelated = hasHover ? hoverRelated : highlighted;
       const source = allRenderedNodes.find((node) => node.id === edge.source);
       const target = allRenderedNodes.find((node) => node.id === edge.target);
       const obstacles = obstacleRectangles.filter(
@@ -514,15 +388,15 @@ export const Canvas = ({
           route,
         },
         className: isAction
-          ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${highlighted ? " incident-edge--related" : ""}`
-          : highlighted
+          ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${visuallyRelated ? " incident-edge--related" : ""}`
+          : visuallyRelated
             ? "incident-edge incident-edge--related"
             : `incident-edge${unrelated ? " incident-edge--unrelated" : ""}`,
         style: {
           stroke: isAction ? "#94a3b8" : "#475569",
           strokeWidth: isAction
             ? 1.5
-            : highlighted
+            : visuallyRelated
               ? 3
               : unrelated
                 ? 1.5
@@ -546,6 +420,7 @@ export const Canvas = ({
     presentationLens,
     selectionId,
     storyFocusIds,
+    hoveredId,
   ]);
 
   useEffect(() => {
@@ -599,6 +474,13 @@ export const Canvas = ({
     },
     [moveNode],
   );
+  const handleNodeMouseEnter = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setHoveredId(node.id);
+    },
+    [],
+  );
+  const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
   useEffect(() => {
     if (!viewportRequest) return;
@@ -704,6 +586,8 @@ export const Canvas = ({
         fitViewOptions={{ padding: 0.2, includeHiddenNodes: true }}
         proOptions={{ hideAttribution: true }}
         onNodeClick={handleNodeClick}
+        onNodeMouseEnter={handleNodeMouseEnter}
+        onNodeMouseLeave={handleNodeMouseLeave}
         onPaneClick={handlePaneClick}
         onNodeDragStop={handleNodeDragStop}
         onNodesChange={handleNodesChange}

@@ -452,6 +452,38 @@ export const Inspector = ({
             </details>
           </div>
 
+          <section
+            aria-labelledby="control-between-heading"
+            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+          >
+            <h4
+              id="control-between-heading"
+              className="text-xs font-bold uppercase tracking-wide text-slate-600"
+            >
+              Between
+            </h4>
+            <dl className="mt-2 grid gap-2 text-sm">
+              <div>
+                <dt className="text-xs text-slate-500">Upstream</dt>
+                <dd className="font-medium text-slate-800">
+                  {upstreamNode?.data.referenceId
+                    ? `${upstreamNode.data.referenceId} · `
+                    : ""}
+                  {upstreamNode?.data.title ?? barrier.upstreamNodeId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Downstream</dt>
+                <dd className="font-medium text-slate-800">
+                  {downstreamNode?.data.referenceId
+                    ? `${downstreamNode.data.referenceId} · `
+                    : ""}
+                  {downstreamNode?.data.title ?? barrier.downstreamNodeId}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
           <AssertionStateField
             id="barrier-assertion-state"
             value={barrier.assertionState}
