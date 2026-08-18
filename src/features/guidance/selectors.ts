@@ -14,6 +14,7 @@ export type GuidanceMode =
   | "Review";
 export type GuidanceNode = Readonly<{
   id: string;
+  title?: string;
   nodeType?: "Impact" | "Event" | "Factor" | "Action";
   evidenceIds?: readonly string[];
   factorSignificance?: string;
@@ -228,7 +229,7 @@ export const selectInvestigationGuidance = (
     if (!signals.some((item) => item.context === context))
       signals.push({ context, reason, mode });
   };
-  // Explicit router lanes. Advisory assessment never contributes missing-* signals.
+  // Explicit router lanes keep teaching tied to current domain and UI state.
   if (input.activeTask)
     add(input.activeTask, "An investigation task is currently active.", "Task");
   if (input.contextEditing)
@@ -239,22 +240,30 @@ export const selectInvestigationGuidance = (
     add("new-map", "This map was newly created.", "Onboarding");
   const type = selected.node?.nodeType ?? selected.supplied?.nodeType;
   if (type) {
+    const firstEventIsDraft =
+      type === "Event" &&
+      selected.node?.title === "New Event" &&
+      nodes.filter((node) => node.nodeType === "Event").length === 1;
+    if (firstEventIsDraft) {
+      add("first-event-draft", "The first Event is being named.", "Onboarding");
+    }
     const context = `${type.toLowerCase()}-selected` as GuideContext;
     const childFactors =
       type === "Event" &&
       edges.some(
         (edge) =>
           (edge.source ?? edge.fromId) === selected.id &&
-          nodes.find((n) => n.id === (edge.target ?? edge.toId))?.nodeType ===
-            "Factor",
+          nodes.find((node) => node.id === (edge.target ?? edge.toId))
+            ?.nodeType === "Factor",
       );
-    add(
-      context,
-      type === "Event" && !childFactors
-        ? "The selected Event has no child Factors."
-        : `A${type === "Impact" || type === "Action" ? "n" : ""} ${type} is selected.`,
-      "Selection",
-    );
+    if (!firstEventIsDraft)
+      add(
+        context,
+        type === "Event" && !childFactors
+          ? "The selected Event has no child Factors."
+          : `A${type === "Impact" || type === "Action" ? "n" : ""} ${type} is selected.`,
+        "Selection",
+      );
   } else if (selected.control || selected.supplied?.kind === "control")
     add("control-selected", "A Control is selected.", "Selection");
   else if (selected.evidence || selected.supplied?.kind === "evidence")

@@ -62,4 +62,45 @@ describe("investigation guide content", () => {
       .sort((a, b) => b.entry.priority - a.entry.priority || a.order - b.order);
     expect(ranked[0].entry.id).toBe("new-map");
   });
+
+  it("keeps Step 1 focused exclusively on naming the outcome", () => {
+    const entry = investigationGuide.find(({ id }) => id === "new-map");
+    expect(entry?.title).toBe("STEP 1 · START HERE");
+    expect(entry?.content).toEqual([
+      { type: "heading", level: 3, text: "Name the Impact" },
+      { type: "question", text: "What outcome or consequence resulted?" },
+      { type: "example", label: "Example", text: "Injury" },
+      { type: "example", label: "Example", text: "Service interruption" },
+      { type: "example", label: "Example", text: "Financial loss" },
+      { type: "rule", text: "Describe the outcome, not the cause." },
+    ]);
+    expect(entry?.suggestedActions).toEqual([]);
+    expect(JSON.stringify(entry)).not.toMatch(
+      /Evidence|Factors|Controls|Root Cause|missing|completeness/,
+    );
+  });
+
+  it("offers both semantic choices with an accessible distinction in Step 3", () => {
+    const entry = investigationGuide.find(({ id }) => id === "selected-event");
+    expect(entry?.title).toBe("STEP 3 · ASK WHY");
+    expect(entry?.suggestedActions.map(({ label }) => label)).toEqual([
+      "+ Event",
+      "+ Factor",
+    ]);
+    expect(entry?.content).toContainEqual(
+      expect.objectContaining({
+        type: "mini-diagram",
+        alt: "Choose Event when something happened. Choose Factor when a condition existed.",
+      }),
+    );
+  });
+
+  it("continues selected-Factor inquiry without claiming another is required", () => {
+    const entry = investigationGuide.find(({ id }) => id === "selected-factor");
+    expect(entry?.title).toBe("ASK WHY");
+    expect(entry?.suggestedActions.map(({ label }) => label)).toEqual([
+      "+ Factor",
+    ]);
+    expect(JSON.stringify(entry)).not.toMatch(/required/i);
+  });
 });

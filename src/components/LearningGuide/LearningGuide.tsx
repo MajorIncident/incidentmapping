@@ -143,9 +143,6 @@ export const LearningGuide = ({
     <>
       <div className="learning-guide__header">
         <div>
-          <span className="learning-guide__context">
-            Context: {match.context.replaceAll("-", " ")}
-          </span>
           <h2>{match.entry.title}</h2>
         </div>
         <button
@@ -186,11 +183,13 @@ export const LearningGuide = ({
           <Blocks blocks={match.entry.detail} />
         </details>
       ) : null}
-      <details>
-        <summary>Why this tip?</summary>
-        <p>{match.entry.whyThisTip}</p>
-        <p className="learning-guide__reason">Current signal: {match.reason}</p>
-      </details>
+      {import.meta.env.DEV ? (
+        <details>
+          <summary>Guide diagnostics</summary>
+          <p>{match.entry.whyThisTip}</p>
+          <p className="learning-guide__reason">Signal: {match.reason}</p>
+        </details>
+      ) : null}
       {match.entry.dismissible ? (
         <button
           type="button"
