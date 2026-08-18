@@ -29,7 +29,8 @@ import { LearnMapDialog } from "../components/LearningGuide/LearnMapDialog";
 import { InvestigationCheck } from "../components/InvestigationCheck/InvestigationCheck";
 
 export const App = (): JSX.Element => {
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorSection, setInspectorSection] = useState<string>();
   const [presenting, setPresenting] = useState(false);
   const [investigationCheckOpen, setInvestigationCheckOpen] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
@@ -60,6 +61,7 @@ export const App = (): JSX.Element => {
     (state) => state.actions.toggleShowDetails,
   );
   const selectionId = useAppStore((state) => state.selectionId);
+  const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
   const canAddBelow = useAppStore((state) =>
     canAddBelowSelection(state.selectionId, state.nodes),
   );
@@ -127,11 +129,38 @@ export const App = (): JSX.Element => {
       return;
     }
     if (action === "review-assertion") {
-      if (state.selectionId) setInspectorOpen(true);
+      if (state.selectionId) {
+        setInspectorSection("More details");
+        setInspectorOpen(true);
+      }
       return;
     }
     if (action === "add-action") {
+      setInspectorSection("Actions");
+      setInspectorOpen(true);
       state.actions.addAction(state.selectionId ?? undefined);
+      return;
+    }
+    if (
+      action === "add-aggravating-context" ||
+      action === "add-mitigating-context"
+    ) {
+      setInspectorSection(
+        action === "add-aggravating-context"
+          ? "Aggravating Context"
+          : "Mitigating Context",
+      );
+      setInspectorOpen(true);
+      return;
+    }
+    if (action === "add-control") {
+      setInspectorSection("Controls");
+      setInspectorOpen(true);
+      return;
+    }
+    if (action === "link-existing-evidence") {
+      setInspectorSection("Evidence");
+      setInspectorOpen(true);
       return;
     }
     const types = {
@@ -140,14 +169,18 @@ export const App = (): JSX.Element => {
       "add-factor": "Factor",
     } as const;
     if (action in types) {
+      setInspectorOpen(true);
       state.actions.addSemanticNode(
         types[action as keyof typeof types],
         state.selectionId ?? undefined,
       );
       return;
     }
-    if (action === "add-evidence" && state.selectionId)
+    if (action === "add-evidence" && state.selectionId) {
+      setInspectorSection("Evidence");
+      setInspectorOpen(true);
       state.actions.addEvidence(state.selectionId, "New evidence");
+    }
   };
   const exitStory = useCallback(() => setStory(null), []);
   const exitPresentation = useCallback(() => {
@@ -157,6 +190,14 @@ export const App = (): JSX.Element => {
     setStory(null);
     setPresenting(false);
   }, [select]);
+
+  useEffect(() => {
+    // Description/control-purpose focus is an explicit request for Inspector
+    // detail. The fresh-map title request remains an inline canvas edit.
+    if (editorFocusRequest && editorFocusRequest.field !== "title") {
+      setInspectorOpen(true);
+    }
+  }, [editorFocusRequest]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") {
@@ -184,10 +225,6 @@ export const App = (): JSX.Element => {
         ),
       }).changed,
   );
-
-  useEffect(() => {
-    if (selectionId) setInspectorOpen(true);
-  }, [selectionId]);
 
   useEffect(() => {
     if (!presenting) return;
@@ -348,7 +385,10 @@ export const App = (): JSX.Element => {
                 ) : null}
               </div>
               {inspectorOpen && !presenting ? (
-                <Inspector onClose={() => setInspectorOpen(false)} />
+                <Inspector
+                  requestedSection={inspectorSection}
+                  onClose={() => setInspectorOpen(false)}
+                />
               ) : null}
             </div>
             {presenting ? (

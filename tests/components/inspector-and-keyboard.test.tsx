@@ -76,6 +76,55 @@ describe("Inspector and keyboard workflows", () => {
     expect(screen.queryByRole("combobox", { name: "Action Type" })).toBeNull();
   });
 
+  it("keeps each entity's identifying fields primary and secondary fields collapsed", async () => {
+    const nodeId = await renderSelectedNode();
+
+    expect(screen.getByLabelText("Type")).toHaveValue("Event");
+    expect(screen.getByLabelText("Event Phase")).toBeVisible();
+    expect(screen.getByLabelText("Title")).toBeVisible();
+    expect(screen.getByLabelText("Description")).toBeVisible();
+    expect(screen.getByText("Timing").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+
+    act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
+    expect(screen.getByLabelText("Category")).toBeVisible();
+    expect(screen.getByLabelText("Significance")).toBeVisible();
+    expect(
+      screen.getByText("More details").closest("details"),
+    ).not.toHaveAttribute("open");
+
+    act(() => useAppStore.getState().actions.setNodeType(nodeId, "Impact"));
+    expect(screen.getByLabelText("Severity")).toBeVisible();
+    for (const section of [
+      "Aggravating Context",
+      "Mitigating Context",
+      "Context",
+      "Evidence",
+    ]) {
+      const summary = screen
+        .getAllByText(section)
+        .find((element) => element.tagName === "SUMMARY");
+      expect(summary?.closest("details")).not.toHaveAttribute("open");
+    }
+  });
+
+  it("expands secondary sections with keyboard and mouse", async () => {
+    const user = userEvent.setup();
+    await renderSelectedNode();
+    const timing = screen.getByText("Timing");
+    timing.focus();
+    await user.keyboard("{Enter}");
+    expect(timing.closest("details")).toHaveAttribute("open");
+
+    const evidence = screen
+      .getAllByText("Evidence")
+      .find((element) => element.tagName === "SUMMARY")!;
+    await user.click(evidence);
+    expect(evidence.closest("details")).toHaveAttribute("open");
+    expect(timing.closest("details")).toHaveAttribute("open");
+  });
+
   it("shows inspector fields for the selected node and updates metadata", async () => {
     const { actions } = useAppStore.getState();
     let id: string | null = null;
@@ -135,6 +184,12 @@ describe("Inspector and keyboard workflows", () => {
 
   it("orders effect-specific Context after timing and limits unsupported nodes", async () => {
     const nodeId = await renderSelectedNode();
+    await userEvent.click(screen.getByText("Timing"));
+    await userEvent.click(
+      screen
+        .getAllByText("Context")
+        .find((element) => element.tagName === "SUMMARY")!,
+    );
     const headings = screen
       .getAllByRole("heading")
       .map((heading) => heading.textContent);
@@ -153,7 +208,7 @@ describe("Inspector and keyboard workflows", () => {
     ).toBeTruthy();
 
     act(() => useAppStore.getState().actions.setNodeType(nodeId, "Factor"));
-    expect(screen.getByRole("heading", { name: "Context" })).toBeVisible();
+    expect(screen.queryByText("Context")).toBeNull();
     expect(
       screen.queryByRole("heading", { name: "Aggravating Context" }),
     ).toBeNull();
@@ -351,6 +406,11 @@ describe("Inspector and keyboard workflows", () => {
       </ReactFlowProvider>,
     );
 
+    await userEvent.click(
+      screen
+        .getAllByText("Controls")
+        .find((element) => element.tagName === "SUMMARY")!,
+    );
     expect(screen.getByText("Add Control to branch")).toBeVisible();
     expect(screen.getByText(/Branch 1 of 2.*ld-one/)).toBeVisible();
     expect(screen.getByText(/Branch 2 of 2.*ld-two/)).toBeVisible();
@@ -424,6 +484,11 @@ describe("Inspector and keyboard workflows", () => {
       type: "SystemLog",
       title: "Witness account",
     });
+    await user.click(
+      screen
+        .getAllByText("Evidence")
+        .find((element) => element.tagName === "SUMMARY")!,
+    );
     expect(
       screen.getByText(/EV-001 · System Log · Witness account/),
     ).toBeVisible();

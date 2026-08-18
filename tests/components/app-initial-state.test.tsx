@@ -24,6 +24,12 @@ describe("App initial canvas", () => {
 
     expect(await screen.findAllByTestId("chain-node")).toHaveLength(1);
     expect(screen.queryByTestId("barrier-node")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "Inspector" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "Learning Guide" }),
+    ).toBeInTheDocument();
 
     // jsdom cannot measure a React Flow viewport. Complete the initial fit
     // request so the production focus request can run against the mounted node.
