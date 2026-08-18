@@ -30,7 +30,6 @@ import {
 import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
 import { layoutWithElk } from "../features/layout/elk/elkAdapter";
 import type { LayoutGraph } from "../features/layout/layoutModel";
-import { CONTROL_BAND_HEIGHT } from "../features/layout/geometry/spacing";
 
 export { GRID_SIZE } from "../features/layout/hierarchy";
 
@@ -1660,11 +1659,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                   parentNode.position.x +
                   parentSize.width / 2 -
                   childSize.width / 2,
-                y:
-                  parentNode.position.y +
-                  parentSize.height +
-                  VERTICAL_GAP +
-                  CONTROL_BAND_HEIGHT,
+                y: parentNode.position.y + parentSize.height + VERTICAL_GAP,
               });
             })()
           : snapPosition({ x: 0, y: 0 });

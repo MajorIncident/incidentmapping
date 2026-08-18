@@ -9,7 +9,6 @@ import {
   snapPosition,
   VERTICAL_GAP,
 } from "../../src/features/layout/hierarchy";
-import { CONTROL_BAND_HEIGHT } from "../../src/features/layout/geometry/spacing";
 import { emptyMap, sampleMap } from "../../src/features/maps/fixtures";
 import type { MapData } from "../../src/features/maps/schema";
 
@@ -594,8 +593,8 @@ describe("useAppStore actions", () => {
     expect(withControls.right.x - withControls.left.x).toBeGreaterThan(
       withoutControls.right.x - withoutControls.left.x,
     );
-    expect(withControls.left.y).toBe(withoutControls.left.y);
-    expect(withControls.right.y).toBe(withoutControls.right.y);
+    expect(withControls.left.y).toBeGreaterThan(withoutControls.left.y);
+    expect(withControls.right.y).toBeGreaterThan(withoutControls.right.y);
   });
 
   it("batches live barrier description changes into one undo entry", () => {
@@ -654,11 +653,7 @@ describe("useAppStore actions", () => {
       const childSize = getNodeSize(child, showDetails);
       const expected = snapPosition({
         x: parent.position.x + parentSize.width / 2 - childSize.width / 2,
-        y:
-          parent.position.y +
-          parentSize.height +
-          VERTICAL_GAP +
-          CONTROL_BAND_HEIGHT,
+        y: parent.position.y + parentSize.height + VERTICAL_GAP,
       });
 
       expect(child.position).toEqual(expected);
@@ -701,7 +696,7 @@ describe("useAppStore actions", () => {
     expect(firstBefore.position.x).toBe(
       snapPosition({
         x: parentBefore.position.x + 320 / 2 - 240 / 2,
-        y: parentBefore.position.y + 184 + VERTICAL_GAP + CONTROL_BAND_HEIGHT,
+        y: parentBefore.position.y + 184 + VERTICAL_GAP,
       }).x,
     );
 

@@ -11,9 +11,9 @@ import {
   ACTION_GAP,
   ACTION_GUTTER,
   CAUSAL_ROW_GAP,
-  CONTROL_BAND_HEIGHT,
   OBJECT_CLEARANCE,
   SIBLING_GAP,
+  requiredControlBandForNextRank,
 } from "../geometry/spacing";
 import type {
   CausalRouteRole,
@@ -61,7 +61,7 @@ type ProjectedEdge = {
 export const toElkGraph = (
   graph: LayoutGraph,
   horizontalGap = SIBLING_GAP,
-  verticalGap = CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT,
+  verticalGap = CAUSAL_ROW_GAP,
 ): { graph: ElkNode; edges: readonly ProjectedEdge[] } => {
   const controls = graph.controls ?? [];
   const allNodes = graph.nodes
@@ -277,12 +277,19 @@ export const layoutWithElk = async (
     const level = rank.get(node.id) ?? 0;
     ranks.set(level, [...(ranks.get(level) ?? []), geometry]);
   });
-  const rankOrigins = new Map<number, number>();
+  const controlHeightsByRank = new Map<number, number[]>();
+  (graph.controls ?? []).forEach((control) => {
+    const targetRank = rank.get(control.downstreamNodeId);
+    if (targetRank === undefined) return;
+    controlHeightsByRank.set(targetRank, [
+      ...(controlHeightsByRank.get(targetRank) ?? []),
+      control.dimensions?.height ?? CONTROL_NODE_HEIGHT,
+    ]);
+  });
   let rankY = 0;
   [...ranks.keys()]
     .sort((a, b) => a - b)
     .forEach((level) => {
-      rankOrigins.set(level, rankY);
       const members = ranks.get(level)!;
       members.sort(
         (a, b) => a.rectangle.x - b.rectangle.x || a.id.localeCompare(b.id),
@@ -294,10 +301,13 @@ export const layoutWithElk = async (
         (member.rectangle as { x: number; y: number }).y = rankY;
         right = x + member.rectangle.width;
       });
+      const nextLevel = level + 1;
       rankY +=
         Math.max(...members.map((member) => member.rectangle.height)) +
         CAUSAL_ROW_GAP +
-        CONTROL_BAND_HEIGHT;
+        requiredControlBandForNextRank(
+          controlHeightsByRank.get(nextLevel) ?? [],
+        );
     });
 
   // Preserve ELK's ordering for branches and merges, but make an unambiguous
@@ -317,7 +327,7 @@ export const layoutWithElk = async (
     );
   });
 
-  // Controls occupy the fixed band immediately before their downstream rank.
+  // Controls are centred in the actual interval between their endpoint ranks.
   // A stable sub-lane offset prevents controls sharing a target lane from
   // competing for the same rectangle.
   const controlGroups = new Map<string, LayoutNodeGeometry[]>();
@@ -326,16 +336,16 @@ export const layoutWithElk = async (
     const target = geometryById.get(control.downstreamNodeId);
     if (!geometry || !target) return;
     const targetRank = rank.get(control.downstreamNodeId) ?? 0;
-    const bandTop =
-      (rankOrigins.get(targetRank) ?? target.rectangle.y) -
-      CONTROL_BAND_HEIGHT -
-      CAUSAL_ROW_GAP / 2;
+    const source = geometryById.get(control.upstreamNodeId);
+    if (!source) return;
+    const spaceTop = source.rectangle.y + source.rectangle.height;
+    const spaceBottom = target.rectangle.y;
     (geometry.rectangle as { x: number; y: number }).x =
       target.rectangle.x +
       target.rectangle.width / 2 -
       geometry.rectangle.width / 2;
     (geometry.rectangle as { x: number; y: number }).y =
-      bandTop + (CONTROL_BAND_HEIGHT - geometry.rectangle.height) / 2;
+      spaceTop + (spaceBottom - spaceTop - geometry.rectangle.height) / 2;
     const key = `${targetRank}:${target.rectangle.x + target.rectangle.width / 2}`;
     controlGroups.set(key, [...(controlGroups.get(key) ?? []), geometry]);
   });

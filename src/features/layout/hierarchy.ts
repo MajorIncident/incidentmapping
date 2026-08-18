@@ -11,10 +11,10 @@ import {
   ACTION_GUTTER,
   CAUSAL_ROW_GAP,
   CHRONOLOGY_GUTTER,
-  CONTROL_BAND_HEIGHT,
   OBJECT_CLEARANCE,
   SIBLING_GAP,
   SUBTREE_GAP,
+  requiredControlBandForNextRank,
 } from "./geometry/spacing";
 import {
   centerAlignmentDelta,
@@ -321,9 +321,26 @@ export const layoutHierarchy = <Data>(
   });
   const layoutTop = Math.min(...nonActionNodes.map((node) => node.position.y));
   const levelY = [layoutTop];
+  const controlHeightsByLevel = new Map<number, number[]>();
+  barrierEdges.forEach((barrier) => {
+    const level = depth.get(barrier.downstreamNodeId);
+    if (level === undefined) return;
+    const height =
+      (barrier.id && controlDimensions[barrier.id]?.height) ||
+      CONTROL_NODE_HEIGHT;
+    controlHeightsByLevel.set(level, [
+      ...(controlHeightsByLevel.get(level) ?? []),
+      height,
+    ]);
+  });
   for (let level = 0; level < maxDepth; level += 1) {
     levelY[level + 1] =
-      levelY[level] + levelHeights[level] + VERTICAL_GAP + CONTROL_BAND_HEIGHT;
+      levelY[level] +
+      levelHeights[level] +
+      VERTICAL_GAP +
+      requiredControlBandForNextRank(
+        controlHeightsByLevel.get(level + 1) ?? [],
+      );
   }
 
   const positions = new Map<string, XYPosition>();
@@ -497,9 +514,13 @@ export const layoutHierarchy = <Data>(
         associated: new Set([barrier.upstreamNodeId, barrier.downstreamNodeId]),
         x: downstreamPosition.x + downstreamSize.width / 2 - size.width / 2,
         y:
-          downstreamPosition.y -
-          (VERTICAL_GAP + CONTROL_BAND_HEIGHT) / 2 -
-          size.height / 2,
+          upstreamPosition.y +
+          getNodeSize(upstream, canvasDetail).height +
+          (downstreamPosition.y -
+            upstreamPosition.y -
+            getNodeSize(upstream, canvasDetail).height -
+            size.height) /
+            2,
         ...size,
       });
     });
