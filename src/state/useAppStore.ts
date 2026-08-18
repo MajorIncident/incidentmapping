@@ -953,6 +953,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const runtimeNodes = mapNodesToReactNodes(map);
       const runtimeEdges = mapEdgesToReactEdges(map);
       const runtimeBarriers = map.barriers.map(cloneBarrier);
+      const causalNodeIds = causalViewportNodeIds(runtimeNodes);
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
@@ -996,11 +997,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         canvasDetail: "Compact",
         layoutVersion: state.layoutVersion + 1,
         measuredControlDimensions: {},
-        viewportRequest: {
-          id: (state.viewportRequest?.id ?? 0) + 1,
-          nodeIds: causalViewportNodeIds(runtimeNodes),
-          causalNodeIds: causalViewportNodeIds(runtimeNodes),
-        },
+        viewportRequest: causalNodeIds.length
+          ? {
+              id: (state.viewportRequest?.id ?? 0) + 1,
+              nodeIds: causalNodeIds,
+              causalNodeIds,
+            }
+          : null,
         contextEditing: false,
         editorFocusRequest: null,
         history: createEmptyHistory(),

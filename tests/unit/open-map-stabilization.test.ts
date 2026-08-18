@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MapData } from "../../src/features/maps/schema";
+import { emptyMap } from "../../src/features/maps/fixtures";
 import {
   causalViewportNodeIds,
   useAppStore,
@@ -102,5 +103,10 @@ describe("opened-map stabilization", () => {
       width: 250,
       height: 120,
     });
+  });
+
+  it("does not leave an unfulfillable viewport request for an empty map", () => {
+    useAppStore.getState().actions.loadMap(emptyMap);
+    expect(useAppStore.getState().viewportRequest).toBeNull();
   });
 });
