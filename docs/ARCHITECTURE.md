@@ -121,6 +121,21 @@ grid-snapped stacks beside their source. Derived lenses, Event phase/time,
 Context mode, Assertion State, and node position do not assert causality.
 `Inferred` records analytical derivation and is not necessarily uncertainty.
 
+Ordinary editing uses incremental placement. Adding a Factor places only the new
+card in its causal rank beside its parent or sibling group, using available
+clearance; existing geometry and the order established by React Flow dragging
+remain authoritative. Selection, hover, and text edits never request a complete
+layout. Material card-size changes and topology changes that cannot be placed
+without collision may trigger broader repair, but adding a second child does
+not. **Arrange Map is explicit permission to discard manual placement and
+recompute structured geometry.** Arrange uses stable existing-order, reference,
+and ID tie-breakers rather than layout-engine iteration order.
+
+After Arrange, the viewport fits the causal bounds with modest whitespace and a
+minimum readable zoom. Action and chronology gutters are included only when the
+whole projection remains readable; otherwise the readable causal overview is
+centered and the gutters remain accessible by panning.
+
 ## Supported quality, accessibility, and responsive behavior
 
 Schema/migration/package tests protect compatibility, references, limits,

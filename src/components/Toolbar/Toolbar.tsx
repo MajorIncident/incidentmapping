@@ -236,6 +236,7 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
           onClick={props.onOrganize}
           disabled={!props.canOrganize}
           aria-label="Arrange Map"
+          title="Recompute structured geometry (manual card positions may change)"
         >
           Arrange Map
         </Item>

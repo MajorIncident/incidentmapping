@@ -19,7 +19,10 @@ import {
 import {
   ACTION_HORIZONTAL_GAP,
   ACTION_VERTICAL_GAP,
+  buildChildrenByParent,
   getNodeSize,
+  GRID_SIZE,
+  HORIZONTAL_GAP,
   snapPosition,
   VERTICAL_GAP,
   type CanvasDetail,
@@ -151,7 +154,12 @@ type AppState = {
   canvasDetail: CanvasDetail;
   layoutVersion: number;
   measuredControlDimensions: Record<string, { width: number; height: number }>;
-  viewportRequest: { id: number; nodeIds: string[] } | null;
+  viewportRequest: {
+    id: number;
+    nodeIds: string[];
+    /** Arrange requests prefer this readable core when auxiliary gutters are too wide. */
+    causalNodeIds?: string[];
+  } | null;
   editorFocusRequest: EditorRequest | null;
   contextEditing: boolean;
   history: HistoryState;
@@ -503,6 +511,133 @@ const applyLayout = (
       ),
     ),
   });
+};
+
+/** Place one new causal card without rewriting geometry established by dragging. */
+const placeIncrementalNode = (
+  nodes: Node<ChainNodeData>[],
+  edges: Edge[],
+  newNodeId: string,
+  parentId: string | null,
+  siblingId: string | null,
+  canvasDetail: CanvasDetail,
+  barriers: RuntimeBarrier[] = [],
+  controlDimensions: Readonly<
+    Record<string, { width: number; height: number }>
+  > = {},
+): Node<ChainNodeData>[] => {
+  const added = nodes.find((node) => node.id === newNodeId);
+  const parent = nodes.find((node) => node.id === parentId);
+  if (!added || !parent || !siblingId) return nodes;
+  const sibling = nodes.find((node) => node.id === siblingId);
+  const parentSize = getNodeSize(parent, canvasDetail);
+  const siblingSize = sibling && getNodeSize(sibling, canvasDetail);
+  const existingSiblingIds = edges
+    .filter(
+      (edge) =>
+        edge.source === parentId &&
+        edge.target !== newNodeId &&
+        edge.data?.kind !== "ActionEdge",
+    )
+    .map((edge) => edge.target);
+  const existingSiblings = nodes.filter((node) =>
+    existingSiblingIds.includes(node.id),
+  );
+  const siblingLeft = Math.min(
+    ...existingSiblings.map((node) => node.position.x),
+  );
+  const siblingRight = Math.max(
+    ...existingSiblings.map(
+      (node) => node.position.x + getNodeSize(node, canvasDetail).width,
+    ),
+  );
+  const manuallyOffset =
+    sibling &&
+    siblingSize &&
+    Math.abs(
+      (siblingLeft + siblingRight) / 2 -
+        (parent.position.x + parentSize.width / 2),
+    ) > HORIZONTAL_GAP;
+  if (sibling && siblingSize && manuallyOffset) {
+    const addedSize = getNodeSize(added, canvasDetail);
+    const peers = nodes.filter(
+      (node) =>
+        node.id !== newNodeId &&
+        Math.abs(node.position.y - sibling.position.y) < GRID_SIZE,
+    );
+    const candidates = [
+      sibling.position.x + siblingSize.width + HORIZONTAL_GAP,
+      sibling.position.x - addedSize.width - HORIZONTAL_GAP,
+    ];
+    const clear = (x: number) =>
+      peers.every((node) => {
+        const width = getNodeSize(node, canvasDetail).width;
+        return (
+          x + addedSize.width + HORIZONTAL_GAP <= node.position.x ||
+          x >= node.position.x + width + HORIZONTAL_GAP
+        );
+      });
+    const x =
+      candidates.find(clear) ??
+      Math.max(
+        ...peers.map(
+          (node) =>
+            node.position.x +
+            getNodeSize(node, canvasDetail).width +
+            HORIZONTAL_GAP,
+        ),
+      );
+    return nodes.map((node) =>
+      node.id === newNodeId
+        ? {
+            ...node,
+            position: snapPosition({ x, y: sibling.position.y }),
+          }
+        : node,
+    );
+  }
+
+  // Reflow only this causal branch. The hierarchy calculation supplies the
+  // established variable-width sibling spacing, then its parent is translated
+  // back to the manually positioned anchor. Unrelated cards and ancestors are
+  // never assigned engine geometry.
+  const arranged = applyLayout(
+    nodes,
+    edges,
+    canvasDetail,
+    barriers,
+    controlDimensions,
+  ).nodes;
+  const arrangedParent = arranged.find((node) => node.id === parentId);
+  if (!arrangedParent) return nodes;
+  const delta = {
+    x: parent.position.x - arrangedParent.position.x,
+    y: parent.position.y - arrangedParent.position.y,
+  };
+  const children = buildChildrenByParent(
+    edges.filter((edge) => edge.data?.kind !== "ActionEdge"),
+  );
+  const affected = new Set<string>();
+  const visit = (id: string) => {
+    for (const childId of children.get(id) ?? []) {
+      if (affected.has(childId)) continue;
+      affected.add(childId);
+      visit(childId);
+    }
+  };
+  visit(parent.id);
+  const arrangedById = new Map(arranged.map((node) => [node.id, node]));
+  return nodes.map((node) =>
+    affected.has(node.id) && arrangedById.has(node.id)
+      ? {
+          ...node,
+          position: snapPosition({
+            x: arrangedById.get(node.id)!.position.x + delta.x,
+            y: arrangedById.get(node.id)!.position.y + delta.y,
+          }),
+        }
+      : node,
+  );
 };
 
 const quantizeDimension = (
@@ -1550,10 +1685,28 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
-        const firstChild = Boolean(parentNode && outgoingChildCount === 0);
-        const { nodes: laidOutNodes, changed: layoutChanged } = firstChild
-          ? { nodes: nextNodes, changed: false }
-          : applyLayout(nextNodes, nextEdges, state.canvasDetail);
+        const laidOutNodes = parentNode
+          ? placeIncrementalNode(
+              nextNodes,
+              nextEdges,
+              newNodeId,
+              parentNode.id,
+              outgoingChildCount > 0
+                ? (nextEdges.find(
+                    (edge) =>
+                      edge.source === parentNode.id &&
+                      edge.target !== newNodeId &&
+                      edge.data?.kind !== "ActionEdge",
+                  )?.target ?? null)
+                : null,
+              state.canvasDetail,
+              state.barriers,
+              state.measuredControlDimensions,
+            )
+          : nextNodes;
+        const layoutChanged = laidOutNodes.some(
+          (node, index) => node !== nextNodes[index],
+        );
         const candidate = {
           ...state,
           nodes: laidOutNodes,
@@ -1748,10 +1901,18 @@ export const useAppStore = create<AppState>((set, get) => ({
             ]
           : state.edges;
         created = true;
-        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
+        const laidOutNodes = placeIncrementalNode(
           nextNodes,
           nextEdges,
+          newNodeId,
+          parentId,
+          targetSiblingId,
           state.canvasDetail,
+          state.barriers,
+          state.measuredControlDimensions,
+        );
+        const layoutChanged = laidOutNodes.some(
+          (node, index) => node !== nextNodes[index],
         );
         const candidate = {
           ...state,
@@ -2274,6 +2435,13 @@ export const useAppStore = create<AppState>((set, get) => ({
               viewportRequest: {
                 id: (state.viewportRequest?.id ?? 0) + 1,
                 nodeIds: nodes.map((node) => node.id),
+                causalNodeIds: nodes
+                  .filter(
+                    (node) =>
+                      node.data.nodeType !== "Action" &&
+                      node.data.eventDisplay !== "ChronologyOnly",
+                  )
+                  .map((node) => node.id),
               },
             };
           });
