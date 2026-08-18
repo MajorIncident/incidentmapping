@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
 import type { ChainNode } from "../../features/maps/schema";
+import type { CanvasDetail } from "../../features/layout/hierarchy";
 import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
@@ -14,8 +15,8 @@ type ToolbarProps = FileMenuRenderProps & {
   canRedo: boolean;
   onOrganize: () => void;
   canOrganize: boolean;
-  showDetails: boolean;
-  onToggleDetails: () => void;
+  canvasDetail: CanvasDetail;
+  onCanvasDetailChange: (detail: CanvasDetail) => void;
   onPresent: () => void;
   onInvestigationCheck: () => void;
   learningGuideEnabled: boolean;
@@ -240,11 +241,29 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
         </Item>
         <Item
           icon="details"
-          onClick={props.onToggleDetails}
-          aria-label={props.showDetails ? "Hide details" : "Show details"}
-          aria-pressed={props.showDetails}
+          onClick={() => props.onCanvasDetailChange("Compact")}
+          aria-label="Use Compact canvas detail"
+          aria-pressed={props.canvasDetail === "Compact"}
         >
-          {props.showDetails ? "Hide details" : "Show details"}
+          Compact canvas
+          {props.canvasDetail === "Compact" ? (
+            <span className="ml-auto" aria-hidden="true">
+              ✓
+            </span>
+          ) : null}
+        </Item>
+        <Item
+          icon="details"
+          onClick={() => props.onCanvasDetailChange("Expanded")}
+          aria-label="Use Expanded canvas detail"
+          aria-pressed={props.canvasDetail === "Expanded"}
+        >
+          Expanded canvas
+          {props.canvasDetail === "Expanded" ? (
+            <span className="ml-auto" aria-hidden="true">
+              ✓
+            </span>
+          ) : null}
         </Item>
         <Item
           icon="delete"

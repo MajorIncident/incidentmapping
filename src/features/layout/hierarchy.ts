@@ -28,8 +28,10 @@ export const CHRONOLOGY_LANE_GAP = CHRONOLOGY_GUTTER;
 export const ACTION_HORIZONTAL_GAP = ACTION_GUTTER;
 export const ACTION_VERTICAL_GAP = ACTION_GAP;
 
+export type CanvasDetail = "Compact" | "Expanded";
+
 export type HierarchyLayoutOptions = {
-  showDetails: boolean;
+  canvasDetail: CanvasDetail;
   /** Edges containing a rendered barrier card need a larger level gap. */
   barrierEdges?: ReadonlyArray<{
     id?: string;
@@ -47,11 +49,14 @@ export const snapPosition = ({ x, y }: XYPosition): XYPosition => ({
   y: Math.round(y / GRID_SIZE) * GRID_SIZE,
 });
 
-export const getNodeSize = <Data>(node: Node<Data>, showDetails: boolean) => ({
+export const getNodeSize = <Data>(
+  node: Node<Data>,
+  detail: CanvasDetail | boolean,
+) => ({
   width: node.width ?? CHAIN_NODE_WIDTH,
   height:
     node.height ??
-    (showDetails
+    (detail === "Expanded" || detail === true
       ? CHAIN_NODE_HEIGHT + CHAIN_NODE_DETAILS_HEIGHT
       : CHAIN_NODE_HEIGHT),
 });
@@ -75,14 +80,24 @@ export const buildChildrenByParent = (edges: Edge[]): Map<string, string[]> => {
 export const layoutHierarchy = <Data>(
   nodes: Node<Data>[],
   edges: Edge[],
-  options: boolean | HierarchyLayoutOptions,
+  options: CanvasDetail | boolean | HierarchyLayoutOptions,
 ): Node<Data>[] => {
   if (!nodes.length) return [];
+  const normalized =
+    typeof options === "string"
+      ? { canvasDetail: options }
+      : typeof options === "boolean"
+        ? {
+            canvasDetail: options
+              ? ("Expanded" as const)
+              : ("Compact" as const),
+          }
+        : options;
   const {
-    showDetails,
+    canvasDetail,
     barrierEdges = [],
     controlDimensions = {},
-  } = typeof options === "boolean" ? { showDetails: options } : options;
+  } = normalized;
   const actionNodes = nodes.filter(
     (node) => (node.data as { nodeType?: string }).nodeType === "Action",
   );
@@ -146,11 +161,11 @@ export const layoutHierarchy = <Data>(
   actionsBySource.forEach((actions, sourceId) => {
     actionColumns.set(sourceId, {
       width: Math.max(
-        ...actions.map((action) => getNodeSize(action, showDetails).width),
+        ...actions.map((action) => getNodeSize(action, canvasDetail).width),
       ),
       height:
         actions.reduce(
-          (height, action) => height + getNodeSize(action, showDetails).height,
+          (height, action) => height + getNodeSize(action, canvasDetail).height,
           0,
         ) +
         ACTION_VERTICAL_GAP * Math.max(0, actions.length - 1),
@@ -278,7 +293,7 @@ export const layoutHierarchy = <Data>(
         childWidth
       );
     }, 0);
-    const nodeWidth = getNodeSize(byId.get(id)!, showDetails).width;
+    const nodeWidth = getNodeSize(byId.get(id)!, canvasDetail).width;
     const actionColumn = actionColumns.get(id);
     const causalWidth = Math.max(nodeWidth, childrenWidth);
     const width = actionColumn
@@ -296,7 +311,7 @@ export const layoutHierarchy = <Data>(
     const level = depth.get(node.id) ?? 0;
     levelHeights[level] = Math.max(
       levelHeights[level],
-      getNodeSize(node, showDetails).height,
+      getNodeSize(node, canvasDetail).height,
     );
   });
   const layoutTop = Math.min(...nonActionNodes.map((node) => node.position.y));
@@ -310,7 +325,7 @@ export const layoutHierarchy = <Data>(
   const actionPositions = new Map<string, XYPosition>();
   const place = (id: string, left: number) => {
     const node = byId.get(id)!;
-    const nodeSize = getNodeSize(node, showDetails);
+    const nodeSize = getNodeSize(node, canvasDetail);
     const causalWidth = causalWidths.get(id)!;
     const sourcePosition = snapPosition({
       x: left + (causalWidth - nodeSize.width) / 2,
@@ -327,7 +342,7 @@ export const layoutHierarchy = <Data>(
         }),
       );
       actionTop +=
-        getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP;
+        getNodeSize(action, canvasDetail).height + ACTION_VERTICAL_GAP;
     }
     let childLeft = left;
     const children = forestChildren.get(id) ?? [];
@@ -406,9 +421,9 @@ export const layoutHierarchy = <Data>(
         const last = children[children.length - 1];
         const firstNode = byId.get(first)!;
         const lastNode = byId.get(last)!;
-        const firstSize = getNodeSize(firstNode, showDetails);
-        const lastSize = getNodeSize(lastNode, showDetails);
-        const parentSize = getNodeSize(byId.get(parent)!, showDetails);
+        const firstSize = getNodeSize(firstNode, canvasDetail);
+        const lastSize = getNodeSize(lastNode, canvasDetail);
+        const parentSize = getNodeSize(byId.get(parent)!, canvasDetail);
         const center =
           (positions.get(first)!.x +
             firstSize.width / 2 +
@@ -436,7 +451,7 @@ export const layoutHierarchy = <Data>(
   const rectangles = (): LayoutRectangle[] => {
     const result: LayoutRectangle[] = [];
     causalNodes.forEach((node) => {
-      const size = getNodeSize(node, showDetails);
+      const size = getNodeSize(node, canvasDetail);
       const position = positions.get(node.id)!;
       result.push({
         id: `node:${node.id}`,
@@ -446,7 +461,7 @@ export const layoutHierarchy = <Data>(
         ...size,
       });
       for (const action of actionsBySource.get(node.id) ?? []) {
-        const actionSize = getNodeSize(action, showDetails);
+        const actionSize = getNodeSize(action, canvasDetail);
         result.push({
           id: `action:${action.id}`,
           owner: node.id,
@@ -463,7 +478,7 @@ export const layoutHierarchy = <Data>(
       const downstreamPosition = positions.get(barrier.downstreamNodeId);
       if (!upstream || !downstream || !upstreamPosition || !downstreamPosition)
         return;
-      const downstreamSize = getNodeSize(downstream, showDetails);
+      const downstreamSize = getNodeSize(downstream, canvasDetail);
       const size = (barrier.id && controlDimensions[barrier.id]) || {
         width: CONTROL_NODE_WIDTH,
         height: CONTROL_NODE_HEIGHT,
@@ -551,15 +566,15 @@ export const layoutHierarchy = <Data>(
         snapPosition({
           x:
             chronologyX +
-            getNodeSize(node, showDetails).width +
+            getNodeSize(node, canvasDetail).width +
             ACTION_HORIZONTAL_GAP,
           y: actionTop,
         }),
       );
       actionTop +=
-        getNodeSize(action, showDetails).height + ACTION_VERTICAL_GAP;
+        getNodeSize(action, canvasDetail).height + ACTION_VERTICAL_GAP;
     }
-    chronologyTop += getNodeSize(node, showDetails).height + VERTICAL_GAP;
+    chronologyTop += getNodeSize(node, canvasDetail).height + VERTICAL_GAP;
   });
 
   const causalResult = nonActionNodes.map((node) => ({
@@ -577,7 +592,7 @@ export const layoutHierarchy = <Data>(
 export const applyHierarchyLayout = <Data>(
   nodes: Node<Data>[],
   edges: Edge[],
-  options: boolean | HierarchyLayoutOptions,
+  options: CanvasDetail | boolean | HierarchyLayoutOptions,
 ): { nodes: Node<Data>[]; changed: boolean } => {
   const laidOut = layoutHierarchy(nodes, edges, options);
   return {

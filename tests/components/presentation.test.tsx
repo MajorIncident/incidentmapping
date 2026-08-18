@@ -492,7 +492,9 @@ describe("presentation mode", () => {
       await userEvent.click(
         screen.getByRole("button", { name: /Exit Presentation/i }),
       );
-      expect(useAppStore.getState().showDetails).toBe(editorShowDetails);
+      expect(useAppStore.getState().canvasDetail === "Expanded").toBe(
+        editorShowDetails,
+      );
     },
   );
 });

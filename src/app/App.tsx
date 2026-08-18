@@ -63,9 +63,7 @@ export const App = (): JSX.Element => {
   const undo = useAppStore((state) => state.actions.undo);
   const redo = useAppStore((state) => state.actions.redo);
   const organizeNodes = useAppStore((state) => state.actions.organizeNodes);
-  const toggleShowDetails = useAppStore(
-    (state) => state.actions.toggleShowDetails,
-  );
+  const setCanvasDetail = useAppStore((state) => state.actions.setCanvasDetail);
   const selectionId = useAppStore((state) => state.selectionId);
   const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
   const canAddBelow = useAppStore((state) =>
@@ -73,7 +71,7 @@ export const App = (): JSX.Element => {
   );
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
-  const showDetails = useAppStore((state) => state.showDetails);
+  const canvasDetail = useAppStore((state) => state.canvasDetail);
   const select = useAppStore((state) => state.actions.select);
   const nodes = useAppStore((state) => state.nodes);
   const barriers = useAppStore((state) => state.barriers);
@@ -252,7 +250,7 @@ export const App = (): JSX.Element => {
     (state) =>
       state.nodes.length >= 2 &&
       applyHierarchyLayout(state.nodes, state.edges, {
-        showDetails: state.showDetails,
+        canvasDetail: state.canvasDetail,
         barrierEdges: state.barriers.filter((barrier) =>
           state.edges.some(
             (edge) =>
@@ -375,8 +373,8 @@ export const App = (): JSX.Element => {
                 canRedo={canRedo}
                 onOrganize={organizeNodes}
                 canOrganize={canOrganize}
-                onToggleDetails={toggleShowDetails}
-                showDetails={showDetails}
+                onCanvasDetailChange={setCanvasDetail}
+                canvasDetail={canvasDetail}
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
                   useAppStore.getState().actions.select(null);

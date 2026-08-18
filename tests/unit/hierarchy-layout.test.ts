@@ -248,7 +248,7 @@ describe("layoutHierarchy", () => {
     const edges = [edge("a", "b")];
     const compact = layoutHierarchy(nodes, edges, false);
     const spacious = layoutHierarchy(nodes, edges, {
-      showDetails: true,
+      canvasDetail: "Expanded",
       barrierEdges: [{ upstreamNodeId: "a", downstreamNodeId: "b" }],
     });
     expect(spacious[1].position.y - spacious[0].position.y).toBeGreaterThan(
@@ -261,7 +261,7 @@ describe("layoutHierarchy", () => {
       [node("root"), node("left"), node("right")],
       [edge("root", "left"), edge("root", "right")],
       {
-        showDetails: false,
+        canvasDetail: "Compact",
         barrierEdges: [
           { upstreamNodeId: "root", downstreamNodeId: "left" },
           { upstreamNodeId: "root", downstreamNodeId: "right" },
@@ -280,7 +280,7 @@ describe("layoutHierarchy", () => {
       [node("root"), node("left"), node("right")],
       [edge("root", "left"), edge("root", "right")],
       {
-        showDetails: false,
+        canvasDetail: "Compact",
         barrierEdges: [
           { upstreamNodeId: "root", downstreamNodeId: "left" },
           { upstreamNodeId: "root", downstreamNodeId: "right" },
@@ -364,15 +364,15 @@ describe("layoutHierarchy", () => {
       result.map((item) => [item.id, nodeRectangle(item)]),
     );
     expect(bounds).toEqual({
-      event: { x: 1016, y: 0, width: 240, height: 176 },
-      "factor-1": { x: 0, y: 424, width: 240, height: 176 },
-      "action-1": { x: 304, y: 424, width: 240, height: 176 },
-      "factor-2": { x: 576, y: 424, width: 240, height: 176 },
-      "action-2": { x: 880, y: 424, width: 240, height: 176 },
-      "factor-3": { x: 1152, y: 424, width: 240, height: 176 },
-      "action-3": { x: 1456, y: 424, width: 240, height: 176 },
-      "factor-4": { x: 1728, y: 424, width: 240, height: 176 },
-      "action-4": { x: 2032, y: 424, width: 240, height: 176 },
+      event: { x: 1016, y: 0, width: 240, height: 144 },
+      "factor-1": { x: 0, y: 392, width: 240, height: 144 },
+      "action-1": { x: 304, y: 392, width: 240, height: 144 },
+      "factor-2": { x: 576, y: 392, width: 240, height: 144 },
+      "action-2": { x: 880, y: 392, width: 240, height: 144 },
+      "factor-3": { x: 1152, y: 392, width: 240, height: 144 },
+      "action-3": { x: 1456, y: 392, width: 240, height: 144 },
+      "factor-4": { x: 1728, y: 392, width: 240, height: 144 },
+      "action-4": { x: 2032, y: 392, width: 240, height: 144 },
     });
 
     const actions = result.filter(
@@ -458,7 +458,7 @@ describe("measured content layout", () => {
       { ...edge("factor", "action"), data: { kind: "ActionEdge" } },
     ];
     const result = layoutHierarchy(measured, edges, {
-      showDetails: true,
+      canvasDetail: "Expanded",
       barrierEdges: [
         { id: "control", upstreamNodeId: "impact", downstreamNodeId: "event" },
       ],
@@ -497,7 +497,7 @@ describe("visual subtree bounds", () => {
       [node("root"), node("controlled"), node("plain")],
       [edge("root", "controlled"), edge("root", "plain")],
       {
-        showDetails: false,
+        canvasDetail: "Compact",
         barrierEdges: controls.map(({ upstream, downstream }) => ({
           upstreamNodeId: upstream,
           downstreamNodeId: downstream,
@@ -516,7 +516,7 @@ describe("visual subtree bounds", () => {
       [node("root"), node("middle"), node("leaf"), node("sibling")],
       [edge("root", "middle"), edge("middle", "leaf"), edge("root", "sibling")],
       {
-        showDetails: false,
+        canvasDetail: "Compact",
         barrierEdges: controls.map(({ upstream, downstream }) => ({
           upstreamNodeId: upstream,
           downstreamNodeId: downstream,
@@ -537,7 +537,7 @@ describe("visual subtree bounds", () => {
         edge("root", "controlled"),
       ],
       {
-        showDetails: false,
+        canvasDetail: "Compact",
         barrierEdges: controls.map(({ upstream, downstream }) => ({
           upstreamNodeId: upstream,
           downstreamNodeId: downstream,
@@ -562,7 +562,7 @@ describe("visual subtree bounds", () => {
       cards,
       [edge("root-a", "child-a"), edge("root-b", "child-b")],
       {
-        showDetails: true,
+        canvasDetail: "Expanded",
         barrierEdges: controls.map(({ upstream, downstream }, index) => ({
           id: `c${index}`,
           upstreamNodeId: upstream,

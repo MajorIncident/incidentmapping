@@ -156,10 +156,10 @@ const ChainNodeComponent = ({
   );
   const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
   const viewportRequest = useAppStore((state) => state.viewportRequest);
-  const editorShowDetails = useAppStore((state) => state.showDetails);
-  const showDetails = data.readOnly
+  const canvasDetail = useAppStore((state) => state.canvasDetail);
+  const expanded = data.readOnly
     ? (data.viewShowDetails ?? false)
-    : editorShowDetails;
+    : canvasDetail === "Expanded";
   const editingId = useAppStore((state) => state.editingId);
   const isEditing = editingId === id;
   const [value, setValue] = useState(data.title);
@@ -545,7 +545,7 @@ const ChainNodeComponent = ({
         </div>
       ) : null}
       {!isEditing &&
-      !showDetails &&
+      !expanded &&
       (compactContext.Aggravating.length ||
         compactContext.Mitigating.length ||
         compactContext.Neutral.length) ? (
@@ -581,7 +581,7 @@ const ChainNodeComponent = ({
           ) : null}
         </div>
       ) : null}
-      {!isEditing && showDetails && hasVisibleDetails ? (
+      {!isEditing && expanded && hasVisibleDetails ? (
         <div
           className="mt-2 space-y-2 text-xs text-slate-600"
           data-testid="node-details"
@@ -643,7 +643,7 @@ const ChainNodeComponent = ({
         </div>
       ) : null}
       {!isEditing &&
-      !showDetails &&
+      !expanded &&
       evidenceItems.length > 0 &&
       data.nodeType !== "Impact" &&
       data.nodeType !== "Event" ? (
@@ -680,10 +680,10 @@ const BarrierNodeComponent = ({
   } as const;
   const description = data.description?.trim();
   const failureDetails = data.failureDetails?.trim();
-  const editorShowDetails = useAppStore((state) => state.showDetails);
-  const showDetails = data.readOnly
+  const canvasDetail = useAppStore((state) => state.canvasDetail);
+  const expanded = data.readOnly
     ? (data.viewShowDetails ?? false)
-    : editorShowDetails;
+    : canvasDetail === "Expanded";
   const failureReason = data.failureReason?.replace(/([a-z])([A-Z])/g, "$1 $2");
   const evidenceRegistry = useAppStore((state) => state.evidence);
   const evidenceItems = resolveEvidence(
@@ -739,7 +739,7 @@ const BarrierNodeComponent = ({
         >
           {data.status}
         </span>
-        <AssertionMarker state={data.assertionState} />
+        {expanded ? <AssertionMarker state={data.assertionState} /> : null}
       </header>
       <p className="mt-2 text-xs font-semibold text-slate-700">
         {role} <span aria-hidden="true">·</span> {data.status}
@@ -757,25 +757,21 @@ const BarrierNodeComponent = ({
           />
         </div>
       ) : null}
-      {!data.readOnly || showDetails ? (
-        <p className="mt-1 min-w-0 whitespace-pre-line break-words text-sm text-slate-700">
-          {description ?? "No control purpose provided."}
-        </p>
-      ) : null}
-      {(!data.readOnly || showDetails) &&
-      data.status !== "Effective" &&
-      data.failureReason ? (
+      <p className="mt-1 min-w-0 whitespace-pre-line break-words text-sm text-slate-700">
+        {description ?? "No control purpose provided."}
+      </p>
+      {expanded && data.status !== "Effective" && data.failureReason ? (
         <p className="mt-2 text-xs font-semibold text-slate-700">
           Failure reason: {failureReason}
         </p>
       ) : null}
-      {showDetails && data.status !== "Effective" && failureDetails ? (
+      {expanded && data.status !== "Effective" && failureDetails ? (
         <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
           {failureDetails}
         </p>
       ) : null}
       {evidenceItems.length > 0 ? (
-        showDetails ? (
+        expanded ? (
           <div
             className="mt-2 space-y-1 text-xs"
             data-testid="control-evidence-summary"

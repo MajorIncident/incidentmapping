@@ -205,7 +205,13 @@ export const hierarchyAdapter =
   (options: boolean | HierarchyLayoutOptions = false): LayoutAdapter =>
   (topology) => ({
     nodes: layoutHierarchy(topology.nodes, topology.edges, {
-      ...(typeof options === "boolean" ? { showDetails: options } : options),
+      ...(typeof options === "boolean"
+        ? {
+            canvasDetail: options
+              ? ("Expanded" as const)
+              : ("Compact" as const),
+          }
+        : options),
       barrierEdges: topology.controls,
     }),
     edges: topology.edges.map((edge) => ({ ...edge })),
