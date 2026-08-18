@@ -376,6 +376,9 @@ describe("presentation mode", () => {
 
   it("exits by button and Escape without changing map data or history", async () => {
     render(<App />);
+    await waitFor(() =>
+      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
+    );
     const beforeMap = useAppStore.getState().actions.toMap();
     const beforeHistory = useAppStore.getState().history;
     await userEvent.click(screen.getByRole("button", { name: "Present map" }));
@@ -411,6 +414,9 @@ describe("presentation mode", () => {
       expect(
         useAppStore.getState().measuredControlDimensions["barrier-root-child"],
       ).toBeDefined(),
+    );
+    await waitFor(() =>
+      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
     );
     const before = useAppStore.getState();
     const serialized = before.actions.toMap();

@@ -12,8 +12,10 @@ import {
 import {
   countCrossings,
   inflateRectangle,
+  routeOrthogonally,
   routeSegments,
   segmentIntersectsRectangle,
+  simplifyOrthogonalRoute,
 } from "../../src/features/layout/routing/geometry";
 
 const node = (id: string, x: number, y: number): LayoutNodeGeometry => ({
@@ -29,6 +31,22 @@ const edge = (
 const vertical = (a: Point, b: Point) => a.x === b.x && a.y !== b.y;
 
 describe("causal routing", () => {
+  it("keeps a two-point route contract when coincident ports collapse", () => {
+    const point = { x: 120, y: 240 };
+    expect(simplifyOrthogonalRoute([point, point])).toEqual([point, point]);
+    expect(routeOrthogonally(point, point, [])).toEqual([point, point]);
+  });
+
+  it("duplicates a lone transient endpoint but rejects an empty route", () => {
+    expect(simplifyOrthogonalRoute([{ x: 0, y: 0 }])).toEqual([
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+    expect(() => simplifyOrthogonalRoute([])).toThrow(
+      "An orthogonal route needs two points",
+    );
+  });
+
   it("classifies relationships solely from graph degree", () => {
     expect(classifyCausalRelationship(1, 1)).toBe("Direct");
     expect(classifyCausalRelationship(2, 1)).toBe("Branch");

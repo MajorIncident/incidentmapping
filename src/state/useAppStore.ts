@@ -29,7 +29,12 @@ import {
 } from "../features/layout/hierarchy";
 import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
 import { layoutWithElk } from "../features/layout/elk/elkAdapter";
-import type { LayoutGraph } from "../features/layout/layoutModel";
+import { layoutInvestigation } from "../features/layout/investigationLayout";
+import { evaluateLayoutHealth } from "../features/layout/layoutHealth";
+import type {
+  LayoutGraph,
+  LayoutNodeGeometry,
+} from "../features/layout/layoutModel";
 
 export { GRID_SIZE } from "../features/layout/hierarchy";
 
@@ -119,6 +124,11 @@ export type MapSession = {
   source: "New" | "Opened";
   fresh: boolean;
 };
+export type InitialLayoutState =
+  | "PendingMeasurement"
+  | "Evaluating"
+  | "Normalizing"
+  | "Complete";
 
 /** Auxiliary Actions and chronology events never define the opening viewport. */
 export const causalViewportNodeIds = (nodes: readonly Node<ChainNodeData>[]) =>
@@ -152,6 +162,8 @@ export type EditorRequest = {
 type AppState = {
   /** Ephemeral lifecycle state; deliberately omitted from maps and history. */
   mapSession: MapSession;
+  /** One-shot, runtime-only compatibility pass for an opened map. */
+  initialLayoutState: InitialLayoutState;
   nodes: Node<ChainNodeData>[];
   edges: Edge[];
   metadata: RuntimeMetadata | undefined;
@@ -787,6 +799,28 @@ const toLayoutGraph = (state: AppState): LayoutGraph => {
   };
 };
 
+const runtimeGeometry = (state: AppState): LayoutNodeGeometry[] => {
+  const actionIds = new Set(
+    state.nodes
+      .filter((node) => node.data.nodeType === "Action")
+      .map((node) => node.id),
+  );
+  return state.nodes.map((node) => {
+    const fallback = getNodeSize(node, state.canvasDetail);
+    return {
+      id: node.id,
+      role: actionIds.has(node.id)
+        ? ("Action" as const)
+        : ("Semantic" as const),
+      rectangle: {
+        ...node.position,
+        width: node.width ?? fallback.width,
+        height: node.height ?? fallback.height,
+      },
+    };
+  });
+};
+
 const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
 
 const applyHistorySnapshot = (snapshot: HistoryEntry) => ({
@@ -908,6 +942,7 @@ export const createNewMapState = () => {
   const rootId = map.nodes[0].id;
   return {
     mapSession: { source: "New", fresh: true } as MapSession,
+    initialLayoutState: "Complete" as InitialLayoutState,
     nodes: mapNodesToReactNodes(map),
     edges: mapEdgesToReactEdges(map),
     metadata: map.metadata ? { ...map.metadata } : undefined,
@@ -953,11 +988,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const runtimeNodes = mapNodesToReactNodes(map);
       const runtimeEdges = mapEdgesToReactEdges(map);
       const runtimeBarriers = map.barriers.map(cloneBarrier);
-      const causalNodeIds = causalViewportNodeIds(runtimeNodes);
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
         mapSession: { source: "Opened", fresh: false },
+        initialLayoutState: runtimeNodes.length
+          ? "PendingMeasurement"
+          : "Complete",
         // OPEN means OPEN: persisted semantic positions are authoritative.
         // Full DAG rearrangement is reserved for the explicit Arrange Map command.
         nodes: runtimeNodes,
@@ -997,13 +1034,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         canvasDetail: "Compact",
         layoutVersion: state.layoutVersion + 1,
         measuredControlDimensions: {},
-        viewportRequest: causalNodeIds.length
-          ? {
-              id: (state.viewportRequest?.id ?? 0) + 1,
-              nodeIds: causalNodeIds,
-              causalNodeIds,
-            }
-          : null,
+        // Final Impact-centred framing waits for measured health/normalization.
+        viewportRequest: null,
         contextEditing: false,
         editorFocusRequest: null,
         history: createEmptyHistory(),
@@ -2432,6 +2464,94 @@ export const useAppStore = create<AppState>((set, get) => ({
           layoutVersion: state.layoutVersion + 1,
         };
       });
+
+      const measured = get();
+      const ready =
+        measured.initialLayoutState === "PendingMeasurement" &&
+        measured.nodes.every((node) => node.width && node.height) &&
+        measured.barriers.every(
+          (barrier) => measured.measuredControlDimensions[barrier.id],
+        );
+      if (!ready) return;
+      set((state) =>
+        state.initialLayoutState === "PendingMeasurement"
+          ? { initialLayoutState: "Evaluating" }
+          : {},
+      );
+      const evaluating = get();
+      if (evaluating.initialLayoutState !== "Evaluating") return;
+      const graph = toLayoutGraph(evaluating);
+      const projected = layoutInvestigation(graph, {
+        mode: "Incremental",
+        priorGeometry: runtimeGeometry(evaluating),
+      });
+      const health = evaluateLayoutHealth(graph, projected);
+      const finishViewport = (state: AppState) => {
+        const ids = causalViewportNodeIds(state.nodes);
+        return ids.length
+          ? {
+              id: (state.viewportRequest?.id ?? 0) + 1,
+              nodeIds: ids,
+              causalNodeIds: ids,
+            }
+          : null;
+      };
+      if (health.healthy) {
+        set((state) =>
+          state.initialLayoutState === "Evaluating"
+            ? {
+                initialLayoutState: "Complete",
+                viewportRequest: finishViewport(state),
+              }
+            : {},
+        );
+        return;
+      }
+
+      const dependencyKey = fullLayoutDependencyKey(evaluating);
+      set((state) =>
+        state.initialLayoutState === "Evaluating"
+          ? { initialLayoutState: "Normalizing" }
+          : {},
+      );
+      void layoutWithElk(graph).then(
+        (result) =>
+          set((state) => {
+            if (
+              state.initialLayoutState !== "Normalizing" ||
+              fullLayoutDependencyKey(state) !== dependencyKey
+            )
+              return {};
+            const geometry = new Map(
+              result.nodes.map((node) => [node.id, node.rectangle]),
+            );
+            const nodes = state.nodes.map((node) => {
+              const rectangle = geometry.get(node.id);
+              return rectangle
+                ? {
+                    ...node,
+                    position: snapPosition({ x: rectangle.x, y: rectangle.y }),
+                  }
+                : node;
+            });
+            const completed = { ...state, nodes };
+            return {
+              nodes,
+              initialLayoutState: "Complete",
+              layoutVersion: state.layoutVersion + 1,
+              viewportRequest: finishViewport(completed),
+            };
+          }),
+        () =>
+          set((state) =>
+            state.initialLayoutState === "Normalizing"
+              ? {
+                  initialLayoutState: "Complete",
+                  viewportRequest: finishViewport(state),
+                }
+              : {},
+          ),
+      );
     },
     organizeNodes: () => {
       const requestedState = get();

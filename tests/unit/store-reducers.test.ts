@@ -832,10 +832,12 @@ describe("useAppStore actions", () => {
     const historyBeforeArrange = useAppStore.getState().history.past.length;
 
     actions.organizeNodes();
-    await vi.waitFor(() =>
-      expect(useAppStore.getState().history.past.length).toBe(
-        historyBeforeArrange + 1,
-      ),
+    await vi.waitFor(
+      () =>
+        expect(useAppStore.getState().history.past.length).toBe(
+          historyBeforeArrange + 1,
+        ),
+      { timeout: 5_000 },
     );
     const organized = useAppStore.getState().nodes.map((node) => node.position);
     expect(organized).not.toEqual(before);

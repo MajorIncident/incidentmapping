@@ -9,7 +9,6 @@ import {
 import { centerAlignmentDelta } from "../geometry/alignment";
 import {
   ACTION_GAP,
-  ACTION_GUTTER,
   CAUSAL_ROW_GAP,
   OBJECT_CLEARANCE,
   SIBLING_GAP,
@@ -23,6 +22,7 @@ import type {
   OrthogonalRoute,
   RoutedRelationship,
 } from "../layoutModel";
+import { placeActionStacks } from "../routing/actionRouting";
 import { ELK_LAYERED_OPTIONS, elkSpacingOptions } from "./elkOptions";
 
 const elk = new ELK();
@@ -378,35 +378,21 @@ export const layoutWithElk = async (
     });
   });
 
-  // Actions remain outside causal ranking and form stable columns beside their
-  // anchors rather than creating accidental ELK layers.
-  const actionsByAnchor = new Map<string, typeof graph.actions>();
-  (graph.actions ?? []).forEach((action) =>
-    actionsByAnchor.set(action.attachedToId, [
-      ...(actionsByAnchor.get(action.attachedToId) ?? []),
-      action,
-    ]),
+  // One projection owns Action geometry in ELK and incremental rendering.
+  const actionIds = new Set((graph.actions ?? []).map((action) => action.id));
+  const causalObjects = nodes.filter((node) => !actionIds.has(node.id));
+  const causalRight = Math.max(
+    0,
+    ...causalObjects.map((node) => node.rectangle.x + node.rectangle.width),
   );
-  actionsByAnchor.forEach((items, anchorId) => {
-    const anchor = geometryById.get(anchorId);
-    if (!anchor || !items) return;
-    items
-      .slice()
-      .sort((a, b) =>
-        compareHints(
-          hint(a.layoutHints?.order, a.referenceId, a.id),
-          hint(b.layoutHints?.order, b.referenceId, b.id),
-        ),
-      )
-      .forEach((action, index) => {
-        const geometry = geometryById.get(action.id);
-        if (!geometry) return;
-        (geometry.rectangle as { x: number; y: number }).x =
-          anchor.rectangle.x + anchor.rectangle.width + ACTION_GUTTER;
-        (geometry.rectangle as { x: number; y: number }).y =
-          anchor.rectangle.y + index * (geometry.rectangle.height + ACTION_GAP);
-      });
+  const actionGeometry = placeActionStacks(graph.actions ?? [], causalObjects, {
+    x: 0,
+    y: 0,
+    width: causalRight,
+    height: 0,
   });
+  nodes.splice(0, nodes.length, ...causalObjects, ...actionGeometry);
+  actionGeometry.forEach((geometry) => geometryById.set(geometry.id, geometry));
   const metadata = new Map(translated.edges.map((edge) => [edge.id, edge]));
   const engineEdges = new Map(
     (result.edges ?? []).map((edge) => [edge.id, edge]),

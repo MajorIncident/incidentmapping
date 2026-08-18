@@ -53,6 +53,15 @@ export const calculateControlPosition = (
       2,
 });
 
+/** Persisted endpoint geometry is viable only when the complete Control band fits. */
+export const hasRequiredControlSpace = (
+  source: PositionedSize,
+  target: PositionedSize,
+  control: MeasuredDimensions,
+): boolean =>
+  target.position.y - (source.position.y + source.height) >=
+  requiredRankInterval(false, [control.height]);
+
 /** Renderer-neutral edge splitting retained for thin UI adapters. */
 export const splitEdgeAtControl = <
   T extends { id: string; source: string; target: string },
@@ -204,9 +213,12 @@ export const layoutInvestigation = (
   [...rankHeights.keys()]
     .sort((a, b) => a - b)
     .forEach((level) => {
-      rankOrigins.set(level, origin);
-      origin +=
-        rankHeights.get(level)! + (vGap ?? intervalBeforeRank(level + 1));
+      const snappedOrigin = snap(origin);
+      rankOrigins.set(level, snappedOrigin);
+      origin =
+        snappedOrigin +
+        rankHeights.get(level)! +
+        (vGap ?? intervalBeforeRank(level + 1));
     });
   const rankOrder = new Map<number, number>();
   const prior = new Map(
@@ -478,16 +490,18 @@ export const layoutInvestigation = (
 
   const actionGeometries = placeActionStacks(
     input.actions ?? [],
-    geometries.filter((node) => node.role === "Semantic"),
+    geometries.filter((node) => node.role !== "Action"),
     causalBounds,
     snap,
+    options.mode === "Incremental",
   );
   geometries.push(...actionGeometries);
   const controlledCausalRelationships = causalRouting.relationships.flatMap(
     (relationship): RoutedRelationship[] => {
       const control = controlsByRelationship.get(relationship.relationshipId);
       if (!control) return [relationship];
-      const controlGeometry = byId.get(control.id)!;
+      const controlGeometry = byId.get(control.id);
+      if (!controlGeometry) return [relationship];
       const centerX =
         controlGeometry.rectangle.x + controlGeometry.rectangle.width / 2;
       const topIndex = relationship.route.findIndex(
@@ -500,6 +514,9 @@ export const layoutInvestigation = (
           point.y ===
             controlGeometry.rectangle.y + controlGeometry.rectangle.height,
       );
+      // Transient invalid intervals stay renderable as the canonical edge;
+      // post-load health evaluation will request one measured normalization.
+      if (topIndex < 1 || bottomIndex <= topIndex) return [relationship];
       const projection = (
         id: string,
         fromId: string,
