@@ -207,6 +207,36 @@ describe("layoutHierarchy", () => {
     );
   });
 
+  it("restores exact one-to-one alignment after unequal-width measurement", () => {
+    const input = [
+      { ...node("parent"), width: 251 },
+      { ...node("child"), width: 318 },
+      { ...node("unrelated", -900), width: 273 },
+    ];
+    const edges = [edge("parent", "child")];
+    const once = layoutHierarchy(input, edges, false);
+    const byId = new Map(once.map((item) => [item.id, item]));
+
+    expect(byId.get("parent")!.position.x + 251 / 2).toBe(
+      byId.get("child")!.position.x + 318 / 2,
+    );
+    const beforeMeasurement = layoutHierarchy(
+      input.map((item) =>
+        ["parent", "child"].includes(item.id)
+          ? { ...item, width: CHAIN_NODE_WIDTH }
+          : item,
+      ),
+      edges,
+      false,
+    );
+    expect(byId.get("unrelated")!.position).toEqual(
+      beforeMeasurement.find((item) => item.id === "unrelated")!.position,
+    );
+    expect(positions(layoutHierarchy(once, edges, false))).toEqual(
+      positions(once),
+    );
+  });
+
   it("reserves additional vertical space for details and Controls", () => {
     const nodes = [node("a"), node("b")];
     const edges = [edge("a", "b")];

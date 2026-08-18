@@ -16,6 +16,11 @@ import {
   SIBLING_GAP,
   SUBTREE_GAP,
 } from "./geometry/spacing";
+import {
+  centerAlignmentDelta,
+  centerX,
+  rectanglesOverlap,
+} from "./geometry/alignment";
 
 export const GRID_SIZE = 8;
 
@@ -429,9 +434,8 @@ export const layoutHierarchy = <Data>(
         const lastSize = getNodeSize(lastNode, canvasDetail);
         const parentSize = getNodeSize(byId.get(parent)!, canvasDetail);
         const center =
-          (positions.get(first)!.x +
-            firstSize.width / 2 +
-            (positions.get(last)!.x + lastSize.width / 2)) /
+          (centerX({ ...positions.get(first)!, width: firstSize.width }) +
+            centerX({ ...positions.get(last)!, width: lastSize.width })) /
           2;
         const old = positions.get(parent)!;
         const nextX = snapPosition({
@@ -546,6 +550,55 @@ export const layoutHierarchy = <Data>(
     if (!correction) break;
     shiftSubtree(correction.owner, correction.amount);
     recenterAncestors(correction.owner);
+  }
+
+  // Collision correction can pull an ancestor away from its sole causal
+  // child. Restore that invariant explicitly by translating the complete
+  // claimed child subtree (including its Actions). A merge keeps its
+  // established downstream lane, and a correction is rejected when any
+  // translated visual object would collide with an unrelated object.
+  for (const parentId of [...forestChildren.keys()].reverse()) {
+    const claimed = forestChildren.get(parentId) ?? [];
+    if (claimed.length !== 1) continue;
+    const childId = claimed[0];
+    if ((incoming.get(childId) ?? 0) !== 1) continue;
+    const parent = byId.get(parentId)!;
+    const child = byId.get(childId)!;
+    const delta = centerAlignmentDelta(
+      {
+        ...positions.get(parentId)!,
+        width: getNodeSize(parent, canvasDetail).width,
+      },
+      {
+        ...positions.get(childId)!,
+        width: getNodeSize(child, canvasDetail).width,
+      },
+    );
+    if (!delta) continue;
+    const moving = getDescendants(childId);
+    const objects = rectangles();
+    const safe = objects
+      .filter((object) => moving.has(object.owner))
+      .every((object) =>
+        objects
+          .filter(
+            (other) =>
+              !moving.has(other.owner) &&
+              !object.associated.has(other.owner) &&
+              !other.associated.has(object.owner),
+          )
+          .every(
+            (other) =>
+              !rectanglesOverlap(
+                { ...object, x: object.x + delta },
+                other,
+                OBJECT_CLEARANCE,
+              ),
+          ),
+      );
+    if (!safe) continue;
+    shiftSubtree(childId, delta);
+    recenterAncestors(childId);
   }
 
   causalRight = Math.max(

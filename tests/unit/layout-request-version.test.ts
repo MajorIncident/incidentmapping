@@ -63,4 +63,25 @@ describe("Arrange request version and dependency key", () => {
         .x,
     ).not.toBe(1200);
   });
+
+  it("keeps measured one-to-one nodes center-aligned across repeated relayout", () => {
+    const actions = useAppStore.getState().actions;
+    const parent = actions.addChild() as string;
+    const child = actions.addChild(parent) as string;
+    const measurements = {
+      [parent]: { width: 251, height: 145 },
+      [child]: { width: 318, height: 173 },
+    };
+
+    actions.applyMeasuredLayout(measurements);
+    const once = useAppStore.getState().nodes;
+    const center = (id: string) => {
+      const item = useAppStore.getState().nodes.find((node) => node.id === id)!;
+      return item.position.x + item.width! / 2;
+    };
+    expect(center(parent)).toBe(center(child));
+
+    actions.applyMeasuredLayout(measurements);
+    expect(useAppStore.getState().nodes).toEqual(once);
+  });
 });
