@@ -38,6 +38,7 @@ export const segmentIntersectsRectangle = (
 export const simplifyOrthogonalRoute = (
   points: readonly Point[],
 ): OrthogonalRoute => {
+  if (!points.length) throw new Error("An orthogonal route needs two points");
   const deduplicated = points.filter(
     (point, index) =>
       !index ||
@@ -55,8 +56,14 @@ export const simplifyOrthogonalRoute = (
           point.y === deduplicated[index + 1].y)
       ),
   );
-  if (result.length < 2)
-    throw new Error("An orthogonal route needs two points");
+  // A transient layout can legitimately collapse both ports to one coordinate.
+  // Keep the route contract stable for renderers instead of turning geometry
+  // simplification into a render-time exception. The health check can then
+  // classify the zero-length relationship for post-load normalization.
+  if (result.length < 2) {
+    const start = points[0];
+    return [start, points.at(-1) ?? start] as OrthogonalRoute;
+  }
   return result as unknown as OrthogonalRoute;
 };
 

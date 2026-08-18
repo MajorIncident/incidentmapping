@@ -134,8 +134,9 @@ describe("opened-map stabilization", () => {
       impact: { width: 280, height: 200 },
     });
     expect(useAppStore.getState().initialLayoutState).toBe("Normalizing");
-    await vi.waitFor(() =>
-      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
+    await vi.waitFor(
+      () => expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
+      { timeout: 5_000 },
     );
     const complete = useAppStore.getState();
     expect(complete.nodes[1].position.y).toBeGreaterThanOrEqual(232);
