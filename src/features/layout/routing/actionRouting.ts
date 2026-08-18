@@ -1,4 +1,9 @@
-import { ACTION_GAP, ACTION_GUTTER, EDGE_STUB } from "../geometry/spacing";
+import {
+  ACTION_GAP,
+  ACTION_GUTTER,
+  EDGE_STUB,
+  OBJECT_CLEARANCE,
+} from "../geometry/spacing";
 import type {
   Action,
   ActionRelationship,
@@ -6,6 +11,7 @@ import type {
   Rectangle,
   RoutedRelationship,
 } from "../layoutModel";
+import { inflateRectangle, routeOrthogonally } from "./geometry";
 
 const overlapsVertically = (a: Rectangle, b: Rectangle) =>
   a.y < b.y + b.height + ACTION_GAP && b.y < a.y + a.height + ACTION_GAP;
@@ -92,6 +98,12 @@ export const routeActionRelationships = (
     };
     const to = { x: target.x, y: target.y + target.height / 2 };
     const stubX = Math.min(to.x, from.x + EDGE_STUB);
+    const startStub = { x: stubX, y: from.y };
+    const endStub = { x: Math.max(stubX, to.x - EDGE_STUB), y: to.y };
+    const obstacles = nodes
+      .filter((node) => node.id !== edge.fromId && node.id !== edge.toId)
+      .map((node) => inflateRectangle(node.rectangle, OBJECT_CLEARANCE));
+    const middle = routeOrthogonally(startStub, endStub, obstacles);
     return [
       {
         id: edge.id,
@@ -100,7 +112,7 @@ export const routeActionRelationships = (
         fromId: edge.fromId,
         toId: edge.toId,
         role: "Direct",
-        route: [from, { x: stubX, y: from.y }, { x: stubX, y: to.y }, to],
+        route: [from, ...middle, to],
       },
     ];
   });

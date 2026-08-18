@@ -107,7 +107,14 @@ export const layoutInvestigation = async (
       .filter((node) => node.eventDisplay === "ChronologyOnly")
       .map((node) => node.id),
   );
-  const causalNodes = input.nodes.filter((node) => !chronologyIds.has(node.id));
+  const causalNodes = input.nodes
+    .filter((node) => !chronologyIds.has(node.id))
+    .sort(
+      (a, b) =>
+        (a.layoutHints?.order ?? a.position?.x ?? 0) -
+          (b.layoutHints?.order ?? b.position?.x ?? 0) ||
+        a.id.localeCompare(b.id),
+    );
   const causal = input.relationships.filter(
     (edge): edge is CausalRelationship =>
       edge.kind === "Causal" &&
@@ -170,7 +177,16 @@ export const layoutInvestigation = async (
     options.structuralChange?.kind === "AddNode"
       ? options.structuralChange.nodeId
       : undefined;
-  const geometries: LayoutNodeGeometry[] = causalNodes.map((node) => {
+  const actionSources = new Set(
+    (input.actions ?? []).map((action) => action.attachedToId),
+  );
+  const placementNodes = [...causalNodes].sort(
+    (a, b) =>
+      (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0) ||
+      Number(actionSources.has(a.id)) - Number(actionSources.has(b.id)) ||
+      a.id.localeCompare(b.id),
+  );
+  const geometries: LayoutNodeGeometry[] = placementNodes.map((node) => {
     const previous = prior.get(node.id);
     const dimensions =
       options.mode === "Incremental" && previous && node.id !== addedId

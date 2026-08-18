@@ -126,26 +126,20 @@ export const routeCausalRelationships = (
       y: endpoint.source.y + EDGE_STUB,
     };
     const endStub = { x: endpoint.target.x, y: endpoint.target.y - EDGE_STUB };
-    const branch = branchRails.get(endpoint.sourceId);
-    const merge = mergeRails.get(endpoint.targetId);
     const obstacles = nodes
       .filter(
         (node) =>
           node.id !== endpoint.sourceId && node.id !== endpoint.targetId,
       )
       .map((node) => inflateRectangle(node.rectangle, OBJECT_CLEARANCE));
-    let middle: OrthogonalRoute;
-    if (branch || merge) {
-      const branchY = branch?.y ?? startStub.y;
-      const mergeY = merge?.y ?? endStub.y;
-      middle = simplifyOrthogonalRoute([
-        startStub,
-        { x: startStub.x, y: branchY },
-        { x: endStub.x, y: branchY },
-        { x: endStub.x, y: mergeY },
-        endStub,
-      ]);
-    } else middle = routeOrthogonally(startStub, endStub, obstacles);
+    // Rails describe shared ink, but the ordered per-relationship route still
+    // has to use the visibility graph: a straight projection between rail
+    // junctions can pass through a tall sibling card.
+    const middle: OrthogonalRoute = routeOrthogonally(
+      startStub,
+      endStub,
+      obstacles,
+    );
     return {
       id: endpoint.relationshipId,
       relationshipId: endpoint.relationshipId,

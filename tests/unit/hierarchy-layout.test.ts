@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "reactflow";
 import { layoutHierarchy } from "../../src/features/layout/hierarchy";
+import { CHAIN_NODE_WIDTH } from "../../src/features/layout/dimensions";
 import {
-  CHAIN_NODE_HEIGHT,
-  CHAIN_NODE_WIDTH,
-  CONTROL_NODE_HEIGHT,
-  CONTROL_NODE_WIDTH,
-} from "../../src/features/layout/dimensions";
-import {
-  CAUSAL_ROW_GAP,
-  CONTROL_BAND_HEIGHT,
-} from "../../src/features/layout/geometry/spacing";
+  hasClearance,
+  legacyControlRectangle as controlRectangle,
+  nodeRectangle,
+  rectanglesIntersect as intersects,
+} from "../helpers/layout/geometry";
 
 const node = (id: string, x = 0, y = 0): Node => ({
   id,
@@ -40,39 +37,6 @@ const eventNode = (
 });
 const positions = (nodes: Node[]) =>
   Object.fromEntries(nodes.map((item) => [item.id, item.position]));
-type Rectangle = { x: number; y: number; width: number; height: number };
-const intersects = (left: Rectangle, right: Rectangle) =>
-  left.x < right.x + right.width &&
-  left.x + left.width > right.x &&
-  left.y < right.y + right.height &&
-  left.y + left.height > right.y;
-const controlRectangle = (
-  _upstream: Node,
-  downstream: Node,
-  width = CONTROL_NODE_WIDTH,
-  height = CONTROL_NODE_HEIGHT,
-): Rectangle => ({
-  x:
-    downstream.position.x +
-    (downstream.width ?? CHAIN_NODE_WIDTH) / 2 -
-    width / 2,
-  y:
-    downstream.position.y -
-    (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
-    height / 2,
-  width,
-  height,
-});
-const nodeRectangle = (item: Node): Rectangle => ({
-  ...item.position,
-  width: item.width ?? CHAIN_NODE_WIDTH,
-  height: item.height ?? CHAIN_NODE_HEIGHT,
-});
-const hasClearance = (left: Rectangle, right: Rectangle, margin = 32) =>
-  left.x + left.width + margin <= right.x ||
-  right.x + right.width + margin <= left.x ||
-  left.y + left.height + margin <= right.y ||
-  right.y + right.height + margin <= left.y;
 
 const expectUnrelatedClearance = (
   nodes: Node[],
