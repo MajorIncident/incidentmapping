@@ -330,9 +330,11 @@ describe("Toolbar map title", () => {
     });
     expect(organize).toBeEnabled();
     await userEvent.click(organize);
+    await waitFor(() => {
+      const [parent, child] = useAppStore.getState().nodes;
+      expect(child.position.x).toBe(parent.position.x);
+    });
     expect(useAppStore.getState().canUndo).toBe(true);
-    const [parent, child] = useAppStore.getState().nodes;
-    expect(child.position.x).toBe(parent.position.x);
     fireEvent.click(screen.getByRole("button", { name: "More menu" }));
     expect(
       screen.getByRole("menuitem", { name: /arrange map/i }),
