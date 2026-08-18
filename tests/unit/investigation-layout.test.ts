@@ -3,6 +3,7 @@ import { layoutInvestigation } from "../../src/features/layout/investigationLayo
 import type { InvestigationLayoutInput } from "../../src/features/layout/layoutModel";
 import {
   ACTION_GAP,
+  ACTION_GUTTER,
   CARD_COLLISION_CLEARANCE,
   CONTROL_BEARING_INTERVAL,
   DIRECT_CAUSAL_EDGE_GAP,
@@ -232,6 +233,83 @@ describe("post-causal projections", () => {
     expect(
       result.relationships.find((edge) => edge.id === "action-edge")?.route[0],
     ).toEqual({ x: root.x + root.width, y: root.y + root.height / 2 });
+  });
+
+  it("places distributed Actions in nearest local sidecars, not at global right", () => {
+    const input: InvestigationLayoutInput = {
+      nodes: [
+        { id: "n004", kind: "Factor", position: { x: 0, y: 0 } },
+        { id: "n005", kind: "Factor", position: { x: 1200, y: 400 } },
+        { id: "n017", kind: "Factor", position: { x: 2400, y: 800 } },
+      ],
+      actions: [
+        { id: "n027", kind: "Action", attachedToId: "n004" },
+        { id: "n030", kind: "Action", attachedToId: "n005" },
+        { id: "n029", kind: "Action", attachedToId: "n017" },
+      ],
+      relationships: [
+        { id: "a27", kind: "Action", fromId: "n004", toId: "n027" },
+        { id: "a30", kind: "Action", fromId: "n005", toId: "n030" },
+        { id: "a29", kind: "Action", fromId: "n017", toId: "n029" },
+      ],
+    };
+    const result = layoutInvestigation(input, { mode: "Incremental" });
+    for (const [sourceId, actionId] of [
+      ["n004", "n027"],
+      ["n005", "n030"],
+      ["n017", "n029"],
+    ]) {
+      const source = result.nodes.find(
+        (item) => item.id === sourceId,
+      )!.rectangle;
+      const action = result.nodes.find(
+        (item) => item.id === actionId,
+      )!.rectangle;
+      expect(action.x - (source.x + source.width)).toBe(ACTION_GUTTER);
+    }
+    expect(
+      result.nodes.find((item) => item.id === "n027")!.rectangle.x,
+    ).toBeLessThan(result.causalBounds.x + result.causalBounds.width);
+  });
+
+  it("preserves valid local Action geometry during incremental projection", () => {
+    const input: InvestigationLayoutInput = {
+      nodes: [{ id: "source", kind: "Factor", position: { x: 0, y: 0 } }],
+      actions: [
+        {
+          id: "action",
+          kind: "Action",
+          attachedToId: "source",
+          position: { x: 304, y: 16 },
+        },
+      ],
+      relationships: [
+        { id: "a", kind: "Action", fromId: "source", toId: "action" },
+      ],
+    };
+    const result = layoutInvestigation(input, {
+      mode: "Incremental",
+      priorGeometry: [
+        {
+          id: "source",
+          role: "Semantic",
+          rectangle: { x: 0, y: 0, width: 240, height: 144 },
+        },
+        {
+          id: "action",
+          role: "Action",
+          rectangle: { x: 304, y: 16, width: 240, height: 112 },
+        },
+      ],
+    });
+    expect(
+      result.nodes.find((item) => item.id === "action")!.rectangle,
+    ).toEqual({
+      x: 304,
+      y: 16,
+      width: 240,
+      height: 112,
+    });
   });
 
   it("centers measured Actions and their routes on a differently sized source", () => {

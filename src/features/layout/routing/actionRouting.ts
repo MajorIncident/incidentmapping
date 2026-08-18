@@ -32,11 +32,12 @@ export const rectanglesOverlap = (
  */
 export const placeActionStacks = (
   actions: readonly Action[],
-  semanticNodes: readonly LayoutNodeGeometry[],
-  causalBounds: Rectangle,
+  causalObjects: readonly LayoutNodeGeometry[],
+  _causalBounds: Rectangle,
   snap: (value: number) => number = (value) => value,
+  preservePrior = false,
 ): LayoutNodeGeometry[] => {
-  const sources = new Map(semanticNodes.map((node) => [node.id, node]));
+  const sources = new Map(causalObjects.map((node) => [node.id, node]));
   const bySource = new Map<string, Action[]>();
   actions.forEach((action) =>
     bySource.set(action.attachedToId, [
@@ -68,32 +69,68 @@ export const placeActionStacks = (
       );
       let y =
         source.rectangle.y + source.rectangle.height / 2 - stackHeight / 2;
-      let x = Math.max(
-        source.rectangle.x + source.rectangle.width + ACTION_GUTTER,
-        causalBounds.x + causalBounds.width + ACTION_GUTTER,
-      );
+      const preferredX =
+        source.rectangle.x + source.rectangle.width + ACTION_GUTTER;
+      let x = preferredX;
       const rectangles = stack.map((action) => {
         const dimensions = action.dimensions ?? { width: 240, height: 112 };
         const rectangle = { x, y, ...dimensions };
         y += dimensions.height + ACTION_GAP;
         return { action, rectangle };
       });
-      let gutterColumn = 0;
-      while (
-        gutterColumn < MAX_ACTION_GUTTER_COLUMNS &&
+      const obstacles = [...causalObjects, ...placed];
+      const collides = () =>
         rectangles.some(({ rectangle }) =>
-          placed.some((other) =>
+          obstacles.some((other) =>
             rectanglesOverlap(
               { ...rectangle, x: snap(rectangle.x), y: snap(rectangle.y) },
               other.rectangle,
             ),
           ),
-        )
-      ) {
-        const width = Math.max(
-          ...rectangles.map((item) => item.rectangle.width),
         );
-        x += width + ACTION_GAP;
+
+      // Incremental projection respects a valid, reasonably local saved/user
+      // sidecar. A render pass must not contradict Arrange Map geometry.
+      const priorX = stack[0]?.position?.x;
+      const priorY = stack[0]?.position?.y;
+      if (
+        preservePrior &&
+        priorX !== undefined &&
+        priorY !== undefined &&
+        priorX >= source.rectangle.x + source.rectangle.width &&
+        priorX - preferredX <=
+          2 *
+            (Math.max(...rectangles.map((item) => item.rectangle.width)) +
+              ACTION_GAP)
+      ) {
+        const deltaY = priorY - rectangles[0].rectangle.y;
+        rectangles.forEach((item) => {
+          item.rectangle.x = priorX;
+          item.rectangle.y += deltaY;
+        });
+        if (collides()) {
+          rectangles.forEach((item) => {
+            item.rectangle.x = preferredX;
+            item.rectangle.y -= deltaY;
+          });
+        }
+      }
+
+      let gutterColumn = 0;
+      while (gutterColumn < MAX_ACTION_GUTTER_COLUMNS && collides()) {
+        // Advance only beyond obstacles which actually intersect this stack's
+        // vertical band. This produces the nearest clear local column.
+        const blockers = obstacles.filter((other) =>
+          rectangles.some(({ rectangle }) =>
+            rectanglesOverlap(rectangle, other.rectangle),
+          ),
+        );
+        x = Math.max(
+          x + ACTION_GAP,
+          ...blockers.map(
+            (other) => other.rectangle.x + other.rectangle.width + ACTION_GAP,
+          ),
+        );
         rectangles.forEach((item) => Object.assign(item.rectangle, { x }));
         gutterColumn++;
       }
@@ -103,11 +140,7 @@ export const placeActionStacks = (
         const widest = Math.max(
           ...rectangles.map(({ rectangle }) => rectangle.width),
         );
-        x =
-          causalBounds.x +
-          causalBounds.width +
-          ACTION_GUTTER +
-          placed.length * (widest + ACTION_GAP);
+        x = preferredX + (placed.length + 1) * (widest + ACTION_GAP);
         rectangles.forEach((item) => Object.assign(item.rectangle, { x }));
         if (import.meta.env.DEV)
           console.warn(

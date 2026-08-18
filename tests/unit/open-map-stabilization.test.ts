@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapData } from "../../src/features/maps/schema";
 import { emptyMap } from "../../src/features/maps/fixtures";
 import {
@@ -61,7 +61,7 @@ const richMap: MapData = {
 describe("opened-map stabilization", () => {
   beforeEach(() => useAppStore.getState().actions.newMap());
 
-  it("preserves semantic positions and requests a causal-only initial viewport", () => {
+  it("preserves persisted positions while measurement is pending", () => {
     useAppStore.getState().actions.loadMap(richMap);
     const state = useAppStore.getState();
     expect(state.mapSession).toEqual({ source: "Opened", fresh: false });
@@ -77,14 +77,78 @@ describe("opened-map stabilization", () => {
       upstreamNodeId: "event",
       downstreamNodeId: "impact",
     });
-    expect(state.viewportRequest?.nodeIds).toEqual([
-      "impact",
-      "event",
-      "factor-a",
-      "factor-b",
-    ]);
+    expect(state.initialLayoutState).toBe("PendingMeasurement");
+    expect(state.viewportRequest).toBeNull();
     expect(causalViewportNodeIds(state.nodes)).not.toContain("action-a");
     expect(causalViewportNodeIds(state.nodes)).not.toContain("chronology");
+  });
+
+  it("preserves a healthy measured map and then requests its viewport", () => {
+    const healthy: MapData = {
+      ...emptyMap,
+      nodes: [
+        node("cause", "Event", 100, 100, "Map"),
+        node("impact", "Impact", 100, 500),
+      ],
+      edges: [
+        {
+          id: "edge",
+          kind: "CauseEffectEdge",
+          fromId: "cause",
+          toId: "impact",
+        },
+      ],
+    };
+    useAppStore.getState().actions.loadMap(healthy);
+    const positions = useAppStore.getState().nodes.map((item) => item.position);
+    useAppStore.getState().actions.applyMeasuredLayout({
+      cause: { width: 240, height: 144 },
+      impact: { width: 240, height: 144 },
+    });
+    const state = useAppStore.getState();
+    expect(state.initialLayoutState).toBe("Complete");
+    expect(state.nodes.map((item) => item.position)).toEqual(positions);
+    expect(state.viewportRequest?.nodeIds).toEqual(["cause", "impact"]);
+    expect(state.history.past).toHaveLength(0);
+  });
+
+  it("normalizes an unhealthy measured map exactly once without undo history", async () => {
+    const unhealthy: MapData = {
+      ...emptyMap,
+      nodes: [
+        node("cause", "Event", 100, 100, "Map"),
+        node("impact", "Impact", 100, 180),
+      ],
+      edges: [
+        {
+          id: "edge",
+          kind: "CauseEffectEdge",
+          fromId: "cause",
+          toId: "impact",
+        },
+      ],
+    };
+    useAppStore.getState().actions.loadMap(unhealthy);
+    useAppStore.getState().actions.applyMeasuredLayout({
+      cause: { width: 280, height: 200 },
+      impact: { width: 280, height: 200 },
+    });
+    expect(useAppStore.getState().initialLayoutState).toBe("Normalizing");
+    await vi.waitFor(() =>
+      expect(useAppStore.getState().initialLayoutState).toBe("Complete"),
+    );
+    const complete = useAppStore.getState();
+    expect(complete.nodes[1].position.y).toBeGreaterThanOrEqual(232);
+    expect(complete.history.past).toHaveLength(0);
+    const positions = complete.nodes.map((item) => item.position);
+    useAppStore.getState().actions.applyMeasuredLayout({
+      cause: { width: 288, height: 208 },
+      impact: { width: 288, height: 208 },
+    });
+    expect(useAppStore.getState().nodes.map((item) => item.position)).toEqual(
+      positions,
+    );
+    expect(useAppStore.getState().initialLayoutState).toBe("Complete");
   });
 
   it("measurement updates dimensions without changing positions or refitting", () => {
