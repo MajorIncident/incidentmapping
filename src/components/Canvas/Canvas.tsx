@@ -86,6 +86,7 @@ export const Canvas = ({
   presentationLens = "Overview",
   evidence = [],
   storyFocusIds,
+  presentationActiveId,
 }: {
   onInspect?: () => void;
   onPresentationInteract?: () => void;
@@ -95,6 +96,7 @@ export const Canvas = ({
   presentationLens?: PresentationLens;
   evidence?: EvidenceItem[];
   storyFocusIds?: string[];
+  presentationActiveId?: string | null;
 }): JSX.Element => {
   const chainNodes = useAppStore((state) => state.nodes);
   const edges = useAppStore((state) => state.edges);
@@ -241,7 +243,7 @@ export const Canvas = ({
           readOnly: presenting,
           viewShowDetails: presentationShowDetails,
         },
-        className: `${node.className ?? ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(node.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
+        className: `${node.className ?? ""}${presentationActiveId === node.id ? " presentation-active" : storyFocusIds?.includes(node.id) ? " presentation-related" : storyFocusIds ? " presentation-background" : ""}${lensPresentation.emphasizedIds.has(node.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(node.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(node.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
       }));
     const actionIds = new Set(
       presentedNodes
@@ -383,7 +385,7 @@ export const Canvas = ({
         draggable: false,
         selectable: true,
         selected: matchingBarrier.id === selectionId,
-        className: `${lensPresentation.emphasizedIds.has(matchingBarrier.id) ? "presentation-emphasized" : ""}${lensPresentation.softenedIds.has(matchingBarrier.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(matchingBarrier.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
+        className: `${presentationActiveId === matchingBarrier.id ? "presentation-active" : storyFocusIds?.includes(matchingBarrier.id) ? "presentation-related" : storyFocusIds ? "presentation-background" : ""}${lensPresentation.emphasizedIds.has(matchingBarrier.id) ? " presentation-emphasized" : ""}${lensPresentation.softenedIds.has(matchingBarrier.id) ? " presentation-softened" : ""}${hasHover ? (hover.emphasizedIds.has(matchingBarrier.id) ? " canvas-hover-related" : " canvas-hover-unrelated") : ""}`,
       };
 
       barrierNodes.push(barrierNode);
@@ -448,6 +450,7 @@ export const Canvas = ({
     presentationShowDetails,
     presenting,
     presentationLens,
+    presentationActiveId,
     selectionId,
     storyFocusIds,
     hoveredId,
