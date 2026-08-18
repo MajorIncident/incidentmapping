@@ -2169,41 +2169,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     setCanvasDetail: (detail) => {
       set((state) => {
-        if (state.canvasDetail === detail) return {};
-        const { nodes: laidOutNodes, changed } = applyLayout(
-          state.nodes,
-          state.edges,
-          detail,
-        );
-        return {
-          canvasDetail: detail,
-          nodes: laidOutNodes,
-          layoutVersion: changed
-            ? state.layoutVersion + 1
-            : state.layoutVersion,
-        };
+        if (state.canvasDetail === detail) return state;
+        // Rendering the new mode causes React Flow to report its new DOM
+        // dimensions. That measured update performs the single necessary
+        // layout without first moving persisted node positions nominally.
+        return { canvasDetail: detail };
       });
     },
     setShowDetails: (visible) =>
       get().actions.setCanvasDetail(visible ? "Expanded" : "Compact"),
-    toggleShowDetails: () => {
-      set((state) => {
-        const nextCanvasDetail: CanvasDetail =
-          state.canvasDetail === "Expanded" ? "Compact" : "Expanded";
-        const { nodes: laidOutNodes, changed } = applyLayout(
-          state.nodes,
-          state.edges,
-          nextCanvasDetail,
-        );
-        return {
-          canvasDetail: nextCanvasDetail,
-          nodes: laidOutNodes,
-          layoutVersion: changed
-            ? state.layoutVersion + 1
-            : state.layoutVersion,
-        };
-      });
-    },
+    toggleShowDetails: () =>
+      get().actions.setCanvasDetail(
+        get().canvasDetail === "Expanded" ? "Compact" : "Expanded",
+      ),
     applyMeasuredLayout: (dimensions) => {
       set((state) => {
         const materiallyDifferent = (a: number | null | undefined, b: number) =>

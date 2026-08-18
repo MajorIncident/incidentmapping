@@ -760,7 +760,7 @@ const BarrierNodeComponent = ({
       <p className="mt-1 min-w-0 whitespace-pre-line break-words text-sm text-slate-700">
         {description ?? "No control purpose provided."}
       </p>
-      {expanded && data.status !== "Effective" && data.failureReason ? (
+      {data.status !== "Effective" && data.failureReason ? (
         <p className="mt-2 text-xs font-semibold text-slate-700">
           Failure reason: {failureReason}
         </p>

@@ -6,8 +6,11 @@ import { Inspector } from "../components/Sidebar/Inspector";
 import { Footer } from "../components/Footer/Footer";
 import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
-import { applyHierarchyLayout } from "../features/layout/hierarchy";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  applyHierarchyLayout,
+  type CanvasDetail,
+} from "../features/layout/hierarchy";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
 import {
@@ -38,6 +41,7 @@ export const App = (): JSX.Element => {
   const [inspectorSection, setInspectorSection] = useState<string>();
   const [choosingControl, setChoosingControl] = useState(false);
   const [presenting, setPresenting] = useState(false);
+  const previousCanvasDetailRef = useRef<CanvasDetail | null>(null);
   const [investigationCheckOpen, setInvestigationCheckOpen] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
   const [presentationHintOpen, setPresentationHintOpen] = useState(false);
@@ -225,7 +229,11 @@ export const App = (): JSX.Element => {
     setChronologyOpen(false);
     setStory(null);
     setPresenting(false);
-  }, [select]);
+    if (previousCanvasDetailRef.current !== null) {
+      setCanvasDetail(previousCanvasDetailRef.current);
+      previousCanvasDetailRef.current = null;
+    }
+  }, [select, setCanvasDetail]);
 
   useEffect(() => {
     // Description/control-purpose focus is an explicit request for Inspector
@@ -378,6 +386,8 @@ export const App = (): JSX.Element => {
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
                   useAppStore.getState().actions.select(null);
+                  previousCanvasDetailRef.current = canvasDetail;
+                  setCanvasDetail("Compact");
                   setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
                   setChronologyOpen(false);
