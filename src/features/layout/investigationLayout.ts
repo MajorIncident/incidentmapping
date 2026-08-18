@@ -294,7 +294,10 @@ export const layoutInvestigation = (
       role: "Control",
       controlId: control.id,
       relationshipId: edge.id,
-      rectangle: { x: snap(position.x), y: snap(position.y), ...dimensions },
+      // Controls are centered from measured React Flow dimensions. Do not snap
+      // their origin: doing so shifts the center away from the relationship
+      // lane whenever a measured width or height is not grid-aligned.
+      rectangle: { x: position.x, y: position.y, ...dimensions },
     };
     geometries.push(geometry);
     byId.set(control.id, geometry);
@@ -360,8 +363,36 @@ export const layoutInvestigation = (
     snap,
   );
   geometries.push(...actionGeometries);
+  const controlledCausalRelationships = causalRouting.relationships.flatMap(
+    (relationship): RoutedRelationship[] => {
+      const control = controlsByRelationship.get(relationship.relationshipId);
+      if (!control) return [relationship];
+      const split = routeCausalRelationships(
+        [
+          {
+            id: `${relationship.id}-${control.id}-upstream`,
+            kind: "Causal",
+            fromId: relationship.fromId,
+            toId: control.id,
+          },
+          {
+            id: `${relationship.id}-${control.id}-downstream`,
+            kind: "Causal",
+            fromId: control.id,
+            toId: relationship.toId,
+          },
+        ],
+        geometries,
+      );
+      return split.relationships.map((segment) => ({
+        ...segment,
+        relationshipId: relationship.relationshipId,
+        role: relationship.role,
+      }));
+    },
+  );
   const routed: RoutedRelationship[] = [
-    ...causalRouting.relationships,
+    ...controlledCausalRelationships,
     ...routeActionRelationships(
       input.relationships.filter((item) => item.kind === "Action"),
       geometries,

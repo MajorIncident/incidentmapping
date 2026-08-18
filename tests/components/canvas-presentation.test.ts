@@ -85,8 +85,18 @@ describe("Canvas layout presentation adapter", () => {
       },
       { mode: "Incremental" },
     );
-    const left = adaptLayoutEdgeData({ selected: true }, "left-edge", layout);
-    const right = adaptLayoutEdgeData({ hovered: true }, "right-edge", layout);
+    const left = adaptLayoutEdgeData(
+      { selected: true },
+      "left-edge",
+      "left-edge",
+      layout,
+    );
+    const right = adaptLayoutEdgeData(
+      { hovered: true },
+      "right-edge",
+      "right-edge",
+      layout,
+    );
 
     expect(left.originalEdgeId).toBe("left-edge");
     expect(right.originalEdgeId).toBe("right-edge");

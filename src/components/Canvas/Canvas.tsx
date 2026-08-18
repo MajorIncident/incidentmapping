@@ -44,18 +44,26 @@ export { calculateControlPosition, splitEdgeAtControl };
 /** Thin React Flow adapter: routing geometry remains owned by the layout layer. */
 export const adaptLayoutEdgeData = <T extends Record<string, unknown>>(
   data: T,
+  rendererEdgeId: string,
   relationshipId: string,
   layout: LayoutResult,
-) => ({
-  ...data,
-  originalEdgeId: relationshipId,
-  route: layout.relationships.find(
-    (relationship) => relationship.relationshipId === relationshipId,
-  )?.route,
-  sharedSegments: layout.sharedSegments.filter((segment) =>
-    segment.relationshipIds.includes(relationshipId),
-  ),
-});
+) => {
+  const routed =
+    layout.relationships.find(
+      (relationship) => relationship.id === rendererEdgeId,
+    ) ??
+    layout.relationships.find(
+      (relationship) => relationship.relationshipId === relationshipId,
+    );
+  return {
+    ...data,
+    originalEdgeId: relationshipId,
+    route: routed?.route,
+    sharedSegments: layout.sharedSegments.filter((segment) =>
+      segment.relationshipIds.includes(relationshipId),
+    ),
+  };
+};
 
 export const viewportAnimationDuration = (duration: number): number =>
   typeof window !== "undefined" &&
@@ -318,7 +326,7 @@ export const Canvas = ({
         : node;
     });
     const barrierNodes: Node<BarrierNodeData>[] = [];
-    const flowEdges = visibleEdges.map((edge) => {
+    const flowEdges = visibleEdges.flatMap((edge) => {
       const presentationRole =
         edge.data?.kind !== "ActionEdge" &&
         presentation.selectedPath.has(edge.source) &&
@@ -336,7 +344,7 @@ export const Canvas = ({
           barrier.downstreamNodeId === edge.target,
       );
 
-      if (!matchingBarrier) return presentedEdge;
+      if (!matchingBarrier) return [presentedEdge];
 
       const controlGeometry = layoutNodes.get(matchingBarrier.id);
 
@@ -375,7 +383,7 @@ export const Canvas = ({
 
       barrierNodes.push(barrierNode);
 
-      return presentedEdge;
+      return splitEdgeAtControl(presentedEdge, matchingBarrier.id);
     });
 
     const styledEdges = flowEdges.map((edge) => {
@@ -399,6 +407,7 @@ export const Canvas = ({
         data: {
           ...adaptLayoutEdgeData(
             edge.data ?? {},
+            edge.id,
             edge.data?.originalEdgeId ?? edge.id,
             layout,
           ),
