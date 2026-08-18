@@ -802,15 +802,21 @@ describe("useAppStore actions", () => {
     expect(actions.toMap().metadata).not.toHaveProperty("incidentId");
   });
 
-  it("organizes atomically and restores positions through undo and redo", () => {
+  it("organizes atomically and restores positions through undo and redo", async () => {
     const { actions } = useAppStore.getState();
     const parent = actions.addChild() as string;
     const child = actions.addChild(parent) as string;
     actions.moveNode(child, { x: 800, y: 800 });
     const before = useAppStore.getState().nodes.map((node) => node.position);
     const selection = useAppStore.getState().selectionId;
+    const historyBeforeArrange = useAppStore.getState().history.past.length;
 
     actions.organizeNodes();
+    await vi.waitFor(() =>
+      expect(useAppStore.getState().history.past.length).toBe(
+        historyBeforeArrange + 1,
+      ),
+    );
     const organized = useAppStore.getState().nodes.map((node) => node.position);
     expect(organized).not.toEqual(before);
     expect(useAppStore.getState().selectionId).toBe(selection);

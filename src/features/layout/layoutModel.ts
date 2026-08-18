@@ -17,6 +17,7 @@ export type SemanticNodeKind = "Event" | "Factor" | "Impact";
 export type SemanticNode = Readonly<{
   id: LayoutId;
   kind: SemanticNodeKind;
+  referenceId?: string;
   position?: Point;
   dimensions?: MeasuredDimensions;
   layoutHints?: LayoutHints;
@@ -26,6 +27,7 @@ export type Action = Readonly<{
   id: LayoutId;
   kind: "Action";
   attachedToId: LayoutId;
+  referenceId?: string;
   position?: Point;
   dimensions?: MeasuredDimensions;
   layoutHints?: LayoutHints;
@@ -37,6 +39,7 @@ export type Control = Readonly<{
   relationshipId: LayoutId;
   upstreamNodeId: LayoutId;
   downstreamNodeId: LayoutId;
+  referenceId?: string;
   dimensions?: MeasuredDimensions;
   layoutHints?: LayoutHints;
 }>;
@@ -106,6 +109,9 @@ export type InvestigationLayoutInput = Readonly<{
   actions?: readonly Action[];
   chronology?: readonly ChronologyItem[];
 }>;
+
+/** Engine-neutral graph accepted by every layout adapter. */
+export type LayoutGraph = InvestigationLayoutInput;
 
 export type LayoutMode = "Incremental" | "ArrangeMap";
 export type InvestigationLayoutOptions = Readonly<{
