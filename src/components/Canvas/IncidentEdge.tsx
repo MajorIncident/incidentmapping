@@ -168,25 +168,31 @@ type IncidentEdgeData = {
   laneOffset?: number;
   kind?: string;
   presentationRole?: string;
+  route?: readonly Point[];
+  sharedSegments?: readonly { from: Point; to: Point }[];
 };
 export const IncidentEdge = memo(
   (props: EdgeProps<IncidentEdgeData>): JSX.Element => {
-    const points = routeIncidentEdge(
+    const points = props.data?.route ?? [
       { x: props.sourceX, y: props.sourceY },
       { x: props.targetX, y: props.targetY },
-      {
-        kind: props.data?.kind === "ActionEdge" ? "action" : "causal",
-        obstacles: props.data?.obstacles ?? [],
-        laneOffset: props.data?.laneOffset,
-      },
-    );
-    const path = points
-      .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
-      .join(" ");
+    ];
+    const path =
+      points
+        .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
+        .join(" ") +
+      (props.data?.sharedSegments ?? [])
+        .map(
+          (segment) =>
+            ` M ${segment.from.x} ${segment.from.y} L ${segment.to.x} ${segment.to.y}`,
+        )
+        .join("");
     return (
       <BaseEdge
         path={path}
-        markerEnd={props.markerEnd}
+        markerEnd={
+          props.data?.kind === "ActionEdge" ? props.markerEnd : undefined
+        }
         style={props.style}
         interactionWidth={props.interactionWidth}
       />
