@@ -12,7 +12,6 @@ import {
   SIBLING_GAP,
 } from "./geometry/spacing";
 import type {
-  CausalRouteRole,
   InvestigationLayoutInput,
   InvestigationLayoutOptions,
   LayoutNodeGeometry,
@@ -23,6 +22,7 @@ import type {
   Rectangle,
   RoutedRelationship,
 } from "./layoutModel";
+import { routeCausalRelationships } from "./routing/causalRouting";
 
 type PositionedSize = Readonly<{
   position: Point;
@@ -84,14 +84,6 @@ const orthogonal = (from: Point, to: Point): OrthogonalRoute => {
   const middleY = (from.y + to.y) / 2;
   return [from, { x: from.x, y: middleY }, { x: to.x, y: middleY }, to];
 };
-const routeRole = (outgoing: number, incoming: number): CausalRouteRole =>
-  outgoing > 1 && incoming > 1
-    ? "BranchAndMerge"
-    : outgoing > 1
-      ? "Branch"
-      : incoming > 1
-        ? "Merge"
-        : "Direct";
 
 /**
  * Creates a disposable graph: Controls become nodes, while branch and merge
@@ -106,13 +98,6 @@ export const layoutInvestigation = async (
   const vGap = options.verticalGap ?? CAUSAL_ROW_GAP;
   const snap = (value: number) => Math.round(value / grid) * grid;
   const causal = input.relationships.filter((edge) => edge.kind === "Causal");
-  const incoming = new Map<string, number>();
-  const outgoing = new Map<string, number>();
-  causal.forEach((edge) => {
-    outgoing.set(edge.fromId, (outgoing.get(edge.fromId) ?? 0) + 1);
-    incoming.set(edge.toId, (incoming.get(edge.toId) ?? 0) + 1);
-  });
-
   // Rank is graph structure, never node classification or a claimed parent.
   const rank = new Map(input.nodes.map((node) => [node.id, 0]));
   const children = new Map<string, string[]>();
@@ -254,30 +239,23 @@ export const layoutInvestigation = async (
     });
   });
 
-  const routed: RoutedRelationship[] = [];
-  for (const edge of input.relationships) {
-    const control = controlsByRelationship.get(edge.id);
-    const stops = [edge.fromId, ...(control ? [control.id] : []), edge.toId];
-    for (let index = 0; index < stops.length - 1; index += 1) {
-      const from = byId.get(stops[index]);
-      const to = byId.get(stops[index + 1]);
-      if (!from || !to) continue;
-      routed.push({
-        id: stops.length > 2 ? `${edge.id}:${index}` : edge.id,
-        relationshipId: edge.id,
-        kind: edge.kind,
-        fromId: from.id,
-        toId: to.id,
-        role: routeRole(
-          outgoing.get(edge.fromId) ?? 0,
-          incoming.get(edge.toId) ?? 0,
-        ),
-        route: orthogonal(
-          centerBottom(from.rectangle),
-          centerTop(to.rectangle),
-        ),
-      });
-    }
+  const causalRouting = routeCausalRelationships(causal, geometries);
+  const routed: RoutedRelationship[] = [...causalRouting.relationships];
+  for (const edge of input.relationships.filter(
+    (item) => item.kind === "Action",
+  )) {
+    const from = byId.get(edge.fromId);
+    const to = byId.get(edge.toId);
+    if (!from || !to) continue;
+    routed.push({
+      id: edge.id,
+      relationshipId: edge.id,
+      kind: edge.kind,
+      fromId: edge.fromId,
+      toId: edge.toId,
+      role: "Direct",
+      route: orthogonal(centerBottom(from.rectangle), centerTop(to.rectangle)),
+    });
   }
   const left = Math.min(0, ...geometries.map((node) => node.rectangle.x));
   const top = Math.min(0, ...geometries.map((node) => node.rectangle.y));
@@ -292,6 +270,7 @@ export const layoutInvestigation = async (
   return {
     nodes: geometries,
     relationships: routed,
+    sharedSegments: causalRouting.sharedSegments,
     bounds: { x: left, y: top, width: right - left, height: bottom - top },
   };
 };

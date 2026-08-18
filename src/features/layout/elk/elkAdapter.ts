@@ -374,6 +374,7 @@ export const layoutWithElk = async (
   return {
     nodes,
     relationships,
+    sharedSegments: [],
     bounds: {
       x: 0,
       y: 0,

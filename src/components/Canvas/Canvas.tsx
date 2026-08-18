@@ -17,7 +17,7 @@ import {
 } from "../../state/useAppStore";
 import { selectContextGroups } from "../../state/selectors";
 import { nodeTypes } from "./NodeTypes";
-import { BRANCH_LANE_GAP, edgeTypes } from "./IncidentEdge";
+import { BRANCH_LANE_GAP, edgeTypes, routeIncidentEdge } from "./IncidentEdge";
 import {
   CHRONOLOGY_GUTTER,
   CAUSAL_ROW_GAP,
@@ -476,24 +476,63 @@ export const Canvas = ({
           presentation.selectedPath.has(edge.source) &&
           presentation.selectedPath.has(edge.target));
       const unrelated = Boolean(selectionId) && !highlighted;
+      const source = allRenderedNodes.find((node) => node.id === edge.source);
+      const target = allRenderedNodes.find((node) => node.id === edge.target);
+      const obstacles = obstacleRectangles.filter(
+        (rectangle) =>
+          rectangle.id !== edge.source && rectangle.id !== edge.target,
+      );
+      const laneOffset =
+        ((branches
+          .get(`${edge.source}:${isAction ? "action" : "causal"}`)
+          ?.indexOf(edge) ?? 0) -
+          ((branches.get(`${edge.source}:${isAction ? "action" : "causal"}`)
+            ?.length ?? 1) -
+            1) /
+            2) *
+        BRANCH_LANE_GAP;
+      const sourceWidth =
+        source?.width ??
+        (source?.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH);
+      const sourceHeight =
+        source?.height ??
+        (source?.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT);
+      const targetWidth =
+        target?.width ??
+        (target?.type === "Barrier" ? CONTROL_NODE_WIDTH : CHAIN_NODE_WIDTH);
+      const targetHeight =
+        target?.height ??
+        (target?.type === "Barrier" ? CONTROL_NODE_HEIGHT : CHAIN_NODE_HEIGHT);
+      const route =
+        source && target
+          ? routeIncidentEdge(
+              isAction
+                ? {
+                    x: source.position.x + sourceWidth,
+                    y: source.position.y + sourceHeight / 2,
+                  }
+                : {
+                    x: source.position.x + sourceWidth / 2,
+                    y: source.position.y + sourceHeight,
+                  },
+              isAction
+                ? {
+                    x: target.position.x,
+                    y: target.position.y + targetHeight / 2,
+                  }
+                : {
+                    x: target.position.x + targetWidth / 2,
+                    y: target.position.y,
+                  },
+              { kind: isAction ? "action" : "causal", obstacles, laneOffset },
+            )
+          : undefined;
       return {
         ...edge,
         type: "incident",
         data: {
           ...edge.data,
-          obstacles: obstacleRectangles.filter(
-            (rectangle) =>
-              rectangle.id !== edge.source && rectangle.id !== edge.target,
-          ),
-          laneOffset:
-            ((branches
-              .get(`${edge.source}:${isAction ? "action" : "causal"}`)
-              ?.indexOf(edge) ?? 0) -
-              ((branches.get(`${edge.source}:${isAction ? "action" : "causal"}`)
-                ?.length ?? 1) -
-                1) /
-                2) *
-            BRANCH_LANE_GAP,
+          route,
         },
         className: isAction
           ? `incident-edge incident-edge--action${unrelated ? " incident-edge--unrelated" : ""}${highlighted ? " incident-edge--related" : ""}`

@@ -96,9 +96,20 @@ export type RoutedRelationship = Readonly<{
   route: OrthogonalRoute;
 }>;
 
+/** A junction-free piece of geometry intentionally shared by several routes. */
+export type SharedRouteSegment = Readonly<{
+  id: LayoutId;
+  kind: "BranchRail" | "MergeRail";
+  from: Point;
+  to: Point;
+  relationshipIds: readonly LayoutId[];
+}>;
+
 export type LayoutResult = Readonly<{
   nodes: readonly LayoutNodeGeometry[];
   relationships: readonly RoutedRelationship[];
+  /** Ephemeral drawing geometry; these are not map entities and are never persisted. */
+  sharedSegments: readonly SharedRouteSegment[];
   bounds: Rectangle;
 }>;
 
