@@ -94,10 +94,10 @@ const boundsOf = (nodes: readonly LayoutNodeGeometry[]): Rectangle => {
  * Creates a disposable graph: Controls become nodes, while branch and merge
  * junctions remain bends in route geometry. Nothing returned is a map entity.
  */
-export const layoutInvestigation = async (
+export const layoutInvestigation = (
   input: InvestigationLayoutInput,
   options: InvestigationLayoutOptions,
-): Promise<LayoutResult> => {
+): LayoutResult => {
   const grid = options.gridSize ?? 8;
   const hGap = options.horizontalGap ?? SIBLING_GAP;
   const vGap = options.verticalGap ?? CAUSAL_ROW_GAP;
@@ -294,7 +294,10 @@ export const layoutInvestigation = async (
       role: "Control",
       controlId: control.id,
       relationshipId: edge.id,
-      rectangle: { x: snap(position.x), y: snap(position.y), ...dimensions },
+      // Controls are centered from measured React Flow dimensions. Do not snap
+      // their origin: doing so shifts the center away from the relationship
+      // lane whenever a measured width or height is not grid-aligned.
+      rectangle: { x: position.x, y: position.y, ...dimensions },
     };
     geometries.push(geometry);
     byId.set(control.id, geometry);
@@ -360,8 +363,43 @@ export const layoutInvestigation = async (
     snap,
   );
   geometries.push(...actionGeometries);
+  const controlledCausalRelationships = causalRouting.relationships.flatMap(
+    (relationship): RoutedRelationship[] => {
+      const control = controlsByRelationship.get(relationship.relationshipId);
+      if (!control) return [relationship];
+      const split = routeCausalRelationships(
+        [
+          {
+            id: `${relationship.id}-${control.id}-upstream`,
+            kind: "Causal",
+            fromId: relationship.fromId,
+            toId: control.id,
+          },
+          {
+            id: `${relationship.id}-${control.id}-downstream`,
+            kind: "Causal",
+            fromId: control.id,
+            toId: relationship.toId,
+          },
+        ],
+        geometries,
+      );
+      // Keep the canonical semantic relationship in the public result. Layout
+      // consumers use its stable id and semantic endpoints (for example when
+      // relating a Control back to its owner). The additional routes are
+      // ephemeral renderer projections for the two visible sides of a Control.
+      return [
+        relationship,
+        ...split.relationships.map((segment) => ({
+          ...segment,
+          relationshipId: relationship.relationshipId,
+          role: relationship.role,
+        })),
+      ];
+    },
+  );
   const routed: RoutedRelationship[] = [
-    ...causalRouting.relationships,
+    ...controlledCausalRelationships,
     ...routeActionRelationships(
       input.relationships.filter((item) => item.kind === "Action"),
       geometries,
