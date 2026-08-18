@@ -519,7 +519,7 @@ describe("useAppStore actions", () => {
     });
   });
 
-  it("uses Control-aware clearance when laying out an imported map", () => {
+  it("preserves imported positions regardless of projected Controls", () => {
     const node = (
       id: string,
       referenceId: string,
@@ -590,11 +590,7 @@ describe("useAppStore actions", () => {
     useAppStore.getState().actions.loadMap(map);
     const withControls = childPositions();
 
-    expect(withControls.right.x - withControls.left.x).toBeGreaterThan(
-      withoutControls.right.x - withoutControls.left.x,
-    );
-    expect(withControls.left.y).toBeGreaterThan(withoutControls.left.y);
-    expect(withControls.right.y).toBeGreaterThan(withoutControls.right.y);
+    expect(withControls).toEqual(withoutControls);
   });
 
   it("batches live barrier description changes into one undo entry", () => {
@@ -829,6 +825,10 @@ describe("useAppStore actions", () => {
     actions.moveNode(child, { x: 800, y: 800 });
     const before = useAppStore.getState().nodes.map((node) => node.position);
     const selection = useAppStore.getState().selectionId;
+    const causalIds = useAppStore
+      .getState()
+      .nodes.filter((node) => node.data.nodeType !== "Action")
+      .map((node) => node.id);
     const historyBeforeArrange = useAppStore.getState().history.past.length;
 
     actions.organizeNodes();
@@ -840,10 +840,7 @@ describe("useAppStore actions", () => {
     const organized = useAppStore.getState().nodes.map((node) => node.position);
     expect(organized).not.toEqual(before);
     expect(useAppStore.getState().selectionId).toBe(selection);
-    expect(useAppStore.getState().viewportRequest?.nodeIds).toEqual([
-      parent,
-      child,
-    ]);
+    expect(useAppStore.getState().viewportRequest?.nodeIds).toEqual(causalIds);
 
     actions.undo();
     expect(useAppStore.getState().nodes.map((node) => node.position)).toEqual(

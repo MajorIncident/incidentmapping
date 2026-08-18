@@ -13,8 +13,18 @@ import type {
 } from "../layoutModel";
 import { inflateRectangle, routeOrthogonally } from "./geometry";
 
-const overlapsVertically = (a: Rectangle, b: Rectangle) =>
-  a.y < b.y + b.height + ACTION_GAP && b.y < a.y + a.height + ACTION_GAP;
+const MAX_ACTION_GUTTER_COLUMNS = 64;
+
+/** Full 2D collision is essential: gutter resolution changes x, not y. */
+export const rectanglesOverlap = (
+  a: Rectangle,
+  b: Rectangle,
+  clearance = ACTION_GAP,
+) =>
+  a.x < b.x + b.width + clearance &&
+  a.x + a.width + clearance > b.x &&
+  a.y < b.y + b.height + clearance &&
+  a.y + a.height + clearance > b.y;
 
 /**
  * Places Actions only after the causal layout is fixed. Stacks may move farther
@@ -68,10 +78,12 @@ export const placeActionStacks = (
         y += dimensions.height + ACTION_GAP;
         return { action, rectangle };
       });
+      let gutterColumn = 0;
       while (
+        gutterColumn < MAX_ACTION_GUTTER_COLUMNS &&
         rectangles.some(({ rectangle }) =>
           placed.some((other) =>
-            overlapsVertically(
+            rectanglesOverlap(
               { ...rectangle, x: snap(rectangle.x), y: snap(rectangle.y) },
               other.rectangle,
             ),
@@ -83,6 +95,24 @@ export const placeActionStacks = (
         );
         x += width + ACTION_GAP;
         rectangles.forEach((item) => Object.assign(item.rectangle, { x }));
+        gutterColumn++;
+      }
+      if (gutterColumn === MAX_ACTION_GUTTER_COLUMNS) {
+        // Deterministic, bounded degradation. This should only be reachable for
+        // pathological maps; interactivity is more important than optimal ink.
+        const widest = Math.max(
+          ...rectangles.map(({ rectangle }) => rectangle.width),
+        );
+        x =
+          causalBounds.x +
+          causalBounds.width +
+          ACTION_GUTTER +
+          placed.length * (widest + ACTION_GAP);
+        rectangles.forEach((item) => Object.assign(item.rectangle, { x }));
+        if (import.meta.env.DEV)
+          console.warn(
+            "Action gutter safety limit reached; using fallback column",
+          );
       }
       rectangles.forEach(({ action, rectangle }) =>
         placed.push({
