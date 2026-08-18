@@ -16,6 +16,7 @@ type ToolbarProps = FileMenuRenderProps & {
   showDetails: boolean;
   onToggleDetails: () => void;
   onPresent: () => void;
+  onInvestigationCheck: () => void;
   learningGuideEnabled: boolean;
   onLearningGuideChange: (enabled: boolean) => void;
   onHelpTopic: (topic: "map" | "basics" | "shortcuts" | "about") => void;
@@ -232,6 +233,13 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
           title="Delete selected item (Delete)"
         >
           Delete selected item
+        </Item>
+        <Item
+          icon="details"
+          onClick={props.onInvestigationCheck}
+          aria-label="Open Investigation Check"
+        >
+          Investigation Check
         </Item>
       </Menu>
       <Menu label="Help" icon="more" align="right">

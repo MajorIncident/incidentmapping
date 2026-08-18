@@ -5,6 +5,12 @@ import type {
 import { investigationGuide } from "../../content/investigationGuide";
 import type { PresentationLens } from "../presentation/selectors";
 
+export type GuidanceMode =
+  | "Onboarding"
+  | "Selection"
+  | "Task"
+  | "Stage"
+  | "Review";
 export type GuidanceNode = Readonly<{
   id: string;
   nodeType?: "Impact" | "Event" | "Factor" | "Action";
@@ -34,7 +40,6 @@ export type SelectedEntity =
     }>
   | string
   | null;
-
 export type GuidanceInput = Readonly<{
   selectedEntity?: SelectedEntity;
   nodes?: readonly GuidanceNode[];
@@ -47,14 +52,16 @@ export type GuidanceInput = Readonly<{
   activeLens?: PresentationLens | string | null;
   contextEditing?: boolean;
   newlyCreated?: boolean;
+  activeTask?: GuideContext | null;
 }>;
 
 export type InvestigationStage =
-  | "Building Story"
-  | "Analyzing Causes"
-  | "Testing Findings"
-  | "Planning Actions"
-  | "Ready to Review";
+  | "Getting Started"
+  | "Building the Story"
+  | "Exploring Causes"
+  | "Developing Findings"
+  | "Planning Response"
+  | "Reviewing the Investigation";
 export type ChecklistConcept =
   | "Impact"
   | "Events"
@@ -63,17 +70,24 @@ export type ChecklistConcept =
   | "Evidence"
   | "Root Cause"
   | "Actions";
+export type AdvisoryState =
+  | "Identified"
+  | "Consider"
+  | "Not yet explored"
+  | "None identified";
 export type ChecklistItem = Readonly<{
   concept: ChecklistConcept;
-  complete: boolean;
+  state: AdvisoryState;
   reason: string;
 }>;
 export type GuidanceMatch = Readonly<{
   entry: GuideEntry;
   context: GuideContext;
   reason: string;
+  mode: GuidanceMode;
 }>;
 export type GuidanceResult = Readonly<{
+  mode: GuidanceMode;
   contexts: readonly GuideContext[];
   matches: readonly GuidanceMatch[];
   primary: GuidanceMatch | null;
@@ -86,16 +100,13 @@ const selection = (input: GuidanceInput) => {
     typeof input.selectedEntity === "string"
       ? input.selectedEntity
       : input.selectedEntity?.id;
-  const node =
-    input.nodes?.find((item) => item.id === id) ??
-    input.actions?.find((item) => item.id === id);
-  const control = input.controls?.find((item) => item.id === id);
-  const evidence = input.evidence?.find((item) => item.id === id);
   return {
     id,
-    node,
-    control,
-    evidence,
+    node:
+      input.nodes?.find((item) => item.id === id) ??
+      input.actions?.find((item) => item.id === id),
+    control: input.controls?.find((item) => item.id === id),
+    evidence: input.evidence?.find((item) => item.id === id),
     supplied:
       typeof input.selectedEntity === "object" && input.selectedEntity
         ? input.selectedEntity
@@ -112,47 +123,94 @@ export const deriveInvestigationChecklist = (
       (a) => !(input.nodes ?? []).some((n) => n.id === a.id),
     ),
   ];
-  const controls = input.controls ?? [];
-  const evidence = input.evidence ?? [];
   const count = (type: GuidanceNode["nodeType"]) =>
     nodes.filter((node) => node.nodeType === type).length;
-  const rootCauses = nodes.filter(
-    (node) =>
-      node.nodeType === "Factor" && node.factorSignificance === "RootCause",
-  ).length;
   const facts: Array<[ChecklistConcept, number, string]> = [
-    ["Impact", count("Impact"), "No Impact has been recorded."],
-    ["Events", count("Event"), "No Events have been recorded."],
-    ["Factors", count("Factor"), "No Factors have been recorded."],
-    ["Controls", controls.length, "No Controls have been assessed."],
-    ["Evidence", evidence.length, "No Evidence has been recorded."],
-    ["Root Cause", rootCauses, "No Factor is marked as Root Cause."],
-    ["Actions", count("Action"), "No Actions have been planned."],
+    [
+      "Impact",
+      count("Impact"),
+      "Consider identifying the consequences that frame the investigation.",
+    ],
+    [
+      "Events",
+      count("Event"),
+      "Not yet explored: events that describe what happened.",
+    ],
+    [
+      "Factors",
+      count("Factor"),
+      "Not yet explored: conditions or influences worth examining.",
+    ],
+    [
+      "Controls",
+      input.controls?.length ?? 0,
+      "None identified; consider relevant safeguards when useful.",
+    ],
+    [
+      "Evidence",
+      input.evidence?.length ?? 0,
+      "None identified; consider support for important assertions.",
+    ],
+    [
+      "Root Cause",
+      nodes.filter(
+        (n) => n.nodeType === "Factor" && n.factorSignificance === "RootCause",
+      ).length,
+      "None identified. A Root Cause label is optional, never mandatory.",
+    ],
+    [
+      "Actions",
+      count("Action"),
+      "None identified; consider a response when findings support one.",
+    ],
   ];
-  return facts.map(([concept, value, missing]) => ({
+  return facts.map(([concept, value, advice]) => ({
     concept,
-    complete: value > 0,
-    reason:
-      value > 0 ? `${concept} is represented in the investigation.` : missing,
+    state: value
+      ? "Identified"
+      : concept === "Impact"
+        ? "Consider"
+        : concept === "Events" || concept === "Factors"
+          ? "Not yet explored"
+          : "None identified",
+    reason: value ? `${concept} identified in the investigation.` : advice,
   }));
 };
 
 export const deriveInvestigationStage = (
   input: GuidanceInput,
 ): InvestigationStage => {
-  const done = new Map(
-    deriveInvestigationChecklist(input).map((item) => [
-      item.concept,
-      item.complete,
-    ]),
-  );
-  if (!done.get("Impact") || !done.get("Events") || !done.get("Factors"))
-    return "Building Story";
-  if (!done.get("Root Cause")) return "Analyzing Causes";
-  if (!done.get("Evidence") || !done.get("Controls")) return "Testing Findings";
-  if (!done.get("Actions")) return "Planning Actions";
-  return "Ready to Review";
+  const nodes = [...(input.nodes ?? []), ...(input.actions ?? [])];
+  const selected = selection(input);
+  const has = (type: GuidanceNode["nodeType"]) =>
+    nodes.some((node) => node.nodeType === type);
+  if (!nodes.length && !input.controls?.length && !input.evidence?.length)
+    return "Getting Started";
+  if (
+    has("Impact") &&
+    has("Event") &&
+    has("Factor") &&
+    has("Action") &&
+    Boolean(input.controls?.length || input.evidence?.length)
+  )
+    return "Reviewing the Investigation";
+  if (selected.node?.nodeType === "Action" || has("Action"))
+    return "Planning Response";
+  if (
+    selected.control ||
+    selected.evidence ||
+    input.controls?.length ||
+    input.evidence?.length
+  ) {
+    return "Developing Findings";
+  }
+  if (selected.node?.nodeType === "Factor" || has("Factor"))
+    return "Exploring Causes";
+  return "Building the Story";
 };
+
+const stageContext = (stage: InvestigationStage): GuideContext =>
+  `maturity-${stage.toLowerCase().replaceAll(" ", "-")}` as GuideContext;
 
 export const selectInvestigationGuidance = (
   input: GuidanceInput,
@@ -160,22 +218,33 @@ export const selectInvestigationGuidance = (
   const nodes = input.nodes ?? [],
     edges = input.edges ?? [],
     selected = selection(input);
-  const contexts: GuideContext[] = [];
-  const reasons = new Map<GuideContext, string>();
-  const add = (context: GuideContext, reason: string) => {
-    if (!reasons.has(context)) {
-      contexts.push(context);
-      reasons.set(context, reason);
-    }
+  const signals: Array<{
+    context: GuideContext;
+    reason: string;
+    mode: GuidanceMode;
+  }> = [];
+  const add = (context: GuideContext, reason: string, mode: GuidanceMode) => {
+    if (!signals.some((item) => item.context === context))
+      signals.push({ context, reason, mode });
   };
-  if (!nodes.length && !input.actions?.length && !input.controls?.length)
-    add("empty-map", "The map has no entities.");
-  if (input.newlyCreated) add("new-map", "This map was newly created.");
+  // Explicit router lanes. Advisory assessment never contributes missing-* signals.
+  if (input.activeTask)
+    add(input.activeTask, "An investigation task is currently active.", "Task");
   if (input.contextEditing)
-    add("context-editing", "Context is currently being edited.");
+    add("context-editing", "Context is currently being edited.", "Task");
   if (input.chronology || input.activeLens === "Chronology")
-    add("chronology", "Chronology is active.");
-  if (input.presentation) add("presentation", "Presentation mode is active.");
+    add("chronology", "Chronology is active.", "Task");
+  const fresh =
+    (!nodes.length && !input.actions?.length && !input.controls?.length) ||
+    input.newlyCreated;
+  if (fresh)
+    add(
+      input.newlyCreated ? "new-map" : "empty-map",
+      input.newlyCreated
+        ? "This map was newly created."
+        : "The map has no entities.",
+      "Onboarding",
+    );
   const type = selected.node?.nodeType ?? selected.supplied?.nodeType;
   if (type) {
     const context = `${type.toLowerCase()}-selected` as GuideContext;
@@ -192,11 +261,12 @@ export const selectInvestigationGuidance = (
       type === "Event" && !childFactors
         ? "The selected Event has no child Factors."
         : `A${type === "Impact" || type === "Action" ? "n" : ""} ${type} is selected.`,
+      "Selection",
     );
   } else if (selected.control || selected.supplied?.kind === "control")
-    add("control-selected", "A Control is selected.");
+    add("control-selected", "A Control is selected.", "Selection");
   else if (selected.evidence || selected.supplied?.kind === "evidence")
-    add("evidence-selected", "Evidence is selected.");
+    add("evidence-selected", "Evidence is selected.", "Selection");
   const assertion =
     selected.node?.assertionState ??
     selected.control?.assertionState ??
@@ -205,54 +275,75 @@ export const selectInvestigationGuidance = (
     add(
       "assertion-state",
       `The selected assertion is ${assertion}, not Confirmed.`,
+      "Selection",
     );
   const causalOut = new Map<string, number>();
   edges
-    .filter((e) => e.kind !== "ActionEdge")
-    .forEach((e) => {
-      const id = e.source ?? e.fromId;
+    .filter((edge) => edge.kind !== "ActionEdge")
+    .forEach((edge) => {
+      const id = edge.source ?? edge.fromId;
       if (id) causalOut.set(id, (causalOut.get(id) ?? 0) + 1);
     });
-  if ([...causalOut.values()].some((value) => value > 1))
-    add("multiple-branches", "The causal graph contains multiple branches.");
-  deriveInvestigationChecklist(input)
-    .filter((item) => !item.complete)
-    .forEach((item) =>
-      add(
-        `missing-${item.concept.toLowerCase().replace(" ", "-")}` as GuideContext,
-        item.reason,
-      ),
+  if ([...causalOut.values()].some((count) => count > 1))
+    add(
+      "multiple-branches",
+      "The causal graph contains multiple branches.",
+      "Stage",
     );
-  const maturityContext = `maturity-${deriveInvestigationStage(input)
-    .toLowerCase()
-    .replaceAll(" ", "-")}` as GuideContext;
-  add(
-    maturityContext,
-    `The investigation is in the ${deriveInvestigationStage(input)} stage.`,
-  );
-  const matches = investigationGuide
-    .flatMap((entry, order) =>
-      entry.contexts
-        .filter((context) => reasons.has(context))
-        .map((context) => ({
-          entry,
-          context,
-          reason: reasons.get(context)!,
-          order,
-        })),
+  const stage = deriveInvestigationStage(input);
+  const mature = stage === "Reviewing the Investigation";
+  // A mature, unselected map moves beyond stage coaching into review.
+  if (!(mature && !selected.id))
+    add(
+      stageContext(stage),
+      `The investigation is oriented toward ${stage}.`,
+      "Stage",
+    );
+  if (input.presentation || (mature && !selected.id))
+    add(
+      "presentation",
+      input.presentation
+        ? "Presentation mode is active."
+        : "The mature investigation is ready for a no-selection review.",
+      "Review",
+    );
+  const rank: Record<GuidanceMode, number> = {
+    Task: 0,
+    Onboarding: 1,
+    Selection: 2,
+    Stage: 3,
+    Review: 4,
+  };
+  const matches = signals
+    .flatMap((signal) =>
+      investigationGuide.flatMap((entry, order) =>
+        entry.contexts.includes(signal.context)
+          ? [
+              {
+                entry,
+                context: signal.context,
+                reason: signal.reason,
+                mode: signal.mode,
+                order,
+              },
+            ]
+          : [],
+      ),
     )
     .sort(
       (a, b) =>
+        rank[a.mode] - rank[b.mode] ||
         b.entry.priority - a.entry.priority ||
-        a.order - b.order ||
-        a.entry.id.localeCompare(b.entry.id),
+        a.order - b.order,
     )
     .map(({ order: _order, ...match }) => match);
+  const primary = matches[0] ?? null;
   return {
-    contexts,
+    mode: primary?.mode ?? "Stage",
+    contexts: signals.map((item) => item.context),
     matches,
-    primary: matches[0] ?? null,
-    stage: deriveInvestigationStage(input),
+    primary,
+    stage,
     checklist: deriveInvestigationChecklist(input),
   };
 };
