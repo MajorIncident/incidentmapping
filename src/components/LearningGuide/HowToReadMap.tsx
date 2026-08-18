@@ -5,7 +5,7 @@ export const HowToReadMap = ({ page }: { page: LearnMapPage }): JSX.Element => (
     <p className="how-to-read-map__eyebrow">{page.eyebrow}</p>
     <h2 id={`learn-map-${page.id}`}>{page.title}</h2>
     <p className="how-to-read-map__intro">{page.introduction}</p>
-    <figure className="how-to-read-map__diagram">
+    <figure className="how-to-read-map__diagram" aria-label={page.diagramAlt}>
       <div className="how-to-read-map__cards">
         {page.cards.map((card, index) => (
           <div
