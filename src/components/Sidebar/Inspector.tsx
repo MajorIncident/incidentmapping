@@ -12,8 +12,7 @@ import { useAppStore } from "../../state/useAppStore";
 import { EvidenceSection } from "../Evidence/EvidenceSection";
 import { ContextEditor } from "../Context/ContextEditor";
 import { AssertionStateField } from "../AssertionState/AssertionState";
-import { selectEligibleControlRelationships } from "../../state/selectors";
-import { ControlBranchChooser } from "./ControlBranchChooser";
+import { selectControlRelationships } from "../../state/selectors";
 
 export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
@@ -134,14 +133,8 @@ export const Inspector = ({
   const chainNodes = useAppStore((state) => state.nodes);
   const barriers = useAppStore((state) => state.barriers);
   const edges = useAppStore((state) => state.edges);
-  const eligibleControlRelationships = useMemo(
-    () =>
-      selectEligibleControlRelationships(
-        selectionId,
-        chainNodes,
-        edges,
-        barriers,
-      ),
+  const controlRelationships = useMemo(
+    () => selectControlRelationships(selectionId, chainNodes, edges, barriers),
     [barriers, chainNodes, edges, selectionId],
   );
   const barrier = useAppStore(
@@ -906,20 +899,51 @@ export const Inspector = ({
               <div className="flex items-center justify-between">
                 <span className={labelClasses}>Controls</span>
               </div>
-              {eligibleControlRelationships.length === 0 ? (
+              {controlRelationships.length === 0 ? (
                 <p className="text-xs text-slate-500">
                   Add an unprotected downstream relationship to place a Control.
                 </p>
               ) : (
-                <ControlBranchChooser
-                  relationships={eligibleControlRelationships}
-                  onChoose={(relationship) =>
-                    addBarrier(
-                      relationship.upstreamNodeId,
-                      relationship.downstreamNodeId,
-                    )
-                  }
-                />
+                <div className="flex flex-col gap-2">
+                  {controlRelationships.length > 1 ? (
+                    <p className="text-sm font-medium text-slate-700">
+                      Add Control to branch
+                    </p>
+                  ) : null}
+                  {controlRelationships.map((relationship, index) => (
+                    <div
+                      key={relationship.edgeId}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 text-sm text-slate-700">
+                        <span>{relationship.downstreamTitle}</span>
+                        {controlRelationships.length > 1 ? (
+                          <span className="block text-xs text-slate-500">
+                            Branch {index + 1} of {controlRelationships.length}{" "}
+                            · {relationship.downstreamNodeId.slice(-6)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className={`${buttonClasses} px-2 py-1 text-xs`}
+                        disabled={!relationship.eligible}
+                        onClick={() =>
+                          addBarrier(
+                            relationship.upstreamNodeId,
+                            relationship.downstreamNodeId,
+                          )
+                        }
+                      >
+                        {relationship.eligible
+                          ? "Add Control"
+                          : "Control exists"}
+                        : {relationship.upstreamTitle} →{" "}
+                        {relationship.downstreamTitle}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ) : null}
@@ -1286,7 +1310,7 @@ export const Inspector = ({
     description,
     endDraft,
     edges,
-    eligibleControlRelationships,
+    controlRelationships,
     handleBarrierDescriptionChange,
     handleBarrierDescriptionBlur,
     handleCenter,
