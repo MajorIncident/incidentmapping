@@ -22,6 +22,7 @@ import {
   getNodeSize,
   snapPosition,
   VERTICAL_GAP,
+  type CanvasDetail,
 } from "../features/layout/hierarchy";
 import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
 import { layoutWithElk } from "../features/layout/elk/elkAdapter";
@@ -147,7 +148,7 @@ type AppState = {
   attachments: Attachment[];
   selectionId: string | null;
   editingId: string | null;
-  showDetails: boolean;
+  canvasDetail: CanvasDetail;
   layoutVersion: number;
   measuredControlDimensions: Record<string, { width: number; height: number }>;
   viewportRequest: { id: number; nodeIds: string[] } | null;
@@ -260,6 +261,8 @@ type AppState = {
     select: (id: string | null) => void;
     startEditing: (id: string) => void;
     finishEditing: () => void;
+    setCanvasDetail: (detail: CanvasDetail) => void;
+    /** Compatibility adapter for presentation-oriented boolean controls. */
     setShowDetails: (visible: boolean) => void;
     toggleShowDetails: () => void;
     organizeNodes: () => void;
@@ -480,7 +483,7 @@ const snapshotsEqual = (a: HistoryEntry, b: HistoryEntry): boolean =>
 const applyLayout = (
   nodes: Node<ChainNodeData>[],
   edges: Edge[],
-  showDetails: boolean,
+  canvasDetail: CanvasDetail,
   barriers: RuntimeBarrier[] = [],
   controlDimensions: Readonly<
     Record<string, { width: number; height: number }>
@@ -492,7 +495,7 @@ const applyLayout = (
       .map((edge) => `${edge.source}\u0000${edge.target}`),
   );
   return applyHierarchyLayout(nodes, edges, {
-    showDetails,
+    canvasDetail,
     controlDimensions,
     barrierEdges: barriers.filter((barrier) =>
       causalRelationships.has(
@@ -511,7 +514,7 @@ const quantizeDimension = (
 const fullLayoutDependencyKey = (state: AppState): string =>
   JSON.stringify({
     nodes: state.nodes.map((node) => {
-      const size = getNodeSize(node, state.showDetails);
+      const size = getNodeSize(node, state.canvasDetail);
       return [
         node.id,
         node.data.nodeType,
@@ -553,7 +556,7 @@ const toLayoutGraph = (state: AppState): LayoutGraph => {
       .map((edge) => [edge.target, edge.source]),
   );
   const dimensions = (node: Node<ChainNodeData>) => {
-    const fallback = getNodeSize(node, state.showDetails);
+    const fallback = getNodeSize(node, state.canvasDetail);
     return {
       width: node.width ?? fallback.width,
       height: node.height ?? fallback.height,
@@ -743,7 +746,7 @@ export const createNewMapState = () => {
     attachments: map.attachments.map(cloneAttachment),
     selectionId: rootId,
     editingId: rootId,
-    showDetails: true,
+    canvasDetail: "Compact" as const,
     layoutVersion: 0,
     measuredControlDimensions: {},
     viewportRequest: { id: nextNewMapViewportRequestId++, nodeIds: [rootId] },
@@ -766,9 +769,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     newMap: () => {
       resetMoveDebounce();
       resetTextEditDebounce();
-      set((state) => ({
+      set(() => ({
         ...createNewMapState(),
-        showDetails: state.showDetails,
       }));
     },
     loadMap: (input) => {
@@ -783,7 +785,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         nodes: applyLayout(
           runtimeNodes,
           runtimeEdges,
-          state.showDetails,
+          "Compact",
           runtimeBarriers,
         ).nodes,
         edges: runtimeEdges,
@@ -819,7 +821,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         attachments: map.attachments.map(cloneAttachment),
         selectionId: map.nodes[0]?.id ?? null,
         editingId: null,
-        showDetails: state.showDetails,
+        canvasDetail: "Compact",
         layoutVersion: state.layoutVersion + 1,
         measuredControlDimensions: {},
         viewportRequest: null,
@@ -1516,8 +1518,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           : 0;
         const position = parentNode
           ? (() => {
-              const parentSize = getNodeSize(parentNode, state.showDetails);
-              const childSize = getNodeSize(newNode, state.showDetails);
+              const parentSize = getNodeSize(parentNode, state.canvasDetail);
+              const childSize = getNodeSize(newNode, state.canvasDetail);
               return snapPosition({
                 x:
                   parentNode.position.x +
@@ -1551,7 +1553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const firstChild = Boolean(parentNode && outgoingChildCount === 0);
         const { nodes: laidOutNodes, changed: layoutChanged } = firstChild
           ? { nodes: nextNodes, changed: false }
-          : applyLayout(nextNodes, nextEdges, state.showDetails);
+          : applyLayout(nextNodes, nextEdges, state.canvasDetail);
         const candidate = {
           ...state,
           nodes: laidOutNodes,
@@ -1630,12 +1632,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           position: snapPosition({
             x:
               source.position.x +
-              getNodeSize(source, state.showDetails).width +
+              getNodeSize(source, state.canvasDetail).width +
               ACTION_HORIZONTAL_GAP,
             y:
               source.position.y +
               attachedActionIds.length *
-                (getNodeSize(source, state.showDetails).height +
+                (getNodeSize(source, state.canvasDetail).height +
                   ACTION_VERTICAL_GAP),
           }),
           data: {
@@ -1749,7 +1751,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
           nextNodes,
           nextEdges,
-          state.showDetails,
+          state.canvasDetail,
         );
         const candidate = {
           ...state,
@@ -2165,43 +2167,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     finishEditing: () => {
       set({ editingId: null });
     },
-    setShowDetails: (visible) => {
+    setCanvasDetail: (detail) => {
       set((state) => {
-        const { nodes: laidOutNodes, changed } = applyLayout(
-          state.nodes,
-          state.edges,
-          visible,
-        );
-        return {
-          showDetails: visible,
-          nodes: laidOutNodes,
-          layoutVersion: changed
-            ? state.layoutVersion + 1
-            : state.layoutVersion,
-        };
+        if (state.canvasDetail === detail) return state;
+        // Rendering the new mode causes React Flow to report its new DOM
+        // dimensions. That measured update performs the single necessary
+        // layout without first moving persisted node positions nominally.
+        return { canvasDetail: detail };
       });
     },
-    toggleShowDetails: () => {
-      set((state) => {
-        const nextShowDetails = !state.showDetails;
-        const { nodes: laidOutNodes, changed } = applyLayout(
-          state.nodes,
-          state.edges,
-          nextShowDetails,
-        );
-        return {
-          showDetails: nextShowDetails,
-          nodes: laidOutNodes,
-          layoutVersion: changed
-            ? state.layoutVersion + 1
-            : state.layoutVersion,
-        };
-      });
-    },
+    setShowDetails: (visible) =>
+      get().actions.setCanvasDetail(visible ? "Expanded" : "Compact"),
+    toggleShowDetails: () =>
+      get().actions.setCanvasDetail(
+        get().canvasDetail === "Expanded" ? "Compact" : "Expanded",
+      ),
     applyMeasuredLayout: (dimensions) => {
       set((state) => {
         const materiallyDifferent = (a: number | null | undefined, b: number) =>
-          a == null || Math.abs(a - b) >= 1;
+          a == null || Math.abs(a - b) >= 8;
         const measuredNodes = state.nodes.map((node) => {
           const size = dimensions[node.id];
           if (
@@ -2234,7 +2218,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const result = applyLayout(
           measuredNodes,
           state.edges,
-          state.showDetails,
+          state.canvasDetail,
           state.barriers,
           measuredControlDimensions,
         );
@@ -2385,7 +2369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
           nextNodes,
           state.edges,
-          state.showDetails,
+          state.canvasDetail,
         );
         const candidate = {
           ...state,

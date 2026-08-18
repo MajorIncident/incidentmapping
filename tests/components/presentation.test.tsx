@@ -468,9 +468,10 @@ describe("presentation mode", () => {
       expect(
         screen.queryByText("Detailed consequence"),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Control purpose details"),
-      ).not.toBeInTheDocument();
+      // A Control's purpose is part of its required Compact summary. This is
+      // card content, not a package-warning modal leaking into presentation.
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByText("Control purpose details")).toBeVisible();
       expect(
         screen.queryByText("Control failure details"),
       ).not.toBeInTheDocument();
@@ -492,7 +493,9 @@ describe("presentation mode", () => {
       await userEvent.click(
         screen.getByRole("button", { name: /Exit Presentation/i }),
       );
-      expect(useAppStore.getState().showDetails).toBe(editorShowDetails);
+      expect(useAppStore.getState().canvasDetail === "Expanded").toBe(
+        editorShowDetails,
+      );
     },
   );
 });

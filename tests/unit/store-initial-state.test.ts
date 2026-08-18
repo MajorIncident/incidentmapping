@@ -24,6 +24,7 @@ const expectCleanRoot = (state: ReturnType<typeof useAppStore.getState>) => {
   expect(state.barriers).toEqual([]);
   expect(state.selectionId).toBe(state.nodes[0].id);
   expect(state.editingId).toBe(state.nodes[0].id);
+  expect(state.canvasDetail).toBe("Compact");
   expect(state.viewportRequest?.nodeIds).toEqual([state.nodes[0].id]);
   expect(state.editorFocusRequest).toMatchObject({
     entityId: state.nodes[0].id,

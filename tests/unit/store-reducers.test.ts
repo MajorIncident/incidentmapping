@@ -16,7 +16,7 @@ import type { MapData } from "../../src/features/maps/schema";
 describe("useAppStore actions", () => {
   beforeEach(() => {
     useAppStore.getState().actions.loadMap(emptyMap);
-    if (!useAppStore.getState().showDetails) {
+    if (useAppStore.getState().canvasDetail !== "Expanded") {
       useAppStore.getState().actions.setShowDetails(true);
     }
   });
@@ -117,6 +117,7 @@ describe("useAppStore actions", () => {
       "mapSession",
     );
     expect(actions.toMap()).not.toHaveProperty("mapSession");
+    expect(actions.toMap()).not.toHaveProperty("canvasDetail");
 
     actions.newMap();
     expect(actions.addChild()).not.toBeNull();
@@ -131,6 +132,25 @@ describe("useAppStore actions", () => {
       source: "Opened",
       fresh: false,
     });
+  });
+
+  it("switches canvas detail once without changing investigation semantics", () => {
+    const { actions } = useAppStore.getState();
+    actions.loadMap(sampleMap);
+    const before = actions.toMap();
+    const initialLayoutVersion = useAppStore.getState().layoutVersion;
+
+    actions.setCanvasDetail("Expanded");
+    const expanded = useAppStore.getState();
+    expect(expanded.canvasDetail).toBe("Expanded");
+    expect(expanded.layoutVersion - initialLayoutVersion).toBeLessThanOrEqual(
+      1,
+    );
+    expect(actions.toMap()).toEqual(before);
+
+    actions.setCanvasDetail("Expanded");
+    expect(useAppStore.getState().layoutVersion).toBe(expanded.layoutVersion);
+    expect(actions.toMap()).toEqual(before);
   });
 
   it("creates a fresh selected root in edit mode without history", () => {
