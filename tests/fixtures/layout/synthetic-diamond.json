@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "synthetic-diamond",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Source",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "left",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Left",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "right",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Right",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "sink",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Impact",
+      "title": "Sink",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "left"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "right"
+    },
+    {
+      "id": "cause-3",
+      "kind": "CauseEffectEdge",
+      "fromId": "left",
+      "toId": "sink"
+    },
+    {
+      "id": "cause-4",
+      "kind": "CauseEffectEdge",
+      "fromId": "right",
+      "toId": "sink"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}

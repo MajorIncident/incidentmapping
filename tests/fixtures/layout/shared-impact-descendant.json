@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "shared-impact-descendant",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "impact-a",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Impact",
+      "title": "Impact A",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "impact-b",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Impact",
+      "title": "Impact B",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "shared",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Shared",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "descendant",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Factor",
+      "title": "Descendant",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "impact-a",
+      "toId": "shared"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "impact-b",
+      "toId": "shared"
+    },
+    {
+      "id": "cause-3",
+      "kind": "CauseEffectEdge",
+      "fromId": "shared",
+      "toId": "descendant"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}

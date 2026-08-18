@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 5,
+  "metadata": {
+    "title": "branch-merge-branch",
+    "contextItems": [],
+    "controlReferenceHighWaterMark": 0,
+    "attachmentReferenceHighWaterMark": 0
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "ChainNode",
+      "referenceId": "N-001",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Source",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "left",
+      "kind": "ChainNode",
+      "referenceId": "N-002",
+      "nodeType": "Factor",
+      "title": "Left",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "right",
+      "kind": "ChainNode",
+      "referenceId": "N-003",
+      "nodeType": "Factor",
+      "title": "Right",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "merge",
+      "kind": "ChainNode",
+      "referenceId": "N-004",
+      "nodeType": "Event",
+      "eventDisplay": "Map",
+      "title": "Merge",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "out-a",
+      "kind": "ChainNode",
+      "referenceId": "N-005",
+      "nodeType": "Impact",
+      "title": "Out A",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "out-b",
+      "kind": "ChainNode",
+      "referenceId": "N-006",
+      "nodeType": "Impact",
+      "title": "Out B",
+      "evidenceIds": [],
+      "contextItems": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cause-1",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "left"
+    },
+    {
+      "id": "cause-2",
+      "kind": "CauseEffectEdge",
+      "fromId": "source",
+      "toId": "right"
+    },
+    {
+      "id": "cause-3",
+      "kind": "CauseEffectEdge",
+      "fromId": "left",
+      "toId": "merge"
+    },
+    {
+      "id": "cause-4",
+      "kind": "CauseEffectEdge",
+      "fromId": "right",
+      "toId": "merge"
+    },
+    {
+      "id": "cause-5",
+      "kind": "CauseEffectEdge",
+      "fromId": "merge",
+      "toId": "out-a"
+    },
+    {
+      "id": "cause-6",
+      "kind": "CauseEffectEdge",
+      "fromId": "merge",
+      "toId": "out-b"
+    }
+  ],
+  "barriers": [],
+  "evidence": [],
+  "attachments": []
+}
