@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ContextEditor } from "../../src/components/Context/ContextEditor";
@@ -11,6 +11,15 @@ const IncidentEditor = () => {
 
 describe("ContextEditor", () => {
   beforeEach(() => useAppStore.getState().actions.newMap());
+
+  it("exposes Context teaching state only while its editor is active", () => {
+    render(<IncidentEditor />);
+    const input = screen.getByLabelText("New label");
+    fireEvent.focus(input);
+    expect(useAppStore.getState().contextEditing).toBe(true);
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(useAppStore.getState().contextEditing).toBe(false);
+  });
 
   it("prevents blank records and adds complete incident Context with Enter", async () => {
     const user = userEvent.setup();

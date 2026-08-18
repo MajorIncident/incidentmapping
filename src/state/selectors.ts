@@ -1,4 +1,4 @@
-import type { Node } from "reactflow";
+import type { Edge, Node } from "reactflow";
 import type { BarrierNodeData, ChainNodeData } from "./useAppStore";
 import type { ContextItem, EvidenceItem } from "../features/maps/schema";
 import type { EventPhase } from "../features/maps/schema";
@@ -8,6 +8,56 @@ const causalNodeTypes = new Set<ChainNodeData["nodeType"]>([
   "Event",
   "Factor",
 ]);
+
+export type EligibleControlRelationship = {
+  edgeId: string;
+  upstreamNodeId: string;
+  downstreamNodeId: string;
+  label: string;
+};
+
+/**
+ * Selects unprotected causal relationships leaving the selected Event/Factor.
+ * React Flow's persisted direction is causal parent (`source`) to causal child
+ * (`target`); keeping that knowledge here prevents guide and Inspector drift.
+ */
+export const selectEligibleControlRelationships = (
+  selectionId: string | null,
+  nodes: Node<ChainNodeData>[],
+  edges: Edge[],
+  controls: Array<Pick<BarrierNodeData, "upstreamNodeId" | "downstreamNodeId">>,
+): EligibleControlRelationship[] => {
+  const selected = nodes.find(({ id }) => id === selectionId);
+  if (
+    !selected ||
+    (selected.data.nodeType !== "Event" && selected.data.nodeType !== "Factor")
+  )
+    return [];
+  const references = new Map(
+    nodes.map((node) => [node.id, node.data.referenceId ?? "N-???"]),
+  );
+  return edges
+    .filter(
+      (edge) =>
+        edge.source === selected.id &&
+        edge.type !== "ActionEdge" &&
+        nodes.some(
+          (node) =>
+            node.id === edge.target && causalNodeTypes.has(node.data.nodeType),
+        ) &&
+        !controls.some(
+          (control) =>
+            control.upstreamNodeId === edge.source &&
+            control.downstreamNodeId === edge.target,
+        ),
+    )
+    .map((edge) => ({
+      edgeId: edge.id,
+      upstreamNodeId: edge.source,
+      downstreamNodeId: edge.target,
+      label: `${references.get(edge.source)} → ${references.get(edge.target)}`,
+    }));
+};
 
 /** Whether the current selection can participate in the causal chain. */
 export const canAddBelowSelection = (

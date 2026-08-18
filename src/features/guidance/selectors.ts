@@ -53,6 +53,7 @@ export type GuidanceInput = Readonly<{
   chronology?: boolean;
   activeLens?: PresentationLens | string | null;
   contextEditing?: boolean;
+  eligibleControlRelationshipCount?: number;
   mapSession?: Readonly<MapSession>;
   activeTask?: GuideContext | null;
 }>;
@@ -337,7 +338,44 @@ export const selectInvestigationGuidance = (
         b.entry.priority - a.entry.priority ||
         a.order - b.order,
     )
-    .map(({ order: _order, ...match }) => match);
+    .map(({ order: _order, ...match }) => {
+      if (match.mode !== "Selection" || !type) return match;
+      const actions = [...match.entry.suggestedActions];
+      if (
+        ["Impact", "Event", "Factor"].includes(type) &&
+        !actions.some((item) => item.id === "add-action")
+      )
+        actions.push({ id: "add-action", label: "+ Action", intent: "create" });
+      if (
+        (type === "Event" || type === "Factor") &&
+        input.eligibleControlRelationshipCount &&
+        !actions.some((item) => item.id === "add-control")
+      )
+        actions.push({
+          id: "add-control",
+          label: "+ Control",
+          intent: "create",
+        });
+      const advisory =
+        type === "Factor" &&
+        (selected.node?.factorSignificance === "RootCause" ||
+          selected.node?.factorSignificance === "KeyFactor")
+          ? [
+              {
+                type: "question" as const,
+                text: "What will change? An Action is optional; add one only when the finding supports a response.",
+              },
+            ]
+          : [];
+      return {
+        ...match,
+        entry: {
+          ...match.entry,
+          content: [...match.entry.content, ...advisory],
+          suggestedActions: actions,
+        },
+      };
+    });
   const primary = matches[0] ?? null;
   return {
     mode: primary?.mode ?? "Stage",

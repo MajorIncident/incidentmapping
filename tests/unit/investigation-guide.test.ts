@@ -110,6 +110,7 @@ const observableGuideBehavior = {
   "add-event": "creates an Event and focuses its title",
   "add-factor": "creates a Factor and focuses its title",
   "add-control": "opens Controls in create mode",
+  "add-context": "opens neutral Context in create mode",
   "add-aggravating-context": "opens Aggravating Context in create mode",
   "add-mitigating-context": "opens Mitigating Context in create mode",
   "add-evidence": "opens Evidence in create mode",

@@ -133,7 +133,7 @@ describe("Learning Guide", () => {
     expect(committed.primary?.entry.title).toBe("STEP 3 · ASK WHY");
     expect(
       committed.primary?.entry.suggestedActions.map(({ label }) => label),
-    ).toEqual(["+ Event", "+ Factor"]);
+    ).toEqual(["+ Event", "+ Factor", "+ Action"]);
   });
 
   it("dismisses an individual tip only in session storage", () => {
