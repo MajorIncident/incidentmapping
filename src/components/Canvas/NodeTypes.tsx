@@ -225,7 +225,7 @@ const ChainNodeComponent = ({
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        commitEdit(true);
+        commitEdit();
       }
       if (event.key === "Escape") {
         event.preventDefault();

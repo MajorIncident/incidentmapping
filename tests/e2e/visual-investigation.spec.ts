@@ -89,7 +89,8 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await title(page).fill("Airport passengers separated from baggage");
   await title(page).press("Enter");
   await page.getByLabel("Type").selectOption("Impact");
-  await page.getByRole("button", { name: "Add Below" }).click();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.locator('[role="menuitem"]:not([disabled])').first().click();
   await title(page).fill("Arrival belt stopped during unloading");
   await title(page).press("Enter");
   await expect(page.getByText("Event", { exact: true }).last()).toBeVisible();
@@ -97,7 +98,8 @@ test("builds a complete visual investigation and preserves it exactly", async ({
 
   // Convert the child to a Factor while its category is deliberately unset,
   // then complete its investigation classification.
-  await page.getByRole("button", { name: "Add Below" }).click();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.locator('[role="menuitem"]:not([disabled])').first().click();
   await title(page).fill("Inspection omitted photo-eye test");
   await title(page).press("Enter");
   await page.getByLabel("Type").selectOption("Factor");
@@ -137,7 +139,8 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   // Add a second branch so selecting the Control below proves the precise
   // controlled branch is highlighted rather than every sibling cause.
   await page.getByText("Arrival belt stopped during unloading").click();
-  await page.getByRole("button", { name: "Add Below" }).click();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.locator('[role="menuitem"]:not([disabled])').first().click();
   await title(page).fill("Fault alarm was not escalated");
   await title(page).press("Enter");
   await page.getByLabel("Type").selectOption("Factor");

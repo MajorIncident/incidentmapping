@@ -22,7 +22,8 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "New" }).click();
-  await page.getByRole("button", { name: "Add Below" }).click();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.locator('[role="menuitem"]:not([disabled])').first().click();
 
   const rootTitle = page.getByText("New Event").first();
   await rootTitle.dblclick();
@@ -123,7 +124,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
     "2024-07-01T08:30:00",
   );
 
-  // Add Below exposes the same causal-node rules to mouse and keyboard users.
+  // The semantic menu and Enter use the same selected-node meaning.
   for (const nodeType of ["Impact", "Event", "Factor"]) {
     await page.getByLabel("Type").selectOption(nodeType);
     const consequences = page.getByRole("heading", { name: "Consequences" });
@@ -132,10 +133,17 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
     } else {
       await expect(consequences).toBeVisible();
     }
-    const addBelow = page.getByRole("button", { name: "Add Below" });
-    await expect(addBelow).toBeEnabled();
+    const addMenu = page.getByRole("button", { name: "+ Add menu" });
+    await expect(addMenu).toBeEnabled();
     const countBeforeMouse = await page.getByTestId("chain-node").count();
-    await addBelow.click();
+    await addMenu.click();
+    const semanticChoice =
+      nodeType === "Impact"
+        ? "Event — What happened?"
+        : nodeType === "Event"
+          ? "Event — Another occurrence"
+          : "Factor — Ask why again";
+    await page.getByRole("menuitem", { name: semanticChoice }).click();
     await expect(page.getByTestId("chain-node")).toHaveCount(
       countBeforeMouse + 1,
     );
@@ -155,7 +163,13 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
     0,
   );
-  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await expect(
+    page.getByRole("menuitem", {
+      name: "Select an Impact, Event, or Factor",
+    }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
   let unavailableCount = await page.getByTestId("chain-node").count();
   await page.keyboard.press("Enter");
   await page.keyboard.press("Shift+Enter");
@@ -173,14 +187,25 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
     0,
   );
-  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await expect(
+    page.getByRole("menuitem", {
+      name: "Select an Impact, Event, or Factor",
+    }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
   unavailableCount = await page.getByTestId("chain-node").count();
   await page.keyboard.press("Enter");
   await page.keyboard.press("Shift+Enter");
   await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
 
   await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
-  await expect(page.getByRole("button", { name: "Add Below" })).toBeDisabled();
+  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await expect(
+    page.getByRole("menuitem", {
+      name: "Select an Impact, Event, or Factor",
+    }),
+  ).toBeDisabled();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
 });

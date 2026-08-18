@@ -96,7 +96,13 @@ export const useKeyboardShortcuts = ({
           if (event.shiftKey) {
             actions.addSibling(selectionId ?? undefined);
           } else {
-            actions.addChild(selectionId ?? undefined);
+            const selectedType = state.nodes.find(
+              (node) => node.id === selectionId,
+            )?.data.nodeType;
+            const nodeType = selectedType === "Impact" ? "Event" : selectedType;
+            if (nodeType === "Event" || nodeType === "Factor") {
+              actions.addSemanticNode(nodeType, selectionId ?? undefined);
+            }
           }
           return;
         }

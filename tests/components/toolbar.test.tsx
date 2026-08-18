@@ -51,7 +51,7 @@ describe("Toolbar map title", () => {
       screen.getByRole("button", { name: "Create a new map" }),
     );
     expect(toolbar).toContainElement(
-      screen.getByRole("button", { name: "Add Below" }),
+      screen.getByRole("button", { name: "+ Add menu" }),
     );
     expect(screen.getByLabelText("File menu")).toHaveAttribute(
       "title",
@@ -67,19 +67,18 @@ describe("Toolbar map title", () => {
     ).toBeDisabled();
   });
 
-  it("enables Add Below only for selected causal nodes and orders editing commands", () => {
+  it("offers semantic Add choices for selected causal nodes", () => {
     render(<App />);
 
     const editingCommands = screen.getByRole("navigation", {
       name: "Editing commands",
     });
-    const addBelow = screen.getByRole("button", { name: "Add Below" });
+    const addMenu = screen.getByRole("button", { name: "+ Add menu" });
     const present = screen.getByRole("button", { name: "Present map" });
-    expect(addBelow).toBeDisabled();
-    expect(addBelow).toHaveClass("command-button--primary");
+    expect(addMenu).toBeEnabled();
     expect(present).not.toHaveClass("command-button--primary");
     expect(within(editingCommands).getAllByRole("button")).toEqual([
-      addBelow,
+      addMenu,
       present,
       screen.getByRole("button", { name: "More menu" }),
       screen.getByRole("button", { name: "Help menu" }),
@@ -91,22 +90,54 @@ describe("Toolbar map title", () => {
     });
     for (const nodeType of ["Impact", "Event", "Factor"] as const) {
       act(() => useAppStore.getState().actions.setNodeType(nodeId, nodeType));
-      expect(addBelow).toBeEnabled();
+      expect(addMenu).toBeEnabled();
     }
 
     act(() => {
       nodeId = useAppStore.getState().actions.addAction(nodeId) ?? "";
     });
-    expect(addBelow).toBeDisabled();
+    expect(addMenu).toBeEnabled();
 
     act(() => {
       useAppStore.getState().actions.loadMap(sampleMap);
       useAppStore.getState().actions.select("barrier-root-child");
     });
-    expect(addBelow).toBeDisabled();
+    expect(addMenu).toBeEnabled();
 
     act(() => useAppStore.getState().actions.select(null));
-    expect(addBelow).toBeDisabled();
+    expect(addMenu).toBeEnabled();
+  });
+
+  it("labels semantic creation choices from the selected entity", () => {
+    act(() => useAppStore.getState().actions.newMap());
+    render(<App />);
+
+    const addMenu = screen.getByRole("button", { name: "+ Add menu" });
+    fireEvent.click(addMenu);
+    expect(
+      screen.getByRole("menuitem", { name: "Event — What happened?" }),
+    ).toBeVisible();
+
+    const rootId = useAppStore.getState().selectionId!;
+    act(() => useAppStore.getState().actions.setNodeType(rootId, "Event"));
+    expect(
+      screen.getByRole("menuitem", { name: "Event — Another occurrence" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("menuitem", {
+        name: "Factor — A condition explaining why",
+      }),
+    ).toBeVisible();
+
+    act(() => useAppStore.getState().actions.setNodeType(rootId, "Factor"));
+    expect(
+      screen.getByRole("menuitem", { name: "Factor — Ask why again" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("menuitem", {
+        name: "Action — Address this finding",
+      }),
+    ).toBeVisible();
   });
 
   it("edits the canvas title with a double-click and commits on Enter", async () => {
@@ -312,9 +343,9 @@ describe("Toolbar map title", () => {
     const user = userEvent.setup();
     act(() => useAppStore.getState().actions.addChild());
     render(<App />);
-    expect(screen.getByRole("button", { name: "Add Below" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "+ Add menu" })).toHaveAttribute(
       "title",
-      "Add Below (Enter)",
+      "+ Add menu",
     );
     const more = screen.getByRole("button", { name: "More menu" });
     await user.click(more);

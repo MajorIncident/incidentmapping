@@ -140,9 +140,10 @@ export const App = (): JSX.Element => {
       "add-factor": "Factor",
     } as const;
     if (action in types) {
-      const id = state.actions.addChild(state.selectionId ?? undefined);
-      if (id)
-        state.actions.setNodeType(id, types[action as keyof typeof types]);
+      state.actions.addSemanticNode(
+        types[action as keyof typeof types],
+        state.selectionId ?? undefined,
+      );
       return;
     }
     if (action === "add-evidence" && state.selectionId)
@@ -274,13 +275,21 @@ export const App = (): JSX.Element => {
             {!presenting ? (
               <Toolbar
                 {...menu}
-                onAddChainNode={() => {
+                onAddSemanticNode={(nodeType) => {
                   const state = useAppStore.getState();
                   if (!canAddBelowSelection(state.selectionId, state.nodes))
                     return;
-                  state.actions.addChild(state.selectionId ?? undefined);
+                  state.actions.addSemanticNode(
+                    nodeType,
+                    state.selectionId ?? undefined,
+                  );
                 }}
-                canAddBelow={canAddBelow}
+                selectedNodeType={
+                  canAddBelow
+                    ? nodes.find((node) => node.id === selectionId)?.data
+                        .nodeType
+                    : undefined
+                }
                 onDeleteSelection={() => {
                   deleteSelection();
                 }}

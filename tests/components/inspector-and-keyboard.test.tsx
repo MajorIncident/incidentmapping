@@ -179,7 +179,7 @@ describe("Inspector and keyboard workflows", () => {
       render(<App />);
     });
 
-    await screen.findByRole("button", { name: "Add Below" });
+    await screen.findByRole("button", { name: "+ Add menu" });
     await waitFor(() => {
       expect(useAppStore.getState().nodes).toHaveLength(1);
     });
@@ -207,7 +207,7 @@ describe("Inspector and keyboard workflows", () => {
     });
   });
 
-  it("keeps Enter and Shift+Enter in parity with causal Add Below availability", () => {
+  it("keeps Enter and Shift+Enter in parity with semantic creation availability", () => {
     render(<App />);
     let nodeId = "";
     act(() => {
