@@ -615,6 +615,7 @@ export const layoutHierarchy = <Data>(
           .filter(
             (other) =>
               !moving.has(other.owner) &&
+              other.owner !== parentId &&
               !object.associated.has(other.owner) &&
               !other.associated.has(object.owner),
           )
@@ -629,7 +630,6 @@ export const layoutHierarchy = <Data>(
       );
     if (!safe) continue;
     shiftSubtree(childId, delta);
-    recenterAncestors(childId);
   }
 
   causalRight = Math.max(

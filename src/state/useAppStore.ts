@@ -626,14 +626,38 @@ const placeIncrementalNode = (
   };
   visit(parent.id);
   const arrangedById = new Map(arranged.map((node) => [node.id, node]));
+  const originalById = new Map(nodes.map((node) => [node.id, node]));
+  const translationById = new Map<string, XYPosition>();
+  for (const childId of children.get(parent.id) ?? []) {
+    if (childId === newNodeId) continue;
+    const originalRoot = originalById.get(childId);
+    const arrangedRoot = arrangedById.get(childId);
+    if (!originalRoot || !arrangedRoot) continue;
+    const translation = {
+      x: arrangedRoot.position.x + delta.x - originalRoot.position.x,
+      y: arrangedRoot.position.y + delta.y - originalRoot.position.y,
+    };
+    const assignTranslation = (id: string) => {
+      if (translationById.has(id)) return;
+      translationById.set(id, translation);
+      for (const descendantId of children.get(id) ?? [])
+        assignTranslation(descendantId);
+    };
+    assignTranslation(childId);
+  }
   return nodes.map((node) =>
     affected.has(node.id) && arrangedById.has(node.id)
       ? {
           ...node,
-          position: snapPosition({
-            x: arrangedById.get(node.id)!.position.x + delta.x,
-            y: arrangedById.get(node.id)!.position.y + delta.y,
-          }),
+          position: translationById.get(node.id)
+            ? {
+                x: node.position.x + translationById.get(node.id)!.x,
+                y: node.position.y + translationById.get(node.id)!.y,
+              }
+            : snapPosition({
+                x: arrangedById.get(node.id)!.position.x + delta.x,
+                y: arrangedById.get(node.id)!.position.y + delta.y,
+              }),
         }
       : node,
   );
