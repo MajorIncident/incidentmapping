@@ -24,6 +24,8 @@ import {
   VERTICAL_GAP,
 } from "../features/layout/hierarchy";
 import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
+import { layoutWithElk } from "../features/layout/elk/elkAdapter";
+import type { LayoutGraph } from "../features/layout/layoutModel";
 
 export { GRID_SIZE } from "../features/layout/hierarchy";
 
@@ -318,6 +320,7 @@ let nextNewMapViewportRequestId = 1;
 let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let textEditDebounceKey: string | null = null;
 let textEditDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let latestArrangeRequest = 0;
 
 const resetMoveDebounce = () => {
   moveDebounceActive = false;
@@ -496,6 +499,118 @@ const applyLayout = (
       ),
     ),
   });
+};
+
+const quantizeDimension = (
+  value: number | null | undefined,
+  fallback: number,
+) => Math.round((value ?? fallback) / 8) * 8;
+
+/** Only material, engine-relevant values participate in stale-result detection. */
+const fullLayoutDependencyKey = (state: AppState): string =>
+  JSON.stringify({
+    nodes: state.nodes.map((node) => {
+      const size = getNodeSize(node, state.showDetails);
+      return [
+        node.id,
+        node.data.nodeType,
+        node.data.referenceId,
+        snapPosition(node.position).x,
+        snapPosition(node.position).y,
+        quantizeDimension(node.width, size.width),
+        quantizeDimension(node.height, size.height),
+      ];
+    }),
+    edges: state.edges.map((edge) => [
+      edge.id,
+      edge.source,
+      edge.target,
+      edge.data?.kind,
+    ]),
+    controls: state.barriers.map((control) => {
+      const size = state.measuredControlDimensions[control.id];
+      return [
+        control.id,
+        control.upstreamNodeId,
+        control.downstreamNodeId,
+        control.referenceId,
+        quantizeDimension(size?.width, 220),
+        quantizeDimension(size?.height, 152),
+      ];
+    }),
+  });
+
+const toLayoutGraph = (state: AppState): LayoutGraph => {
+  const actions = new Set(
+    state.nodes
+      .filter((node) => node.data.nodeType === "Action")
+      .map((node) => node.id),
+  );
+  const actionAnchor = new Map(
+    state.edges
+      .filter((edge) => edge.data?.kind === "ActionEdge")
+      .map((edge) => [edge.target, edge.source]),
+  );
+  const dimensions = (node: Node<ChainNodeData>) => {
+    const fallback = getNodeSize(node, state.showDetails);
+    return {
+      width: node.width ?? fallback.width,
+      height: node.height ?? fallback.height,
+    };
+  };
+  const relationships = state.edges.map((edge) => ({
+    id: edge.id,
+    kind:
+      edge.data?.kind === "ActionEdge"
+        ? ("Action" as const)
+        : ("Causal" as const),
+    fromId: edge.source,
+    toId: edge.target,
+  }));
+  return {
+    nodes: state.nodes
+      .filter((node) => !actions.has(node.id))
+      .map((node) => ({
+        id: node.id,
+        kind:
+          (node.data.nodeType === "Action" ? "Factor" : node.data.nodeType) ??
+          "Factor",
+        referenceId: node.data.referenceId,
+        position: node.position,
+        dimensions: dimensions(node),
+      })),
+    actions: state.nodes
+      .filter((node) => actions.has(node.id))
+      .map((node) => ({
+        id: node.id,
+        kind: "Action" as const,
+        attachedToId: actionAnchor.get(node.id) ?? "",
+        referenceId: node.data.referenceId,
+        position: node.position,
+        dimensions: dimensions(node),
+      })),
+    relationships,
+    controls: state.barriers.flatMap((control) => {
+      const relationship = relationships.find(
+        (edge) =>
+          edge.kind === "Causal" &&
+          edge.fromId === control.upstreamNodeId &&
+          edge.toId === control.downstreamNodeId,
+      );
+      if (!relationship) return [];
+      return [
+        {
+          id: control.id,
+          kind: "Control" as const,
+          relationshipId: relationship.id,
+          upstreamNodeId: control.upstreamNodeId,
+          downstreamNodeId: control.downstreamNodeId,
+          referenceId: control.referenceId,
+          dimensions: state.measuredControlDimensions[control.id],
+        },
+      ];
+    }),
+  };
 };
 
 const createEmptyHistory = (): HistoryState => ({ past: [], future: [] });
@@ -2129,29 +2244,53 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     },
     organizeNodes: () => {
-      const prevSnapshot = snapshotFromState(get());
-      set((state) => {
-        if (state.nodes.length < 2) return {};
-        const { nodes, changed } = applyLayout(
-          state.nodes,
-          state.edges,
-          state.showDetails,
-          state.barriers,
-        );
-        if (!changed) return {};
-        const history = updateHistoryState(state, prevSnapshot, true);
-        return {
-          nodes,
-          history,
-          canUndo: true,
-          canRedo: false,
-          layoutVersion: state.layoutVersion + 1,
-          viewportRequest: {
-            id: (state.viewportRequest?.id ?? 0) + 1,
-            nodeIds: nodes.map((node) => node.id),
-          },
-        };
-      });
+      const requestedState = get();
+      if (requestedState.nodes.length < 2) return;
+      const request = ++latestArrangeRequest;
+      const dependencyKey = fullLayoutDependencyKey(requestedState);
+      void layoutWithElk(toLayoutGraph(requestedState)).then(
+        (result) => {
+          if (request !== latestArrangeRequest) return;
+          set((state) => {
+            if (fullLayoutDependencyKey(state) !== dependencyKey) return {};
+            const geometry = new Map(
+              result.nodes.map((node) => [node.id, node.rectangle]),
+            );
+            const nodes = state.nodes.map((node) => {
+              const rectangle = geometry.get(node.id);
+              if (!rectangle) return node;
+              const position = snapPosition({ x: rectangle.x, y: rectangle.y });
+              return position.x === node.position.x &&
+                position.y === node.position.y
+                ? node
+                : { ...node, position };
+            });
+            const changed = nodes.some(
+              (node, index) => node !== state.nodes[index],
+            );
+            if (!changed) return {};
+            // Snapshot at completion so permitted intervening selection/text
+            // changes are not accidentally folded into the Arrange undo step.
+            const history = updateHistoryState(
+              state,
+              snapshotFromState(state),
+              true,
+            );
+            return {
+              nodes,
+              history,
+              canUndo: true,
+              canRedo: false,
+              layoutVersion: state.layoutVersion + 1,
+              viewportRequest: {
+                id: (state.viewportRequest?.id ?? 0) + 1,
+                nodeIds: nodes.map((node) => node.id),
+              },
+            };
+          });
+        },
+        () => undefined,
+      );
     },
     updateNodeData: (id, patch) => {
       const prevSnapshot = snapshotFromState(get());
