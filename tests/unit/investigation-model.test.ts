@@ -42,6 +42,25 @@ describe("investigation model content", () => {
     }
   });
 
+  it("provides the eight post-Impact classification decisions and questions", () => {
+    const decisionIds = Object.values(investigationDecisionGuide).filter(
+      (id) => id !== "impact",
+    );
+    expect(decisionIds).toEqual([
+      "event",
+      "factor",
+      "aggravating-context",
+      "mitigating-context",
+      "context",
+      "control",
+      "evidence",
+      "action",
+    ]);
+    decisionIds.forEach((id) =>
+      expect(getInvestigationConcept(id).investigativeQuestion).toMatch(/\?$/),
+    );
+  });
+
   it("fails clearly for duplicate and unknown IDs", () => {
     expect(() =>
       createInvestigationConceptCollection([{ id: "same" }, { id: "same" }]),

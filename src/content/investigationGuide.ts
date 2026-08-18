@@ -259,9 +259,9 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
       body(concept("aggravating-context").definition),
       example("aggravating-context"),
       diagram(
-        ["Context", "Effect"],
-        ["increased →"],
-        "Aggravating Context increased the observed effect.",
+        ["Effect", "Aggravating Context"],
+        ["made worse by ↓"],
+        "Read top down: the Effect was made worse by Aggravating Context.",
       ),
     ],
     suggestedActions: [
@@ -284,9 +284,9 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
         text: `Use ${concept("control").name} for an intended safeguard; use ${concept("mitigating-context").name} for what actually reduced this incident's effect.`,
       },
       diagram(
-        ["Context", "Effect"],
-        ["reduced →"],
-        "Mitigating Context reduced the observed effect.",
+        ["Effect", "Mitigating Context"],
+        ["reduced by ↓"],
+        "Read top down: the Effect was reduced by Mitigating Context.",
       ),
     ],
     suggestedActions: [
@@ -353,8 +353,8 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
       body(concept("event").definition),
       diagram(
         ["Earlier Event", "Later Event"],
-        ["time →"],
-        "An earlier Event precedes a later Event; this does not by itself show causation.",
+        ["followed in time by ↓"],
+        "Read top down: an Earlier Event is followed in time by a Later Event; this does not by itself show causation.",
       ),
     ],
     suggestedActions: [

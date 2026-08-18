@@ -77,6 +77,7 @@ export const LearnMapDialog = ({
             <button
               key={item.id}
               type="button"
+              aria-label={item.title}
               aria-current={itemIndex === index ? "page" : undefined}
               onClick={() => setIndex(itemIndex)}
             >
