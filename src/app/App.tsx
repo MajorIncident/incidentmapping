@@ -10,7 +10,11 @@ import { applyHierarchyLayout } from "../features/layout/hierarchy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Legend } from "../components/Presentation/Legend";
 import { Chronology } from "../components/Presentation/Chronology";
-import { canAddBelowSelection } from "../state/selectors";
+import {
+  canAddBelowSelection,
+  selectEligibleControlRelationships,
+} from "../state/selectors";
+import { ControlBranchChooser } from "../components/Sidebar/ControlBranchChooser";
 import { CaseSummary } from "../components/Presentation/CaseSummary";
 import { LensPicker } from "../components/Presentation/LensPicker";
 import { type PresentationLens } from "../features/presentation/selectors";
@@ -32,6 +36,7 @@ import { InvestigationCheck } from "../components/InvestigationCheck/Investigati
 export const App = (): JSX.Element => {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorSection, setInspectorSection] = useState<string>();
+  const [choosingControl, setChoosingControl] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [investigationCheckOpen, setInvestigationCheckOpen] = useState(false);
   const [presentationShowDetails, setPresentationShowDetails] = useState(false);
@@ -76,6 +81,12 @@ export const App = (): JSX.Element => {
   const edges = useAppStore((state) => state.edges);
   const attachments = useAppStore((state) => state.attachments);
   const mapSession = useAppStore((state) => state.mapSession);
+  const contextEditing = useAppStore((state) => state.contextEditing);
+  const eligibleControlRelationships = useMemo(
+    () =>
+      selectEligibleControlRelationships(selectionId, nodes, edges, barriers),
+    [barriers, edges, nodes, selectionId],
+  );
   const contextItems = useAppStore(
     (state) => state.metadata?.contextItems ?? [],
   );
@@ -101,6 +112,8 @@ export const App = (): JSX.Element => {
         chronology: chronologyOpen,
         activeLens: presentationLens,
         mapSession,
+        contextEditing,
+        eligibleControlRelationshipCount: eligibleControlRelationships.length,
       }),
     [
       barriers,
@@ -109,6 +122,8 @@ export const App = (): JSX.Element => {
       evidence,
       nodes,
       mapSession,
+      contextEditing,
+      eligibleControlRelationships.length,
       presentationLens,
       presenting,
       selectionId,
@@ -156,7 +171,20 @@ export const App = (): JSX.Element => {
         state.actions.addSemanticNode("Factor", selectedId ?? undefined);
         return;
       case "add-control":
-        openEditor("Control", "Create");
+        if (eligibleControlRelationships.length === 1) {
+          const relationship = eligibleControlRelationships[0];
+          state.actions.addBarrier(
+            relationship.upstreamNodeId,
+            relationship.downstreamNodeId,
+          );
+          setInspectorSection("Controls");
+          setInspectorOpen(true);
+        } else if (eligibleControlRelationships.length > 1) {
+          setChoosingControl(true);
+        }
+        return;
+      case "add-context":
+        openEditor("Context", "Create");
         return;
       case "add-aggravating-context":
         openEditor("ContextAggravating", "Create");
@@ -392,6 +420,38 @@ export const App = (): JSX.Element => {
                     onAction={runGuideAction}
                     onDismissed={() => setGuideRevision((value) => value + 1)}
                   />
+                ) : null}
+                {choosingControl ? (
+                  <div
+                    className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Choose Control relationship"
+                  >
+                    <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl">
+                      <ControlBranchChooser
+                        relationships={eligibleControlRelationships}
+                        onChoose={(relationship) => {
+                          useAppStore
+                            .getState()
+                            .actions.addBarrier(
+                              relationship.upstreamNodeId,
+                              relationship.downstreamNodeId,
+                            );
+                          setChoosingControl(false);
+                          setInspectorSection("Controls");
+                          setInspectorOpen(true);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mt-3 text-sm text-slate-600"
+                        onClick={() => setChoosingControl(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
               </div>
               {inspectorOpen && !presenting ? (

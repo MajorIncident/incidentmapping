@@ -109,6 +109,11 @@ export const ContextEditor = ({
       className="min-w-0 space-y-3 [grid-column:1/-1]"
       aria-label={definition.heading}
       data-context-editor={uid}
+      onFocusCapture={() => actions.setContextEditing(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          actions.setContextEditing(false);
+      }}
     >
       <div>
         <h3 className="text-sm font-semibold text-slate-900">

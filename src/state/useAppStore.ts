@@ -149,6 +149,7 @@ type AppState = {
   measuredControlDimensions: Record<string, { width: number; height: number }>;
   viewportRequest: { id: number; nodeIds: string[] } | null;
   editorFocusRequest: EditorRequest | null;
+  contextEditing: boolean;
   history: HistoryState;
   canUndo: boolean;
   canRedo: boolean;
@@ -169,6 +170,7 @@ type AppState = {
       upstreamNodeId: string,
       downstreamNodeId: string,
     ) => string | null;
+    setContextEditing: (editing: boolean) => void;
     setMapTitle: (title: string) => void;
     updateMetadata: (patch: Partial<NonNullable<MapData["metadata"]>>) => void;
     setNodeType: (id: string, value: ChainNode["nodeType"]) => void;
@@ -629,6 +631,7 @@ export const createNewMapState = () => {
     layoutVersion: 0,
     measuredControlDimensions: {},
     viewportRequest: { id: nextNewMapViewportRequestId++, nodeIds: [rootId] },
+    contextEditing: false,
     editorFocusRequest: {
       id: nextEditorFocusRequestId++,
       entityId: rootId,
@@ -704,6 +707,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         layoutVersion: state.layoutVersion + 1,
         measuredControlDimensions: {},
         viewportRequest: null,
+        contextEditing: false,
         editorFocusRequest: null,
         history: createEmptyHistory(),
         canUndo: false,
@@ -1750,6 +1754,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return createdId;
     },
+    setContextEditing: (contextEditing) => set({ contextEditing }),
     renameNode: (id, title) => {
       const trimmed = title.trim();
       if (trimmed.length === 0) {

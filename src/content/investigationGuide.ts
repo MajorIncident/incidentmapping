@@ -33,6 +33,7 @@ export const GUIDE_ACTION_IDS = [
   "add-event",
   "add-factor",
   "add-control",
+  "add-context",
   "add-aggravating-context",
   "add-mitigating-context",
   "add-evidence",
@@ -181,8 +182,13 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
   makeEntry({
     id: "edit-event-context",
     contexts: ["context-editing"],
-    title: "Classify the context",
-    content: [question("context")],
+    title: "Does this belong in the causal chain?",
+    content: [
+      {
+        type: "question",
+        text: "Choose Factor when it contributed causally; otherwise classify how the Context changed the outcome.",
+      },
+    ],
     detail: [
       body(concept("context").definition),
       example("context"),
@@ -196,7 +202,12 @@ export const investigationGuide: readonly GuideEntry[] = Object.freeze([
         text: "Press Escape to finish editing.",
       },
     ],
-    suggestedActions: [],
+    suggestedActions: [
+      action("add-factor", "Factor"),
+      action("add-aggravating-context", "Aggravating Context"),
+      action("add-mitigating-context", "Mitigating Context"),
+      action("add-context", "Context"),
+    ],
     relatedConcepts: [
       "context",
       "factor",

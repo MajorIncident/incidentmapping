@@ -12,6 +12,7 @@ import { useAppStore } from "../../state/useAppStore";
 import { EvidenceSection } from "../Evidence/EvidenceSection";
 import { ContextEditor } from "../Context/ContextEditor";
 import { AssertionStateField } from "../AssertionState/AssertionState";
+import { selectControlRelationships } from "../../state/selectors";
 
 export const validateTitle = (value: string): string | null => {
   return value.trim().length === 0 ? "Title is required." : null;
@@ -132,6 +133,10 @@ export const Inspector = ({
   const chainNodes = useAppStore((state) => state.nodes);
   const barriers = useAppStore((state) => state.barriers);
   const edges = useAppStore((state) => state.edges);
+  const controlRelationships = useMemo(
+    () => selectControlRelationships(selectionId, chainNodes, edges, barriers),
+    [barriers, chainNodes, edges, selectionId],
+  );
   const barrier = useAppStore(
     (state) => state.barriers.find((item) => item.id === selectionId) ?? null,
   );
@@ -618,24 +623,6 @@ export const Inspector = ({
       );
     }
 
-    const downstreamBranches = edges
-      .filter(
-        (edge) => edge.source === node.id && edge.data?.kind !== "ActionEdge",
-      )
-      .map((edge, index, branchEdges) => ({
-        edge,
-        node:
-          chainNodes.find((candidate) => candidate.id === edge.target) ?? null,
-        barrier:
-          barriers.find(
-            (item) =>
-              item.upstreamNodeId === node.id &&
-              item.downstreamNodeId === edge.target,
-          ) ?? null,
-        index,
-        count: branchEdges.length,
-      }));
-
     return (
       <form className="flex flex-1 flex-col gap-5" onSubmit={handleSubmit}>
         {node.data.nodeType !== "Action" ? (
@@ -912,52 +899,50 @@ export const Inspector = ({
               <div className="flex items-center justify-between">
                 <span className={labelClasses}>Controls</span>
               </div>
-              {downstreamBranches.length === 0 ? (
+              {controlRelationships.length === 0 ? (
                 <p className="text-xs text-slate-500">
-                  Add a downstream node to place a Control.
+                  Add an unprotected downstream relationship to place a Control.
                 </p>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {downstreamBranches.length > 1 ? (
+                  {controlRelationships.length > 1 ? (
                     <p className="text-sm font-medium text-slate-700">
                       Add Control to branch
                     </p>
                   ) : null}
-                  {downstreamBranches.map((branch) => {
-                    const childTitle =
-                      branch.node?.data.title ?? branch.edge.target;
-                    const context =
-                      branch.count > 1
-                        ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
-                        : null;
-                    return (
-                      <div
-                        key={branch.edge.id}
-                        className="flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0 text-sm text-slate-700">
-                          <span>{childTitle}</span>
-                          {context ? (
-                            <span className="block text-xs text-slate-500">
-                              {context}
-                            </span>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          className={`${buttonClasses} px-2 py-1 text-xs`}
-                          disabled={Boolean(branch.barrier)}
-                          onClick={() =>
-                            addBarrier(node.id, branch.edge.target)
-                          }
-                        >
-                          {branch.barrier
-                            ? `Control exists: ${node.data.title} → ${childTitle}`
-                            : `Add Control: ${node.data.title} → ${childTitle}`}
-                        </button>
+                  {controlRelationships.map((relationship, index) => (
+                    <div
+                      key={relationship.edgeId}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 text-sm text-slate-700">
+                        <span>{relationship.downstreamTitle}</span>
+                        {controlRelationships.length > 1 ? (
+                          <span className="block text-xs text-slate-500">
+                            Branch {index + 1} of {controlRelationships.length}{" "}
+                            · {relationship.downstreamNodeId.slice(-6)}
+                          </span>
+                        ) : null}
                       </div>
-                    );
-                  })}
+                      <button
+                        type="button"
+                        className={`${buttonClasses} px-2 py-1 text-xs`}
+                        disabled={!relationship.eligible}
+                        onClick={() =>
+                          addBarrier(
+                            relationship.upstreamNodeId,
+                            relationship.downstreamNodeId,
+                          )
+                        }
+                      >
+                        {relationship.eligible
+                          ? "Add Control"
+                          : "Control exists"}
+                        : {relationship.upstreamTitle} →{" "}
+                        {relationship.downstreamTitle}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1320,12 +1305,12 @@ export const Inspector = ({
     addAction,
     barrier,
     barrierDescription,
-    barriers,
     chainNodes,
     commitEventTiming,
     description,
     endDraft,
     edges,
+    controlRelationships,
     handleBarrierDescriptionChange,
     handleBarrierDescriptionBlur,
     handleCenter,

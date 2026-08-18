@@ -26,6 +26,28 @@ const core: GuidanceInput = {
 };
 
 describe("investigation guidance", () => {
+  it("offers secondary Control and Action coaching only when applicable", () => {
+    const result = selectInvestigationGuidance({
+      selectedEntity: "event",
+      nodes: [node("event", "Event", { title: "Alarm" })],
+      eligibleControlRelationshipCount: 1,
+    });
+    expect(
+      result.primary?.entry.suggestedActions.map((action) => action.label),
+    ).toEqual(["+ Event", "+ Factor", "+ Action", "+ Control"]);
+  });
+
+  it("uses advisory rather than mandatory Action wording for a Root Cause", () => {
+    const result = selectInvestigationGuidance({
+      selectedEntity: "factor",
+      nodes: [node("factor", "Factor", { factorSignificance: "RootCause" })],
+    });
+    expect(result.primary?.entry.content).toContainEqual(
+      expect.objectContaining({
+        text: expect.stringMatching(/Action is optional/),
+      }),
+    );
+  });
   it("handles missing/default fields without mutating the input", () => {
     const input: GuidanceInput = {};
     const result = selectInvestigationGuidance(input);
