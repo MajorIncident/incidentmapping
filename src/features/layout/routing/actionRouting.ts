@@ -49,21 +49,32 @@ export const placeActionStacks = (
           (a.position?.y ?? source.rectangle.y) -
             (b.position?.y ?? source.rectangle.y) || a.id.localeCompare(b.id),
       );
-      let y = source.rectangle.y;
+      const stackHeight = stack.reduce(
+        (height, action, index) =>
+          height +
+          (action.dimensions?.height ?? 112) +
+          (index === 0 ? 0 : ACTION_GAP),
+        0,
+      );
+      let y =
+        source.rectangle.y + source.rectangle.height / 2 - stackHeight / 2;
       let x = Math.max(
         source.rectangle.x + source.rectangle.width + ACTION_GUTTER,
         causalBounds.x + causalBounds.width + ACTION_GUTTER,
       );
       const rectangles = stack.map((action) => {
         const dimensions = action.dimensions ?? { width: 240, height: 112 };
-        const rectangle = { x: snap(x), y: snap(y), ...dimensions };
+        const rectangle = { x, y, ...dimensions };
         y += dimensions.height + ACTION_GAP;
         return { action, rectangle };
       });
       while (
         rectangles.some(({ rectangle }) =>
           placed.some((other) =>
-            overlapsVertically(rectangle, other.rectangle),
+            overlapsVertically(
+              { ...rectangle, x: snap(rectangle.x), y: snap(rectangle.y) },
+              other.rectangle,
+            ),
           ),
         )
       ) {
@@ -71,12 +82,18 @@ export const placeActionStacks = (
           ...rectangles.map((item) => item.rectangle.width),
         );
         x += width + ACTION_GAP;
-        rectangles.forEach((item) =>
-          Object.assign(item.rectangle, { x: snap(x) }),
-        );
+        rectangles.forEach((item) => Object.assign(item.rectangle, { x }));
       }
       rectangles.forEach(({ action, rectangle }) =>
-        placed.push({ id: action.id, role: "Action", rectangle }),
+        placed.push({
+          id: action.id,
+          role: "Action",
+          rectangle: {
+            ...rectangle,
+            x: snap(rectangle.x),
+            y: snap(rectangle.y),
+          },
+        }),
       );
     });
   return placed;
