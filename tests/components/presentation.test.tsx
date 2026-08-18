@@ -212,6 +212,30 @@ describe("presentation mode", () => {
     expect(document.querySelectorAll("marker")).toHaveLength(0);
   });
 
+  it("enters presentation directly for an investigation at the review stage", async () => {
+    const reviewingMap: MapData = {
+      ...detailedMap,
+      nodes: detailedMap.nodes.map((node) =>
+        node.id === "root"
+          ? { ...node, nodeType: "Impact", eventDisplay: undefined }
+          : node.id === "child"
+            ? { ...node, nodeType: "Factor", eventDisplay: undefined }
+            : node,
+      ),
+    };
+    act(() => useAppStore.getState().actions.loadMap(reviewingMap));
+    render(<App />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Present map" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Investigation Check" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Exit Presentation/i }),
+    ).toBeVisible();
+  });
+
   it("discloses only classifications present on the map by keyboard", async () => {
     const classifiedMap: MapData = {
       ...actionMap,

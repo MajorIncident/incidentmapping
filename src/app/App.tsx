@@ -379,10 +379,6 @@ export const App = (): JSX.Element => {
                 showDetails={showDetails}
                 onPresent={() => {
                   useAppStore.getState().actions.finishEditing();
-                  if (guidance.stage === "Reviewing the Investigation") {
-                    setInvestigationCheckOpen(true);
-                    return;
-                  }
                   useAppStore.getState().actions.select(null);
                   setPresentationShowDetails(false);
                   setPresentationHintOpen(true);
