@@ -23,7 +23,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
 
   await page.getByRole("button", { name: "New" }).click();
   await page.getByRole("button", { name: "+ Add menu" }).click();
-  await page.locator('[role="menuitem"]:not([disabled])').first().click();
+  await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
 
   const rootTitle = page.getByText("New Event").first();
   await rootTitle.dblclick();
