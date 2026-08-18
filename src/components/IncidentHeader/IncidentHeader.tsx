@@ -37,10 +37,7 @@ export const IncidentHeader = ({
     metadata?.severity,
     metadata?.status === "InProgress" ? "In progress" : metadata?.status,
   ].filter(Boolean);
-  const pinnedContext = selectPinnedContext(metadata?.contextItems ?? []).slice(
-    0,
-    4,
-  );
+  const pinnedContext = selectPinnedContext(metadata?.contextItems ?? []);
 
   return (
     <section className="incident-header" aria-label="Incident header">
@@ -63,10 +60,12 @@ export const IncidentHeader = ({
         ))}
       </div>
       {pinnedContext.length ? (
-        <ContextPresentation
-          items={pinnedContext}
-          ariaLabel="Pinned incident context"
-        />
+        <div className="incident-header__context">
+          <ContextPresentation
+            items={pinnedContext}
+            ariaLabel="Pinned incident context"
+          />
+        </div>
       ) : null}
       {!readOnly ? (
         <button
