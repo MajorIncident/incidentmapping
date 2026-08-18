@@ -70,6 +70,37 @@ const buttonClasses =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent disabled:cursor-not-allowed disabled:opacity-60";
 
 type SectionProps = { children: React.ReactNode };
+type SecondarySectionProps = SectionProps & {
+  title: string;
+  open?: boolean;
+};
+
+/** A keyboard-accessible disclosure boundary for fields that are not essential
+ * to identifying the selected object. Native details/summary deliberately
+ * preserves expected mouse, Enter and Space behaviour without custom state. */
+export const SecondarySection = ({
+  children,
+  title,
+  open,
+}: SecondarySectionProps): JSX.Element => (
+  <details
+    className="group rounded-lg border border-slate-200 bg-slate-50 p-3"
+    open={open || undefined}
+  >
+    <summary
+      className="cursor-pointer text-sm font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas-accent"
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        const details = event.currentTarget.parentElement;
+        if (details instanceof HTMLDetailsElement) details.open = !details.open;
+      }}
+    >
+      {title}
+    </summary>
+    <div className="mt-4 flex flex-col gap-4">{children}</div>
+  </details>
+);
 export const CoreFields = ({ children }: SectionProps): JSX.Element => (
   <>{children}</>
 );
@@ -88,8 +119,10 @@ export const InspectorHeader = ({ children }: SectionProps): JSX.Element => (
 
 export const Inspector = ({
   onClose,
+  requestedSection,
 }: {
   onClose?: () => void;
+  requestedSection?: string;
 }): JSX.Element => {
   const selectionId = useAppStore((state) => state.selectionId);
   const node = useAppStore(
@@ -709,13 +742,6 @@ export const Inspector = ({
             ) : null}
           </div>
         ) : null}
-        {node.data.nodeType === "Factor" ? (
-          <AssertionStateField
-            id="factor-assertion-state"
-            value={node.data.assertionState}
-            onChange={(value) => setFactorAssertionState(node.id, value)}
-          />
-        ) : null}
         {node.data.nodeType === "Action" ? (
           <div className="flex flex-col gap-1">
             <label htmlFor="inspector-action-type" className={labelClasses}>
@@ -740,6 +766,32 @@ export const Inspector = ({
             </select>
           </div>
         ) : null}
+        {node.data.nodeType === "Impact" ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-severity" className={labelClasses}>
+              Severity
+            </label>
+            <select
+              id="inspector-severity"
+              className={inputClasses}
+              value={node.data.severity ?? ""}
+              onChange={(event) =>
+                updateNodeData(node.id, {
+                  severity: (event.target.value ||
+                    undefined) as typeof node.data.severity,
+                })
+              }
+            >
+              <option value="">Not set</option>
+              {(["Low", "Medium", "High", "Critical"] as const).map(
+                (severity) => (
+                  <option key={severity}>{severity}</option>
+                ),
+              )}
+            </select>
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-1">
           <label htmlFor="inspector-title" className={labelClasses}>
             Title
@@ -818,100 +870,143 @@ export const Inspector = ({
           </>
         ) : null}
 
-        {node.data.nodeType === "Impact" ? (
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspector-severity" className={labelClasses}>
-              Severity
-            </label>
-            <select
-              id="inspector-severity"
-              className={inputClasses}
-              value={node.data.severity ?? ""}
-              onChange={(event) =>
-                updateNodeData(node.id, {
-                  severity: (event.target.value ||
-                    undefined) as typeof node.data.severity,
-                })
-              }
-            >
-              <option value="">Not set</option>
-              {(["Low", "Medium", "High", "Critical"] as const).map(
-                (severity) => (
-                  <option key={severity}>{severity}</option>
-                ),
-              )}
-            </select>
-          </div>
-        ) : null}
-
-        {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <span className={labelClasses}>Controls</span>
-            </div>
-            {downstreamBranches.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Add a downstream node to place a Control.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {downstreamBranches.length > 1 ? (
-                  <p className="text-sm font-medium text-slate-700">
-                    Add Control to branch
-                  </p>
-                ) : null}
-                {downstreamBranches.map((branch) => {
-                  const childTitle =
-                    branch.node?.data.title ?? branch.edge.target;
-                  const context =
-                    branch.count > 1
-                      ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
-                      : null;
-                  return (
-                    <div
-                      key={branch.edge.id}
-                      className="flex items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0 text-sm text-slate-700">
-                        <span>{childTitle}</span>
-                        {context ? (
-                          <span className="block text-xs text-slate-500">
-                            {context}
-                          </span>
-                        ) : null}
-                      </div>
-                      <button
-                        type="button"
-                        className={`${buttonClasses} px-2 py-1 text-xs`}
-                        disabled={Boolean(branch.barrier)}
-                        onClick={() => addBarrier(node.id, branch.edge.target)}
-                      >
-                        {branch.barrier
-                          ? `Control exists: ${node.data.title} → ${childTitle}`
-                          : `Add Control: ${node.data.title} → ${childTitle}`}
-                      </button>
-                    </div>
-                  );
-                })}
+        <SecondarySection
+          title="Controls"
+          open={requestedSection === "Controls"}
+        >
+          {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className={labelClasses}>Controls</span>
               </div>
-            )}
+              {downstreamBranches.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Add a downstream node to place a Control.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {downstreamBranches.length > 1 ? (
+                    <p className="text-sm font-medium text-slate-700">
+                      Add Control to branch
+                    </p>
+                  ) : null}
+                  {downstreamBranches.map((branch) => {
+                    const childTitle =
+                      branch.node?.data.title ?? branch.edge.target;
+                    const context =
+                      branch.count > 1
+                        ? `Branch ${branch.index + 1} of ${branch.count} · ${branch.edge.target.slice(-6)}`
+                        : null;
+                    return (
+                      <div
+                        key={branch.edge.id}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0 text-sm text-slate-700">
+                          <span>{childTitle}</span>
+                          {context ? (
+                            <span className="block text-xs text-slate-500">
+                              {context}
+                            </span>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          className={`${buttonClasses} px-2 py-1 text-xs`}
+                          disabled={Boolean(branch.barrier)}
+                          onClick={() =>
+                            addBarrier(node.id, branch.edge.target)
+                          }
+                        >
+                          {branch.barrier
+                            ? `Control exists: ${node.data.title} → ${childTitle}`
+                            : `Add Control: ${node.data.title} → ${childTitle}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </SecondarySection>
+
+        <SecondarySection
+          title="Evidence"
+          open={requestedSection === "Evidence"}
+        >
+          <EvidenceSection target={{ kind: "node", id: node.id }} />
+        </SecondarySection>
+
+        <SecondarySection
+          title="More details"
+          open={requestedSection === "More details"}
+        >
+          {node.data.nodeType === "Factor" ? (
+            <AssertionStateField
+              id="factor-assertion-state"
+              value={node.data.assertionState}
+              onChange={(value) => setFactorAssertionState(node.id, value)}
+            />
+          ) : null}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="inspector-owner" className={labelClasses}>
+              Owner
+            </label>
+            <input
+              id="inspector-owner"
+              className={inputClasses}
+              value={ownerValue}
+              onChange={handleOwnerChange}
+              placeholder="Unassigned"
+            />
           </div>
-        ) : null}
 
-        <EvidenceSection target={{ kind: "node", id: node.id }} />
+          {node.data.nodeType === "Event" ? (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="inspector-event-display" className={labelClasses}>
+                Event display
+              </label>
+              <select
+                id="inspector-event-display"
+                className={inputClasses}
+                value={node.data.eventDisplay ?? "Map"}
+                onChange={(event) =>
+                  setEventDisplay(
+                    node.id,
+                    event.target.value as "Map" | "ChronologyOnly",
+                  )
+                }
+              >
+                <option value="Map">Show on map</option>
+                <option value="ChronologyOnly">Chronology only</option>
+              </select>
+              <p className="text-xs text-slate-500">
+                Chronology-only Events remain in Chronology but are hidden from
+                the causal map unless Show Timeline Events is enabled.
+              </p>
+            </div>
+          ) : null}
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="inspector-owner" className={labelClasses}>
-            Owner
-          </label>
-          <input
-            id="inspector-owner"
-            className={inputClasses}
-            value={ownerValue}
-            onChange={handleOwnerChange}
-            placeholder="Unassigned"
-          />
-        </div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className={buttonClasses}
+              onClick={handleFocusTitle}
+              aria-label="Focus the selected node title"
+            >
+              Focus Title
+            </button>
+            <button
+              type="button"
+              className={buttonClasses}
+              onClick={handleCenter}
+              aria-label="Center the canvas on the selected node"
+            >
+              Center on Node
+            </button>
+          </div>
+        </SecondarySection>
 
         {node.data.nodeType === "Action" ? (
           <fieldset className="flex min-w-0 flex-col gap-2">
@@ -983,97 +1078,137 @@ export const Inspector = ({
           </fieldset>
         ) : null}
 
-        {node.data.nodeType === "Event" ? (
-          <fieldset
-            className="flex flex-col gap-2"
-            aria-describedby={timingError ? "event-timing-error" : undefined}
-          >
-            <legend className={labelClasses}>Event timing</legend>
-            <label htmlFor="inspector-timestamp" className={labelClasses}>
-              Started
-            </label>
-            <input
-              id="inspector-timestamp"
-              type="datetime-local"
-              step="1"
-              className={inputClasses}
-              value={timestampValue}
-              onChange={handleTimestampChange}
-              aria-invalid={Boolean(timingError)}
+        <SecondarySection title="Timing">
+          {node.data.nodeType === "Event" ? (
+            <fieldset
+              className="flex flex-col gap-2"
               aria-describedby={timingError ? "event-timing-error" : undefined}
-            />
-            {showEndTime || endDraft ? (
-              <>
-                <label
-                  htmlFor="inspector-end-timestamp"
-                  className={labelClasses}
-                >
-                  Ended
-                </label>
-                <input
-                  id="inspector-end-timestamp"
-                  type="datetime-local"
-                  step="1"
-                  className={inputClasses}
-                  value={endDraft}
-                  onChange={(event) =>
-                    commitEventTiming("end", event.target.value)
-                  }
-                  aria-invalid={Boolean(timingError)}
-                  aria-describedby={
-                    timingError ? "event-timing-error" : undefined
-                  }
-                />
+            >
+              <legend className={labelClasses}>Event timing</legend>
+              <label htmlFor="inspector-timestamp" className={labelClasses}>
+                Started
+              </label>
+              <input
+                id="inspector-timestamp"
+                type="datetime-local"
+                step="1"
+                className={inputClasses}
+                value={timestampValue}
+                onChange={handleTimestampChange}
+                aria-invalid={Boolean(timingError)}
+                aria-describedby={
+                  timingError ? "event-timing-error" : undefined
+                }
+              />
+              {showEndTime || endDraft ? (
+                <>
+                  <label
+                    htmlFor="inspector-end-timestamp"
+                    className={labelClasses}
+                  >
+                    Ended
+                  </label>
+                  <input
+                    id="inspector-end-timestamp"
+                    type="datetime-local"
+                    step="1"
+                    className={inputClasses}
+                    value={endDraft}
+                    onChange={(event) =>
+                      commitEventTiming("end", event.target.value)
+                    }
+                    aria-invalid={Boolean(timingError)}
+                    aria-describedby={
+                      timingError ? "event-timing-error" : undefined
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={buttonClasses}
+                    onClick={() => {
+                      setEndDraft("");
+                      setShowEndTime(false);
+                      setTimingError(null);
+                      setEventEndTimestamp(node.id, undefined);
+                    }}
+                  >
+                    Remove end time
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   className={buttonClasses}
-                  onClick={() => {
-                    setEndDraft("");
-                    setShowEndTime(false);
-                    setTimingError(null);
-                    setEventEndTimestamp(node.id, undefined);
-                  }}
+                  onClick={() => setShowEndTime(true)}
                 >
-                  Remove end time
+                  Add end time
                 </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className={buttonClasses}
-                onClick={() => setShowEndTime(true)}
-              >
-                Add end time
-              </button>
-            )}
-            {timingError ? (
-              <p
-                id="event-timing-error"
-                role="alert"
-                className="text-xs text-red-700"
-              >
-                {timingError}
-              </p>
-            ) : null}
-          </fieldset>
-        ) : node.data.nodeType !== "Action" ? (
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspector-timestamp" className={labelClasses}>
-              Occurred at
-            </label>
-            <input
-              id="inspector-timestamp"
-              type="datetime-local"
-              step="1"
-              className={inputClasses}
-              value={timestampValue}
-              onChange={handleTimestampChange}
-            />
-          </div>
-        ) : null}
+              )}
+              {timingError ? (
+                <p
+                  id="event-timing-error"
+                  role="alert"
+                  className="text-xs text-red-700"
+                >
+                  {timingError}
+                </p>
+              ) : null}
+            </fieldset>
+          ) : node.data.nodeType !== "Action" ? (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="inspector-timestamp" className={labelClasses}>
+                Occurred at
+              </label>
+              <input
+                id="inspector-timestamp"
+                type="datetime-local"
+                step="1"
+                className={inputClasses}
+                value={timestampValue}
+                onChange={handleTimestampChange}
+              />
+            </div>
+          ) : null}
+        </SecondarySection>
 
-        {node.data.nodeType === "Impact" || node.data.nodeType === "Event" ? (
+        {node.data.nodeType === "Impact" ? (
           <>
+            <SecondarySection
+              title="Aggravating Context"
+              open={requestedSection === "Aggravating Context"}
+            >
+              <ContextEditor
+                target={node.id}
+                items={node.data.contextItems ?? []}
+                effect="Aggravating"
+                lockedEffect="Aggravating"
+              />
+            </SecondarySection>
+            <SecondarySection
+              title="Mitigating Context"
+              open={requestedSection === "Mitigating Context"}
+            >
+              <ContextEditor
+                target={node.id}
+                items={node.data.contextItems ?? []}
+                effect="Mitigating"
+                lockedEffect="Mitigating"
+              />
+            </SecondarySection>
+            <SecondarySection title="Context">
+              <ContextEditor
+                target={node.id}
+                items={node.data.contextItems ?? []}
+                effect="Neutral"
+                lockedEffect="Neutral"
+              />
+            </SecondarySection>
+          </>
+        ) : node.data.nodeType === "Event" ? (
+          <SecondarySection
+            title="Context"
+            open={requestedSection?.includes("Context")}
+          >
             <ContextEditor
               target={node.id}
               items={node.data.contextItems ?? []}
@@ -1092,56 +1227,25 @@ export const Inspector = ({
               effect="Neutral"
               lockedEffect="Neutral"
             />
-          </>
-        ) : node.data.nodeType === "Factor" ? (
-          <ContextEditor
-            target={node.id}
-            items={node.data.contextItems ?? []}
-            effect="Neutral"
-            lockedEffect="Neutral"
-          />
+          </SecondarySection>
         ) : null}
 
-        {node.data.nodeType === "Event" ? (
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspector-event-display" className={labelClasses}>
-              Event display
-            </label>
-            <select
-              id="inspector-event-display"
-              className={inputClasses}
-              value={node.data.eventDisplay ?? "Map"}
-              onChange={(event) =>
-                setEventDisplay(
-                  node.id,
-                  event.target.value as "Map" | "ChronologyOnly",
-                )
-              }
-            >
-              <option value="Map">Show on map</option>
-              <option value="ChronologyOnly">Chronology only</option>
-            </select>
-            <p className="text-xs text-slate-500">
-              Chronology-only Events remain in Chronology but are hidden from
-              the causal map unless Show Timeline Events is enabled.
-            </p>
-          </div>
-        ) : null}
-
-        {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
-          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
-            <button
-              type="button"
-              className={`${buttonClasses} w-full border-sky-400 bg-sky-600 text-white hover:bg-sky-700`}
-              onClick={() => addAction(node.id)}
-            >
-              + Action
-            </button>
-            <p className="mt-2 text-xs text-sky-900">
-              Add a corrective action that addresses this node.
-            </p>
-          </div>
-        ) : null}
+        <SecondarySection title="Actions" open={requestedSection === "Actions"}>
+          {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+              <button
+                type="button"
+                className={`${buttonClasses} w-full border-sky-400 bg-sky-600 text-white hover:bg-sky-700`}
+                onClick={() => addAction(node.id)}
+              >
+                + Action
+              </button>
+              <p className="mt-2 text-xs text-sky-900">
+                Add a corrective action that addresses this node.
+              </p>
+            </div>
+          ) : null}
+        </SecondarySection>
 
         {node.data.nodeType === "Action"
           ? (() => {
@@ -1173,25 +1277,6 @@ export const Inspector = ({
               );
             })()
           : null}
-
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            className={buttonClasses}
-            onClick={handleFocusTitle}
-            aria-label="Focus the selected node title"
-          >
-            Focus Title
-          </button>
-          <button
-            type="button"
-            className={buttonClasses}
-            onClick={handleCenter}
-            aria-label="Center the canvas on the selected node"
-          >
-            Center on Node
-          </button>
-        </div>
       </form>
     );
   }, [
@@ -1217,6 +1302,7 @@ export const Inspector = ({
     node,
     ownerValue,
     removeBarrier,
+    requestedSection,
     setFactorCategory,
     setFactorAssertionState,
     setFactorSignificance,
