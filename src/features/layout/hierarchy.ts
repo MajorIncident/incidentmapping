@@ -21,8 +21,6 @@ export const GRID_SIZE = 8;
 
 export const HORIZONTAL_GAP = SIBLING_GAP;
 export const VERTICAL_GAP = CAUSAL_ROW_GAP;
-export const CONTROL_VERTICAL_MARGIN = 32;
-export const CONTROL_HORIZONTAL_MARGIN = 32;
 /** Space kept around cards and the lanes used to route their edges. */
 export { OBJECT_CLEARANCE };
 /** Separates unconnected chronology from the causal forest. */
@@ -259,7 +257,7 @@ export const layoutHierarchy = <Data>(
             );
           }),
         ) +
-          CONTROL_HORIZONTAL_MARGIN) -
+          OBJECT_CLEARANCE) -
         (leftWidth + rightWidth) / 2,
     );
   };
@@ -301,36 +299,11 @@ export const layoutHierarchy = <Data>(
       getNodeSize(node, showDetails).height,
     );
   });
-  const barrierLevelHeights = new Map<number, number>();
-  barrierEdges.forEach((barrier) => {
-    const upstreamDepth = depth.get(barrier.upstreamNodeId);
-    if (
-      upstreamDepth !== undefined &&
-      depth.get(barrier.downstreamNodeId) === upstreamDepth + 1
-    ) {
-      barrierLevelHeights.set(
-        upstreamDepth,
-        Math.max(
-          barrierLevelHeights.get(upstreamDepth) ?? 0,
-          (barrier.id && controlDimensions[barrier.id]?.height) ||
-            CONTROL_NODE_HEIGHT,
-        ),
-      );
-    }
-  });
   const layoutTop = Math.min(...nonActionNodes.map((node) => node.position.y));
   const levelY = [layoutTop];
   for (let level = 0; level < maxDepth; level += 1) {
     levelY[level + 1] =
-      levelY[level] +
-      levelHeights[level] +
-      VERTICAL_GAP +
-      Math.max(
-        CONTROL_BAND_HEIGHT,
-        barrierLevelHeights.has(level)
-          ? barrierLevelHeights.get(level)! + CONTROL_VERTICAL_MARGIN
-          : 0,
-      );
+      levelY[level] + levelHeights[level] + VERTICAL_GAP + CONTROL_BAND_HEIGHT;
   }
 
   const positions = new Map<string, XYPosition>();
@@ -490,7 +463,6 @@ export const layoutHierarchy = <Data>(
       const downstreamPosition = positions.get(barrier.downstreamNodeId);
       if (!upstream || !downstream || !upstreamPosition || !downstreamPosition)
         return;
-      const upstreamSize = getNodeSize(upstream, showDetails);
       const downstreamSize = getNodeSize(downstream, showDetails);
       const size = (barrier.id && controlDimensions[barrier.id]) || {
         width: CONTROL_NODE_WIDTH,
@@ -502,11 +474,8 @@ export const layoutHierarchy = <Data>(
         associated: new Set([barrier.upstreamNodeId, barrier.downstreamNodeId]),
         x: downstreamPosition.x + downstreamSize.width / 2 - size.width / 2,
         y:
-          (upstreamPosition.y +
-            upstreamSize.height / 2 +
-            downstreamPosition.y +
-            downstreamSize.height / 2) /
-            2 -
+          downstreamPosition.y -
+          (VERTICAL_GAP + CONTROL_BAND_HEIGHT) / 2 -
           size.height / 2,
         ...size,
       });

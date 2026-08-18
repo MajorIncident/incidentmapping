@@ -276,7 +276,9 @@ export const layoutWithElk = async (
     if (!geometry || !target) return;
     const targetRank = rank.get(control.downstreamNodeId) ?? 0;
     const bandTop =
-      (rankOrigins.get(targetRank) ?? target.rectangle.y) - CONTROL_BAND_HEIGHT;
+      (rankOrigins.get(targetRank) ?? target.rectangle.y) -
+      CONTROL_BAND_HEIGHT -
+      CAUSAL_ROW_GAP / 2;
     (geometry.rectangle as { x: number; y: number }).x =
       target.rectangle.x +
       target.rectangle.width / 2 -

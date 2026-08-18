@@ -7,6 +7,10 @@ import {
   CONTROL_NODE_HEIGHT,
   CONTROL_NODE_WIDTH,
 } from "../../src/features/layout/dimensions";
+import {
+  CAUSAL_ROW_GAP,
+  CONTROL_BAND_HEIGHT,
+} from "../../src/features/layout/geometry/spacing";
 
 const node = (id: string, x = 0, y = 0): Node => ({
   id,
@@ -43,24 +47,18 @@ const intersects = (left: Rectangle, right: Rectangle) =>
   left.y < right.y + right.height &&
   left.y + left.height > right.y;
 const controlRectangle = (
-  upstream: Node,
+  _upstream: Node,
   downstream: Node,
   width = CONTROL_NODE_WIDTH,
   height = CONTROL_NODE_HEIGHT,
 ): Rectangle => ({
   x:
-    (upstream.position.x +
-      (upstream.width ?? CHAIN_NODE_WIDTH) / 2 +
-      downstream.position.x +
-      (downstream.width ?? CHAIN_NODE_WIDTH) / 2) /
-      2 -
+    downstream.position.x +
+    (downstream.width ?? CHAIN_NODE_WIDTH) / 2 -
     width / 2,
   y:
-    (upstream.position.y +
-      (upstream.height ?? CHAIN_NODE_HEIGHT) / 2 +
-      downstream.position.y +
-      (downstream.height ?? CHAIN_NODE_HEIGHT) / 2) /
-      2 -
+    downstream.position.y -
+    (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
     height / 2,
   width,
   height,

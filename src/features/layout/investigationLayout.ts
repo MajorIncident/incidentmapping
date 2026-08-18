@@ -32,14 +32,16 @@ type PositionedSize = Readonly<{
 
 /** Layout-owned placement of an ephemeral Control projection. */
 export const calculateControlPosition = (
-  source: PositionedSize,
+  _source: PositionedSize,
   target: PositionedSize,
   control: MeasuredDimensions,
 ): Point => ({
   // The downstream port is the stable relationship lane through a merge.
   x: target.position.x + target.width / 2 - control.width / 2,
+  // Rank origins, rather than individual source heights, define the band.
   y:
-    (source.position.y + source.height + target.position.y) / 2 -
+    target.position.y -
+    (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
     control.height / 2,
 });
 

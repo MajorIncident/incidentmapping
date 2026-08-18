@@ -37,7 +37,7 @@ describe("Control edge geometry", () => {
 
     expect(center).toEqual({
       x: targetTop.x,
-      y: (sourceBottom.y + targetTop.y) / 2,
+      y: targetTop.y - (64 + 184) / 2,
     });
     expect(center.x).not.toBe(sourceBottom.x);
     expect(center.y).toBeGreaterThan(sourceBottom.y);
