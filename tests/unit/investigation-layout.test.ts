@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { layoutInvestigation } from "../../src/features/layout/investigationLayout";
 import type { InvestigationLayoutInput } from "../../src/features/layout/layoutModel";
-import { ACTION_GAP } from "../../src/features/layout/geometry/spacing";
+import {
+  ACTION_GAP,
+  CAUSAL_ROW_GAP,
+  CONTROL_BAND_HEIGHT,
+  OBJECT_CLEARANCE,
+} from "../../src/features/layout/geometry/spacing";
 import { loadLayoutFixture } from "../helpers/layout/fixtures";
 
 const base: InvestigationLayoutInput = {
@@ -15,6 +20,88 @@ const base: InvestigationLayoutInput = {
 };
 
 describe("post-causal projections", () => {
+  const chain = (controlHeight?: number): InvestigationLayoutInput => ({
+    nodes: [
+      { id: "one", kind: "Event" },
+      { id: "two", kind: "Factor" },
+      { id: "three", kind: "Impact" },
+    ],
+    relationships: [
+      { id: "one-two", kind: "Causal", fromId: "one", toId: "two" },
+      { id: "two-three", kind: "Causal", fromId: "two", toId: "three" },
+    ],
+    ...(controlHeight === undefined
+      ? {}
+      : {
+          controls: [
+            {
+              id: "control",
+              kind: "Control" as const,
+              relationshipId: "two-three",
+              upstreamNodeId: "two",
+              downstreamNodeId: "three",
+              dimensions: { width: 220, height: controlHeight },
+            },
+          ],
+        }),
+  });
+
+  it("uses the compact causal gap for every edge in a direct chain", () => {
+    const result = layoutInvestigation(chain(), { mode: "ArrangeMap" });
+    const nodes = ["one", "two", "three"].map(
+      (id) => result.nodes.find((node) => node.id === id)!.rectangle,
+    );
+    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(CAUSAL_ROW_GAP);
+    expect(nodes[2].y - nodes[1].y - nodes[1].height).toBe(CAUSAL_ROW_GAP);
+  });
+
+  it("expands only the interval whose incoming edge has a Control", () => {
+    const result = layoutInvestigation(chain(120), { mode: "ArrangeMap" });
+    const nodes = ["one", "two", "three"].map(
+      (id) => result.nodes.find((node) => node.id === id)!.rectangle,
+    );
+    expect(nodes[1].y - nodes[0].y - nodes[0].height).toBe(CAUSAL_ROW_GAP);
+    expect(nodes[2].y - nodes[1].y - nodes[1].height).toBe(
+      CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT,
+    );
+  });
+
+  it("sizes each Control interval from its measured height", () => {
+    const short = layoutInvestigation(chain(80), { mode: "ArrangeMap" });
+    const tall = layoutInvestigation(chain(260), { mode: "ArrangeMap" });
+    const interval = (result: typeof tall) => {
+      const upstream = result.nodes.find(
+        (node) => node.id === "two",
+      )!.rectangle;
+      const downstream = result.nodes.find(
+        (node) => node.id === "three",
+      )!.rectangle;
+      return downstream.y - upstream.y - upstream.height;
+    };
+    expect(interval(short)).toBe(CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT);
+    expect(interval(tall)).toBeGreaterThanOrEqual(
+      CAUSAL_ROW_GAP + 260 + OBJECT_CLEARANCE,
+    );
+    const control = tall.nodes.find((node) => node.id === "control")!.rectangle;
+    const upstream = tall.nodes.find((node) => node.id === "two")!.rectangle;
+    const downstream = tall.nodes.find(
+      (node) => node.id === "three",
+    )!.rectangle;
+    expect(control.y - (upstream.y + upstream.height)).toBe(
+      downstream.y - (control.y + control.height),
+    );
+  });
+
+  it("keeps repeated Arrange calls idempotent with a measured Control", () => {
+    const input = chain(260);
+    const first = layoutInvestigation(input, { mode: "ArrangeMap" });
+    const second = layoutInvestigation(input, {
+      mode: "ArrangeMap",
+      priorGeometry: first.nodes,
+    });
+    expect(second.nodes).toEqual(first.nodes);
+  });
+
   it("routes controlled siblings on the semantic branch rail and vertically through each Control", () => {
     const fixture = loadLayoutFixture("controlled-siblings-with-descendants");
     const relationships = fixture.edges.map((edge) => ({

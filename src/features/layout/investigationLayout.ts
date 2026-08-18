@@ -8,8 +8,8 @@ import {
   ACTION_GAP,
   CAUSAL_ROW_GAP,
   CHRONOLOGY_GUTTER,
-  CONTROL_BAND_HEIGHT,
   SIBLING_GAP,
+  requiredControlBandForNextRank,
 } from "./geometry/spacing";
 import type {
   InvestigationLayoutInput,
@@ -38,17 +38,19 @@ type PositionedSize = Readonly<{
 
 /** Layout-owned placement of an ephemeral Control projection. */
 export const calculateControlPosition = (
-  _source: PositionedSize,
+  source: PositionedSize,
   target: PositionedSize,
   control: MeasuredDimensions,
 ): Point => ({
   // The downstream port is the stable relationship lane through a merge.
   x: target.position.x + target.width / 2 - control.width / 2,
-  // Rank origins, rather than individual source heights, define the band.
+  // Use the concrete interval produced by rank placement, including measured
+  // source height and any rank-aware Control band.
   y:
-    target.position.y -
-    (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2 -
-    control.height / 2,
+    source.position.y +
+    source.height +
+    (target.position.y - source.position.y - source.height - control.height) /
+      2,
 });
 
 /** Renderer-neutral edge splitting retained for thin UI adapters. */
@@ -164,12 +166,30 @@ export const layoutInvestigation = (
     );
   });
   const rankOrigins = new Map<number, number>();
+  const controlHeightsByRank = new Map<number, number[]>();
+  const controlByRelationship = new Map(
+    (input.controls ?? []).map((control) => [control.relationshipId, control]),
+  );
+  causal.forEach((edge) => {
+    const control = controlByRelationship.get(edge.id);
+    if (!control) return;
+    const targetRank = rank.get(edge.toId) ?? 0;
+    controlHeightsByRank.set(targetRank, [
+      ...(controlHeightsByRank.get(targetRank) ?? []),
+      control.dimensions?.height ?? CONTROL_NODE_HEIGHT,
+    ]);
+  });
   let origin = 0;
   [...rankHeights.keys()]
     .sort((a, b) => a - b)
     .forEach((level) => {
       rankOrigins.set(level, origin);
-      origin += rankHeights.get(level)! + vGap + CONTROL_BAND_HEIGHT;
+      origin +=
+        rankHeights.get(level)! +
+        vGap +
+        requiredControlBandForNextRank(
+          controlHeightsByRank.get(level + 1) ?? [],
+        );
     });
   const rankOrder = new Map<number, number>();
   const prior = new Map(
@@ -267,7 +287,9 @@ export const layoutInvestigation = (
           parent.rectangle.y +
             parent.rectangle.height +
             vGap +
-            CONTROL_BAND_HEIGHT,
+            requiredControlBandForNextRank(
+              controlHeightsByRank.get(rank.get(addedId) ?? 0) ?? [],
+            ),
         );
     }
   }

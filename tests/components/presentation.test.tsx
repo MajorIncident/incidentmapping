@@ -12,10 +12,6 @@ import { App } from "../../src/app/App";
 import { sampleMap } from "../../src/features/maps/fixtures";
 import type { MapData } from "../../src/features/maps/schema";
 import { useAppStore } from "../../src/state/useAppStore";
-import {
-  CAUSAL_ROW_GAP,
-  CONTROL_BAND_HEIGHT,
-} from "../../src/features/layout/geometry/spacing";
 
 const actionMap: MapData = {
   ...sampleMap,
@@ -322,16 +318,17 @@ describe("presentation mode", () => {
       expect(match).not.toBeNull();
       return { x: Number(match![1]), y: Number(match![2]) };
     });
-    const [, downstream, control] = coordinates;
+    const [upstream, downstream, control] = coordinates;
 
     const state = useAppStore.getState();
+    const upstreamSize = state.nodes.find((node) => node.id === "root")!;
     const downstreamSize = state.nodes.find((node) => node.id === "child")!;
     const controlSize = state.measuredControlDimensions["barrier-root-child"];
     expect(control.x + controlSize.width / 2).toBe(
       downstream.x + downstreamSize.width! / 2,
     );
     expect(control.y + controlSize.height / 2).toBe(
-      downstream.y - (CAUSAL_ROW_GAP + CONTROL_BAND_HEIGHT) / 2,
+      (upstream.y + upstreamSize.height! + downstream.y) / 2,
     );
   });
 

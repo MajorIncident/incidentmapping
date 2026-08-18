@@ -395,14 +395,14 @@ describe("layoutHierarchy", () => {
     );
     expect(bounds).toEqual({
       event: { x: 1016, y: 0, width: 240, height: 144 },
-      "factor-1": { x: 0, y: 392, width: 240, height: 144 },
-      "action-1": { x: 304, y: 392, width: 240, height: 144 },
-      "factor-2": { x: 576, y: 392, width: 240, height: 144 },
-      "action-2": { x: 880, y: 392, width: 240, height: 144 },
-      "factor-3": { x: 1152, y: 392, width: 240, height: 144 },
-      "action-3": { x: 1456, y: 392, width: 240, height: 144 },
-      "factor-4": { x: 1728, y: 392, width: 240, height: 144 },
-      "action-4": { x: 2032, y: 392, width: 240, height: 144 },
+      "factor-1": { x: 0, y: 208, width: 240, height: 144 },
+      "action-1": { x: 304, y: 208, width: 240, height: 144 },
+      "factor-2": { x: 576, y: 208, width: 240, height: 144 },
+      "action-2": { x: 880, y: 208, width: 240, height: 144 },
+      "factor-3": { x: 1152, y: 208, width: 240, height: 144 },
+      "action-3": { x: 1456, y: 208, width: 240, height: 144 },
+      "factor-4": { x: 1728, y: 208, width: 240, height: 144 },
+      "action-4": { x: 2032, y: 208, width: 240, height: 144 },
     });
 
     const actions = result.filter(
