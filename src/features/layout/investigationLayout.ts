@@ -384,11 +384,18 @@ export const layoutInvestigation = (
         ],
         geometries,
       );
-      return split.relationships.map((segment) => ({
-        ...segment,
-        relationshipId: relationship.relationshipId,
-        role: relationship.role,
-      }));
+      // Keep the canonical semantic relationship in the public result. Layout
+      // consumers use its stable id and semantic endpoints (for example when
+      // relating a Control back to its owner). The additional routes are
+      // ephemeral renderer projections for the two visible sides of a Control.
+      return [
+        relationship,
+        ...split.relationships.map((segment) => ({
+          ...segment,
+          relationshipId: relationship.relationshipId,
+          role: relationship.role,
+        })),
+      ];
     },
   );
   const routed: RoutedRelationship[] = [
