@@ -26,6 +26,10 @@ import {
 } from "../../features/layout/dimensions";
 import type { EvidenceItem } from "../../features/maps/schema";
 import {
+  calculateControlPosition,
+  splitEdgeAtControl,
+} from "../../features/layout/investigationLayout";
+import {
   selectLensPresentation,
   type PresentationLens,
 } from "../../features/presentation/selectors";
@@ -38,55 +42,8 @@ export type GraphRole = {
   unrelated: Set<string>;
 };
 
-type PositionedSize = {
-  position: { x: number; y: number };
-  width: number;
-  height: number;
-};
-
-/** Centers a Control between the source bottom and target top handles. */
-export const calculateControlPosition = (
-  source: PositionedSize,
-  target: PositionedSize,
-  control: { width: number; height: number },
-): { x: number; y: number } => {
-  const sourceBottom = {
-    x: source.position.x + source.width / 2,
-    y: source.position.y + source.height,
-  };
-  const targetTop = {
-    x: target.position.x + target.width / 2,
-    y: target.position.y,
-  };
-
-  return {
-    x: (sourceBottom.x + targetTop.x) / 2 - control.width / 2,
-    y: (sourceBottom.y + targetTop.y) / 2 - control.height / 2,
-  };
-};
-
-/** Replaces a causal edge with explicitly connected segments around a Control. */
-export const splitEdgeAtControl = <
-  T extends { id: string; source: string; target: string },
->(
-  edge: T,
-  controlId: string,
-) => [
-  {
-    ...edge,
-    id: `${edge.id}-${controlId}-upstream`,
-    target: controlId,
-    sourceHandle: "bottom",
-    targetHandle: "top",
-  },
-  {
-    ...edge,
-    id: `${edge.id}-${controlId}-downstream`,
-    source: controlId,
-    sourceHandle: "bottom",
-    targetHandle: "top",
-  },
-];
+// Compatibility exports for callers migrating to the layout-layer adapter.
+export { calculateControlPosition, splitEdgeAtControl };
 
 export const viewportAnimationDuration = (duration: number): number =>
   typeof window !== "undefined" &&
