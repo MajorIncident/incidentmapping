@@ -10,6 +10,13 @@ import {
   evaluateLayout,
   hierarchyAdapter,
 } from "../helpers/layout/baseline";
+import {
+  BRANCH_MERGE_RAIL_GAP,
+  CARD_COLLISION_CLEARANCE,
+  CONTROL_BEARING_INTERVAL,
+  DIRECT_CAUSAL_EDGE_GAP,
+} from "../../src/features/layout/geometry/spacing";
+import { CHAIN_NODE_HEIGHT } from "../../src/features/layout/dimensions";
 
 describe("layout fixture suite", () => {
   it.each(layoutFixtureNames)(
@@ -50,5 +57,49 @@ describe("layout fixture suite", () => {
     );
     expect(controls.controls).toMatchObject({ count: 2, placed: 2 });
     expect(actions.actions).toMatchObject({ count: 3, placed: 3 });
+  });
+
+  it("applies rank-interval invariants to representative fixtures", () => {
+    const simple = evaluateLayout(
+      loadLayoutTopology("simple-chain"),
+      hierarchyAdapter(),
+    );
+    const branch = evaluateLayout(
+      loadLayoutTopology("one-to-three-branch"),
+      hierarchyAdapter(),
+    );
+    const merge = evaluateLayout(
+      loadLayoutTopology("three-to-one-convergence"),
+      hierarchyAdapter(),
+    );
+    const controls = evaluateLayout(
+      loadLayoutTopology("multiple-controls"),
+      hierarchyAdapter(),
+    );
+
+    expect(simple.bounds.height).toBe(
+      3 * CHAIN_NODE_HEIGHT + 2 * DIRECT_CAUSAL_EDGE_GAP,
+    );
+    expect(branch.bounds.height).toBe(
+      2 * CHAIN_NODE_HEIGHT + BRANCH_MERGE_RAIL_GAP,
+    );
+    expect(merge.bounds.height).toBe(
+      2 * CHAIN_NODE_HEIGHT + BRANCH_MERGE_RAIL_GAP,
+    );
+    expect(controls.bounds.height).toBe(
+      2 * CHAIN_NODE_HEIGHT + CONTROL_BEARING_INTERVAL,
+    );
+    expect(simple.bounds.height).toBeLessThan(
+      3 * CHAIN_NODE_HEIGHT + 2 * BRANCH_MERGE_RAIL_GAP,
+    );
+
+    const controlBottom = Math.max(
+      ...Object.values(controls.controls.coordinates).map(({ y }) => y + 120),
+    );
+    const targetTop =
+      controls.bounds.y + CHAIN_NODE_HEIGHT + CONTROL_BEARING_INTERVAL;
+    expect(targetTop - controlBottom).toBeGreaterThanOrEqual(
+      CARD_COLLISION_CLEARANCE,
+    );
   });
 });
