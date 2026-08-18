@@ -317,12 +317,21 @@ describe("Inspector and keyboard workflows", () => {
     const newNodeId = useAppStore.getState().nodes[1]?.id;
     expect(useAppStore.getState().editingId).toBe(newNodeId);
 
-    await waitFor(() => {
-      const editor = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Node title"]',
-      );
-      expect(editor).not.toBeNull();
-      expect(editor).toBe(document.activeElement);
+    // jsdom cannot initialize or animate a React Flow viewport. Complete the
+    // incremental-placement request so the production title-focus effect runs.
+    act(() => {
+      const request = useAppStore.getState().viewportRequest;
+      if (request) actions.clearViewportRequest(request.id);
+    });
+
+    await act(async () => {
+      await waitFor(() => {
+        const editor = document.querySelector<HTMLInputElement>(
+          'input[aria-label="Node title"]',
+        );
+        expect(editor).not.toBeNull();
+        expect(editor).toBe(document.activeElement);
+      });
     });
   });
 

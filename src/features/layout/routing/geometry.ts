@@ -62,12 +62,102 @@ export const simplifyOrthogonalRoute = (
 
 const key = (point: Point) => `${point.x},${point.y}`;
 
+const MAX_ROUTING_STATES = 12_000;
+const MAX_ROUTING_EXPANSIONS = 8_000;
+
+const segmentClear = (a: Point, b: Point, rectangles: readonly Rectangle[]) =>
+  (a.x === b.x || a.y === b.y) &&
+  !rectangles.some((rectangle) => segmentIntersectsRectangle(a, b, rectangle));
+
+const clearRoute = (
+  points: readonly Point[],
+  rectangles: readonly Rectangle[],
+) =>
+  points
+    .slice(1)
+    .every((point, index) => segmentClear(points[index], point, rectangles));
+
+const fallbackRoute = (
+  start: Point,
+  end: Point,
+  rectangles: readonly Rectangle[],
+): OrthogonalRoute => {
+  const margin = OBJECT_CLEARANCE;
+  const xs = [
+    Math.min(start.x, end.x, ...rectangles.map((r) => r.x)) - margin,
+    Math.max(start.x, end.x, ...rectangles.map((r) => r.x + r.width)) + margin,
+  ];
+  const ys = [
+    Math.min(start.y, end.y, ...rectangles.map((r) => r.y)) - margin,
+    Math.max(start.y, end.y, ...rectangles.map((r) => r.y + r.height)) + margin,
+  ];
+  const candidates = [
+    ...ys.map((y) => [start, { x: start.x, y }, { x: end.x, y }, end]),
+    ...xs.map((x) => [start, { x, y: start.y }, { x, y: end.y }, end]),
+    ...xs.flatMap((x) =>
+      ys.map((y) => [start, { x, y: start.y }, { x, y }, { x: end.x, y }, end]),
+    ),
+  ];
+  const clear = candidates.find((candidate) =>
+    clearRoute(candidate, rectangles),
+  );
+  return simplifyOrthogonalRoute(clear ?? candidates[0]);
+};
+
+class MinHeap<T extends { cost: number }> {
+  private values: T[] = [];
+  get length() {
+    return this.values.length;
+  }
+  push(value: T) {
+    this.values.push(value);
+    let index = this.values.length - 1;
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (this.values[parent].cost <= value.cost) break;
+      this.values[index] = this.values[parent];
+      index = parent;
+    }
+    this.values[index] = value;
+  }
+  pop(): T | undefined {
+    const first = this.values[0];
+    const last = this.values.pop();
+    if (!first || !last || !this.values.length) return first;
+    let index = 0;
+    while (index * 2 + 1 < this.values.length) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      const child =
+        right < this.values.length &&
+        this.values[right].cost < this.values[left].cost
+          ? right
+          : left;
+      if (this.values[child].cost >= last.cost) break;
+      this.values[index] = this.values[child];
+      index = child;
+    }
+    this.values[index] = last;
+    return first;
+  }
+}
+
 /** Deterministic readability-first routing through an orthogonal visibility graph. */
 export const routeOrthogonally = (
   start: Point,
   end: Point,
   rectangles: readonly Rectangle[],
 ): OrthogonalRoute => {
+  // Common connectors must never pay the visibility-graph cost.
+  if (segmentClear(start, end, rectangles))
+    return simplifyOrthogonalRoute([start, end]);
+  const oneBends = [
+    [start, { x: start.x, y: end.y }, end],
+    [start, { x: end.x, y: start.y }, end],
+  ];
+  const oneBend = oneBends.find((route) => clearRoute(route, rectangles));
+  if (oneBend) return simplifyOrthogonalRoute(oneBend);
+
   const xs = [
     ...new Set([
       start.x,
@@ -82,6 +172,14 @@ export const routeOrthogonally = (
       ...rectangles.flatMap((r) => [r.y, r.y + r.height]),
     ]),
   ].sort((a, b) => a - b);
+  // Deterministic two-bend corridors along useful obstacle boundaries.
+  const twoBends = [
+    ...xs.map((x) => [start, { x, y: start.y }, { x, y: end.y }, end]),
+    ...ys.map((y) => [start, { x: start.x, y }, { x: end.x, y }, end]),
+  ];
+  const twoBend = twoBends.find((route) => clearRoute(route, rectangles));
+  if (twoBend) return simplifyOrthogonalRoute(twoBend);
+
   const points = xs
     .flatMap((x) => ys.map((y) => ({ x, y })))
     .filter((p) => !rectangles.some((r) => pointInsideRectangle(p, r)));
@@ -95,16 +193,14 @@ export const routeOrthogonally = (
     previous?: string;
   };
   const states = new Map<string, State>();
-  const pending: State[] = [{ point: start, direction: null, cost: 0 }];
+  const pending = new MinHeap<State>();
+  pending.push({ point: start, direction: null, cost: 0 });
+  const best = new Map<string, number>();
+  best.set(`${key(start)}:N`, 0);
   const stateKey = (p: Point, d: State["direction"]) => `${key(p)}:${d ?? "N"}`;
-  while (pending.length) {
-    pending.sort(
-      (a, b) =>
-        a.cost - b.cost ||
-        key(a.point).localeCompare(key(b.point)) ||
-        String(a.direction).localeCompare(String(b.direction)),
-    );
-    const current = pending.shift()!;
+  let expansions = 0;
+  while (pending.length && expansions++ < MAX_ROUTING_EXPANSIONS) {
+    const current = pending.pop()!;
     const currentKey = stateKey(current.point, current.direction);
     if (states.has(currentKey)) continue;
     states.set(currentKey, current);
@@ -117,7 +213,18 @@ export const routeOrthogonally = (
       }
       return simplifyOrthogonalRoute(route);
     }
-    for (const next of byKey.values()) {
+    // Only adjacent visible points on each axis are graph neighbours.
+    const neighbours = [...byKey.values()]
+      .filter(
+        (next) => next.x === current.point.x || next.y === current.point.y,
+      )
+      .sort((a, b) =>
+        a.x === current.point.x
+          ? Math.abs(a.y - current.point.y) - Math.abs(b.y - current.point.y)
+          : Math.abs(a.x - current.point.x) - Math.abs(b.x - current.point.x),
+      );
+    const seenDirections = new Set<string>();
+    for (const next of neighbours) {
       if (
         next === current.point ||
         (next.x !== current.point.x && next.y !== current.point.y)
@@ -165,10 +272,22 @@ export const routeOrthogonally = (
           proximity,
         previous: currentKey,
       };
-      if (!states.has(stateKey(next, direction))) pending.push(candidate);
+      const directionSide = `${direction}:${direction === "V" ? Math.sign(next.y - current.point.y) : Math.sign(next.x - current.point.x)}`;
+      if (seenDirections.has(directionSide)) continue;
+      seenDirections.add(directionSide);
+      const nextKey = stateKey(next, direction);
+      if (candidate.cost >= (best.get(nextKey) ?? Infinity)) continue;
+      best.set(nextKey, candidate.cost);
+      if (best.size >= MAX_ROUTING_STATES) break;
+      pending.push(candidate);
     }
+    if (best.size >= MAX_ROUTING_STATES) break;
   }
-  return simplifyOrthogonalRoute([start, { x: start.x, y: end.y }, end]);
+  if (import.meta.env.DEV)
+    console.warn(
+      "Orthogonal routing safety limit reached; using deterministic fallback",
+    );
+  return fallbackRoute(start, end, rectangles);
 };
 
 export const routeSegments = (route: readonly Point[]): Segment[] =>

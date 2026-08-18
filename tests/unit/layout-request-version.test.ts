@@ -64,7 +64,7 @@ describe("Arrange request version and dependency key", () => {
     ).not.toBe(1200);
   });
 
-  it("keeps measured one-to-one nodes center-aligned across repeated relayout", () => {
+  it("records measurements without moving semantic nodes", () => {
     const actions = useAppStore.getState().actions;
     const parent = actions.addChild() as string;
     const child = actions.addChild(parent) as string;
@@ -73,13 +73,20 @@ describe("Arrange request version and dependency key", () => {
       [child]: { width: 318, height: 173 },
     };
 
+    const positions = Object.fromEntries(
+      useAppStore.getState().nodes.map((node) => [node.id, node.position]),
+    );
     actions.applyMeasuredLayout(measurements);
     const once = useAppStore.getState().nodes;
-    const center = (id: string) => {
-      const item = useAppStore.getState().nodes.find((node) => node.id === id)!;
-      return item.position.x + item.width! / 2;
-    };
-    expect(center(parent)).toBe(center(child));
+    expect(
+      Object.fromEntries(once.map((node) => [node.id, node.position])),
+    ).toEqual(positions);
+    expect(once.find((node) => node.id === parent)).toMatchObject(
+      measurements[parent],
+    );
+    expect(once.find((node) => node.id === child)).toMatchObject(
+      measurements[child],
+    );
 
     actions.applyMeasuredLayout(measurements);
     expect(useAppStore.getState().nodes).toEqual(once);

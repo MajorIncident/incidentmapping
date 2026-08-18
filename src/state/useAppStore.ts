@@ -120,6 +120,16 @@ export type MapSession = {
   fresh: boolean;
 };
 
+/** Auxiliary Actions and chronology events never define the opening viewport. */
+export const causalViewportNodeIds = (nodes: readonly Node<ChainNodeData>[]) =>
+  nodes
+    .filter(
+      (node) =>
+        node.data.nodeType !== "Action" &&
+        node.data.eventDisplay !== "ChronologyOnly",
+    )
+    .map((node) => node.id);
+
 export type EditorSection =
   | "Title"
   | "ContextAggravating"
@@ -355,7 +365,9 @@ const chainNodeToReactNode = (
 ): Node<ChainNodeData> => ({
   id: node.id,
   type: "ChainNode",
-  position: snapPosition(node.position),
+  // Saved coordinates are investigation data. Grid snapping applies to user
+  // movement and layout commands, never as a side effect of opening a file.
+  position: { ...node.position },
   data: {
     title: node.title,
     referenceId: node.referenceId,
@@ -932,20 +944,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     },
     loadMap: (input) => {
+      if (
+        import.meta.env.MODE === "development" &&
+        typeof performance !== "undefined"
+      )
+        performance.mark("incidentmapping:map-load:start");
       const map = parseAndMigrateMapData(input);
       const runtimeNodes = mapNodesToReactNodes(map);
       const runtimeEdges = mapEdgesToReactEdges(map);
       const runtimeBarriers = map.barriers.map(cloneBarrier);
+      const causalNodeIds = causalViewportNodeIds(runtimeNodes);
       resetMoveDebounce();
       resetTextEditDebounce();
       set((state) => ({
         mapSession: { source: "Opened", fresh: false },
-        nodes: applyLayout(
-          runtimeNodes,
-          runtimeEdges,
-          "Compact",
-          runtimeBarriers,
-        ).nodes,
+        // OPEN means OPEN: persisted semantic positions are authoritative.
+        // Full DAG rearrangement is reserved for the explicit Arrange Map command.
+        nodes: runtimeNodes,
         edges: runtimeEdges,
         metadata: {
           ...(map.metadata ?? {}),
@@ -982,13 +997,30 @@ export const useAppStore = create<AppState>((set, get) => ({
         canvasDetail: "Compact",
         layoutVersion: state.layoutVersion + 1,
         measuredControlDimensions: {},
-        viewportRequest: null,
+        viewportRequest: causalNodeIds.length
+          ? {
+              id: (state.viewportRequest?.id ?? 0) + 1,
+              nodeIds: causalNodeIds,
+              causalNodeIds,
+            }
+          : null,
         contextEditing: false,
         editorFocusRequest: null,
         history: createEmptyHistory(),
         canUndo: false,
         canRedo: false,
       }));
+      if (
+        import.meta.env.MODE === "development" &&
+        typeof performance !== "undefined"
+      ) {
+        performance.mark("incidentmapping:map-load:end");
+        performance.measure(
+          "incidentmapping:map-load",
+          "incidentmapping:map-load:start",
+          "incidentmapping:map-load:end",
+        );
+      }
     },
     progressMapSession: () =>
       set((state) =>
@@ -2350,9 +2382,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     setCanvasDetail: (detail) => {
       set((state) => {
         if (state.canvasDetail === detail) return state;
-        // Rendering the new mode causes React Flow to report its new DOM
-        // dimensions. That measured update performs the single necessary
-        // layout without first moving persisted node positions nominally.
+        // Rendering the new mode causes React Flow to report new DOM dimensions;
+        // measurement updates geometry but never grants permission to rearrange.
         return { canvasDetail: detail };
       });
     },
@@ -2395,20 +2426,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         });
         if (!dimensionsChanged) return {};
-        const result = applyLayout(
-          measuredNodes,
-          state.edges,
-          state.canvasDetail,
-          state.barriers,
-          measuredControlDimensions,
-        );
         return {
-          nodes: result.nodes,
+          nodes: measuredNodes,
           measuredControlDimensions,
-          layoutVersion:
-            result.changed || dimensionsChanged
-              ? state.layoutVersion + 1
-              : state.layoutVersion,
+          layoutVersion: state.layoutVersion + 1,
         };
       });
     },
@@ -2437,7 +2458,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             const changed = nodes.some(
               (node, index) => node !== state.nodes[index],
             );
-            if (!changed) return {};
+            const viewportRequest = {
+              id: (state.viewportRequest?.id ?? 0) + 1,
+              nodeIds: causalViewportNodeIds(nodes),
+              causalNodeIds: causalViewportNodeIds(nodes),
+            };
+            if (!changed) return { viewportRequest };
             // Snapshot at completion so permitted intervening selection/text
             // changes are not accidentally folded into the Arrange undo step.
             const history = updateHistoryState(
@@ -2451,17 +2477,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               canUndo: true,
               canRedo: false,
               layoutVersion: state.layoutVersion + 1,
-              viewportRequest: {
-                id: (state.viewportRequest?.id ?? 0) + 1,
-                nodeIds: nodes.map((node) => node.id),
-                causalNodeIds: nodes
-                  .filter(
-                    (node) =>
-                      node.data.nodeType !== "Action" &&
-                      node.data.eventDisplay !== "ChronologyOnly",
-                  )
-                  .map((node) => node.id),
-              },
+              viewportRequest,
             };
           });
         },

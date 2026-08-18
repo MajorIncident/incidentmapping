@@ -456,6 +456,11 @@ export const Canvas = ({
   useEffect(() => {
     if (!presenting || !selectionId) return;
     const frame = requestAnimationFrame(() => {
+      if (
+        import.meta.env.MODE === "development" &&
+        typeof performance !== "undefined"
+      )
+        performance.mark("incidentmapping:initial-viewport:start");
       const selected = reactFlow.getNode(selectionId);
       if (selected)
         void reactFlow.fitBounds(getNodesBounds([selected]), {
@@ -513,7 +518,7 @@ export const Canvas = ({
   const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
   useEffect(() => {
-    if (!viewportRequest) return;
+    if (!viewportRequest || !nodesInitialized) return;
 
     const frame = requestAnimationFrame(() => {
       const requestedIds = new Set(viewportRequest.nodeIds);
@@ -521,42 +526,45 @@ export const Canvas = ({
         .getNodes()
         .filter((node) => requestedIds.has(node.id));
       if (requestedNodes.length > 0) {
-        let fittedNodes = requestedNodes;
-        if (viewportRequest.causalNodeIds?.length && canvasRef.current) {
-          const allBounds = getNodesBounds(requestedNodes);
-          const available = canvasRef.current.getBoundingClientRect();
-          const whitespaceFactor = 0.8;
-          const allZoom = Math.min(
-            (available.width * whitespaceFactor) / Math.max(1, allBounds.width),
-            (available.height * whitespaceFactor) /
-              Math.max(1, allBounds.height),
-          );
-          if (allZoom < 0.65) {
-            const causalIds = new Set(viewportRequest.causalNodeIds);
-            fittedNodes = requestedNodes.filter((node) =>
-              causalIds.has(node.id),
-            );
-          }
-        }
+        const causalIds = new Set(
+          viewportRequest.causalNodeIds ?? viewportRequest.nodeIds,
+        );
+        const fittedNodes = requestedNodes.filter((node) =>
+          causalIds.has(node.id),
+        );
         const fittedBounds = getNodesBounds(fittedNodes);
         const available = canvasRef.current?.getBoundingClientRect();
-        const readableZoom = available
+        const zoom = available
           ? Math.min(
+              1,
               (available.width * 0.8) / Math.max(1, fittedBounds.width),
               (available.height * 0.8) / Math.max(1, fittedBounds.height),
             )
           : 1;
-        if (readableZoom < 0.65) {
-          void reactFlow.setCenter(
-            fittedBounds.x + fittedBounds.width / 2,
-            fittedBounds.y + fittedBounds.height / 2,
-            { zoom: 0.65, duration: viewportAnimationDuration(400) },
+        const impacts = fittedNodes.filter(
+          (node) => (node.data as ChainNodeData).nodeType === "Impact",
+        );
+        const anchor = getNodesBounds(impacts.length ? impacts : fittedNodes);
+        const width = available?.width ?? 1;
+        const height = available?.height ?? 1;
+        void reactFlow.setViewport(
+          {
+            x: width / 2 - (anchor.x + anchor.width / 2) * zoom,
+            y: height * 0.25 - (anchor.y + anchor.height / 2) * zoom,
+            zoom,
+          },
+          { duration: viewportAnimationDuration(300) },
+        );
+        if (
+          import.meta.env.MODE === "development" &&
+          typeof performance !== "undefined"
+        ) {
+          performance.mark("incidentmapping:initial-viewport:end");
+          performance.measure(
+            "incidentmapping:initial-viewport",
+            "incidentmapping:initial-viewport:start",
+            "incidentmapping:initial-viewport:end",
           );
-        } else {
-          void reactFlow.fitBounds(fittedBounds, {
-            padding: 0.25,
-            duration: viewportAnimationDuration(400),
-          });
         }
         setTimeout(
           () => clearViewportRequest(viewportRequest.id),
@@ -568,7 +576,7 @@ export const Canvas = ({
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [clearViewportRequest, reactFlow, viewportRequest]);
+  }, [clearViewportRequest, nodesInitialized, reactFlow, viewportRequest]);
 
   useEffect(() => {
     if (!presenting) return;
@@ -645,8 +653,6 @@ export const Canvas = ({
         edges={renderedEdges}
         nodeTypes={memorizedNodeTypes}
         edgeTypes={memorizedEdgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2, includeHiddenNodes: true }}
         proOptions={{ hideAttribution: true }}
         onNodeClick={handleNodeClick}
         onNodeMouseEnter={handleNodeMouseEnter}
