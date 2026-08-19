@@ -196,6 +196,11 @@ type AppState = {
       nodeType: ChainNode["nodeType"],
       parentId?: string,
     ) => string | null;
+    createImpact: () => string | null;
+    createCausalChild: (
+      parentId: string,
+      nodeType: "Event" | "Factor",
+    ) => string | null;
     addChild: (parentId?: string) => string | null;
     addSibling: (siblingId?: string) => string | null;
     addAction: (sourceId?: string) => string | null;
@@ -1663,7 +1668,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().actions.unlinkEvidenceFromNode(nodeId, evidenceId),
     addSemanticNode: (nodeType, parentId) => {
       if (nodeType === "Action") return get().actions.addAction(parentId);
-      const initialParentId = parentId ?? get().selectionId ?? undefined;
+      // Impact is always a top-level outcome. Selection can never turn it into
+      // an implicit causal child.
+      const initialParentId =
+        nodeType === "Impact"
+          ? undefined
+          : (parentId ?? get().selectionId ?? undefined);
       const newNodeId = createId("node");
       const prevSnapshot = snapshotFromState(get());
       let created = false;
@@ -1671,7 +1681,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         const parentNode = initialParentId
           ? (state.nodes.find((node) => node.id === initialParentId) ?? null)
           : null;
-        if (parentNode?.data.nodeType === "Action") return {};
+        if (
+          nodeType !== "Impact" &&
+          parentNode &&
+          (parentNode.data.nodeType === "Action" ||
+            (nodeType === "Event" && parentNode.data.nodeType === "Factor") ||
+            parentNode.data.nodeType === undefined)
+        )
+          return {};
         const newNode: Node<ChainNodeData> = {
           id: newNodeId,
           type: "ChainNode",
@@ -1746,7 +1763,13 @@ export const useAppStore = create<AppState>((set, get) => ({
               state.barriers,
               state.measuredControlDimensions,
             )
-          : nextNodes;
+          : applyLayout(
+              nextNodes,
+              nextEdges,
+              state.canvasDetail,
+              state.barriers,
+              state.measuredControlDimensions,
+            ).nodes;
         const layoutChanged = laidOutNodes.some(
           (node, index) => node !== nextNodes[index],
         );
@@ -1792,7 +1815,12 @@ export const useAppStore = create<AppState>((set, get) => ({
                     .map((edge) => edge.target),
                 ],
               }
-            : null,
+            : {
+                id: (state.viewportRequest?.id ?? 0) + 1,
+                nodeIds: laidOutNodes
+                  .filter((node) => node.data.nodeType === "Impact")
+                  .map((node) => node.id),
+              },
           editorFocusRequest: {
             id: nextEditorFocusRequestId++,
             entityId: newNodeId,
@@ -1806,6 +1834,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return created ? newNodeId : null;
     },
+    createImpact: () => get().actions.addSemanticNode("Impact"),
+    createCausalChild: (parentId, nodeType) =>
+      get().nodes.some(
+        (node) =>
+          node.id === parentId &&
+          node.data.nodeType !== "Action" &&
+          node.data.nodeType !== undefined &&
+          !(nodeType === "Event" && node.data.nodeType === "Factor"),
+      )
+        ? get().actions.addSemanticNode(nodeType, parentId)
+        : null,
     addChild: (parentId) => get().actions.addSemanticNode("Event", parentId),
     addAction: (sourceId) => {
       const targetSourceId = sourceId ?? get().selectionId ?? undefined;

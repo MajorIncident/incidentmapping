@@ -89,6 +89,7 @@ export type LearningGuideProps = {
   mapSession?: Readonly<MapSession>;
   onAction: (action: GuideActionId) => void;
   onDismissed?: () => void;
+  availableCreationCommands?: readonly string[];
 };
 
 export const LearningGuide = ({
@@ -97,6 +98,7 @@ export const LearningGuide = ({
   mapSession,
   onAction,
   onDismissed,
+  availableCreationCommands = [],
 }: LearningGuideProps): JSX.Element | null => {
   const [firstUse] = useState(() => !hasSeenLearningGuideIntroduction());
   const [open, setOpen] = useState(firstUse);
@@ -166,15 +168,31 @@ export const LearningGuide = ({
       <Blocks blocks={match.entry.content} />
       {match.entry.suggestedActions.length ? (
         <div className="learning-guide__actions" aria-label="Suggested actions">
-          {match.entry.suggestedActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => onAction(action.id)}
-            >
-              {action.label}
-            </button>
-          ))}
+          {match.entry.suggestedActions
+            .filter((action) => {
+              const command = action.id.startsWith("add-")
+                ? action.id.slice(4)
+                : null;
+              if (
+                !command ||
+                !["impact", "event", "factor", "control", "action"].includes(
+                  command,
+                )
+              )
+                return true;
+              return availableCreationCommands.some(
+                (item) => item.toLowerCase() === command,
+              );
+            })
+            .map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => onAction(action.id)}
+              >
+                {action.label}
+              </button>
+            ))}
         </div>
       ) : null}
       {match.entry.detail?.length ? (

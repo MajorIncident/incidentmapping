@@ -21,8 +21,157 @@ export type ControlRelationship = EligibleControlRelationship & {
   downstreamTitle: string;
 };
 
+export type CreationCommand =
+  | "Impact"
+  | "Event"
+  | "Factor"
+  | "Control"
+  | "Action";
+export type CreationMode =
+  | "TopLevel"
+  | "CausalChild"
+  | "Relationship"
+  | "Sidecar";
+export type CreationContext =
+  | { kind: "Canvas" }
+  | {
+      kind: "Impact" | "Event" | "Factor" | "Action";
+      id: string;
+      referenceId?: string;
+      title: string;
+    }
+  | { kind: "Control"; id: string; referenceId?: string; title: string };
+export type CreationOption = {
+  type: CreationCommand;
+  mode: CreationMode;
+  label: string;
+  help: string;
+  eligibleRelationshipCount?: number;
+};
+
+export const selectCreationContext = (
+  selectionId: string | null,
+  nodes: Node<ChainNodeData>[],
+  controls: Array<{ id: string; referenceId?: string; description?: string }>,
+): CreationContext => {
+  if (!selectionId) return { kind: "Canvas" };
+  const node = nodes.find((item) => item.id === selectionId);
+  if (node?.data.nodeType)
+    return {
+      kind: node.data.nodeType,
+      id: node.id,
+      referenceId: node.data.referenceId,
+      title: node.data.title,
+    };
+  const control = controls.find((item) => item.id === selectionId);
+  return control
+    ? {
+        kind: "Control",
+        id: control.id,
+        referenceId: control.referenceId,
+        title: control.description ?? "Control",
+      }
+    : { kind: "Canvas" };
+};
+
+/** The single product rule matrix for every structural creation surface. */
+export const selectAvailableCreationOptions = (
+  context: CreationContext,
+  impactCount: number,
+  eligibleRelationshipCount: number,
+): CreationOption[] => {
+  const option = (
+    type: CreationCommand,
+    mode: CreationMode,
+    label: string,
+    help: string,
+  ): CreationOption => ({ type, mode, label, help });
+  if (context.kind === "Canvas")
+    return [
+      option(
+        "Impact",
+        "TopLevel",
+        impactCount ? "Another outcome" : "Add an outcome",
+        "A material outcome of the incident",
+      ),
+    ];
+  if (context.kind === "Control" || context.kind === "Action") return [];
+  const control = eligibleRelationshipCount
+    ? [
+        {
+          ...option(
+            "Control",
+            "Relationship",
+            "Add safeguard",
+            "A safeguard on a causal relationship",
+          ),
+          eligibleRelationshipCount,
+        },
+      ]
+    : [];
+  if (context.kind === "Impact")
+    return [
+      option(
+        "Impact",
+        "TopLevel",
+        "Another outcome",
+        "A material outcome of the incident",
+      ),
+      option(
+        "Event",
+        "CausalChild",
+        "What happened?",
+        "Something that happened in the causal story",
+      ),
+      ...control,
+      option(
+        "Action",
+        "Sidecar",
+        "Address this outcome",
+        "A response attached to an outcome, event, or finding",
+      ),
+    ];
+  if (context.kind === "Event")
+    return [
+      option(
+        "Event",
+        "CausalChild",
+        "Contributing occurrence",
+        "Something that happened in the causal story",
+      ),
+      option(
+        "Factor",
+        "CausalChild",
+        "Why did this happen?",
+        "A condition explaining why",
+      ),
+      ...control,
+      option(
+        "Action",
+        "Sidecar",
+        "Address this event",
+        "A response attached to an outcome, event, or finding",
+      ),
+    ];
+  return [
+    option(
+      "Factor",
+      "CausalChild",
+      "Ask why again",
+      "A condition explaining why",
+    ),
+    ...control,
+    option(
+      "Action",
+      "Sidecar",
+      "Address this finding",
+      "A response attached to an outcome, event, or finding",
+    ),
+  ];
+};
+
 /**
- * Selects unprotected causal relationships leaving the selected Event/Factor.
+ * Selects causal relationships adjacent to the selected semantic node.
  * React Flow's persisted direction is causal parent (`source`) to causal child
  * (`target`); keeping that knowledge here prevents guide and Inspector drift.
  */
@@ -35,7 +184,8 @@ export const selectControlRelationships = (
   const selected = nodes.find(({ id }) => id === selectionId);
   if (
     !selected ||
-    (selected.data.nodeType !== "Event" && selected.data.nodeType !== "Factor")
+    !selected.data.nodeType ||
+    !causalNodeTypes.has(selected.data.nodeType)
   )
     return [];
   const references = new Map(
@@ -44,8 +194,13 @@ export const selectControlRelationships = (
   return edges
     .filter(
       (edge) =>
-        edge.source === selected.id &&
-        edge.type !== "ActionEdge" &&
+        (edge.source === selected.id || edge.target === selected.id) &&
+        (edge.data?.kind === undefined ||
+          edge.data.kind === "CauseEffectEdge") &&
+        nodes.some(
+          (node) =>
+            node.id === edge.source && causalNodeTypes.has(node.data.nodeType),
+        ) &&
         nodes.some(
           (node) =>
             node.id === edge.target && causalNodeTypes.has(node.data.nodeType),
@@ -56,7 +211,9 @@ export const selectControlRelationships = (
       upstreamNodeId: edge.source,
       downstreamNodeId: edge.target,
       label: `${references.get(edge.source)} → ${references.get(edge.target)}`,
-      upstreamTitle: selected.data.title,
+      upstreamTitle:
+        nodes.find((node) => node.id === edge.source)?.data.title ??
+        edge.source,
       downstreamTitle:
         nodes.find((node) => node.id === edge.target)?.data.title ??
         edge.target,

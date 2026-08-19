@@ -35,6 +35,11 @@ describe("eligible Control relationships", () => {
         downstreamNodeId: "factor-a",
         label: "N-002 → N-004",
       }),
+      expect.objectContaining({
+        upstreamNodeId: "factor-a",
+        downstreamNodeId: "event",
+        label: "N-004 → N-002",
+      }),
     ]);
   });
 });
