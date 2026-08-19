@@ -7,6 +7,7 @@ import { Icon, type IconName } from "./Icons";
 type ToolbarProps = FileMenuRenderProps & {
   onAddSemanticNode: (nodeType: ChainNode["nodeType"]) => void;
   selectedNodeType?: ChainNode["nodeType"];
+  canCreateImpact: boolean;
   onDeleteSelection: () => void;
   canDelete: boolean;
   onUndo: () => void;
@@ -170,7 +171,12 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
       </span>
     </nav>
     <nav className="flex items-center gap-2" aria-label="Editing commands">
-      <Menu label="+ Add" icon="add">
+      <Menu label="Add" icon="add">
+        {props.canCreateImpact ? (
+          <Item icon="add" onClick={() => props.onAddSemanticNode("Impact")}>
+            Impact — Start a new map
+          </Item>
+        ) : null}
         {props.selectedNodeType === "Impact" ? (
           <Item icon="add" onClick={() => props.onAddSemanticNode("Event")}>
             Event — What happened?
@@ -196,7 +202,8 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
             </Item>
           </>
         ) : null}
-        {!props.selectedNodeType || props.selectedNodeType === "Action" ? (
+        {(!props.selectedNodeType || props.selectedNodeType === "Action") &&
+        !props.canCreateImpact ? (
           <Item icon="add" disabled>
             Select an Impact, Event, or Factor
           </Item>

@@ -22,7 +22,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "New" }).click();
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
 
   const rootTitle = page.getByText("New Event").first();
@@ -133,7 +133,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
     } else {
       await expect(consequences).toBeVisible();
     }
-    const addMenu = page.getByRole("button", { name: "+ Add menu" });
+    const addMenu = page.getByRole("button", { name: "Add menu" });
     await expect(addMenu).toBeEnabled();
     const countBeforeMouse = await page.getByTestId("chain-node").count();
     await addMenu.click();
@@ -163,7 +163,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
     0,
   );
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await expect(
     page.getByRole("menuitem", {
       name: "Select an Impact, Event, or Factor",
@@ -187,7 +187,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
     0,
   );
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await expect(
     page.getByRole("menuitem", {
       name: "Select an Impact, Event, or Factor",
@@ -200,7 +200,7 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
   await expect(page.getByTestId("chain-node")).toHaveCount(unavailableCount);
 
   await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await expect(
     page.getByRole("menuitem", {
       name: "Select an Impact, Event, or Factor",

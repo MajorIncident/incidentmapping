@@ -371,6 +371,10 @@ export const App = (): JSX.Element => {
                 {...menu}
                 onAddSemanticNode={(nodeType) => {
                   const state = useAppStore.getState();
+                  if (nodeType === "Impact" && state.nodes.length === 0) {
+                    state.actions.addSemanticNode("Impact");
+                    return;
+                  }
                   if (!canAddBelowSelection(state.selectionId, state.nodes))
                     return;
                   state.actions.addSemanticNode(
@@ -384,6 +388,7 @@ export const App = (): JSX.Element => {
                         .nodeType
                     : undefined
                 }
+                canCreateImpact={nodes.length === 0}
                 onDeleteSelection={() => {
                   deleteSelection();
                 }}
