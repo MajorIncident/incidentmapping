@@ -170,7 +170,10 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   // Create the corrective Action from the root cause. Its card belongs to the
   // right-hand action lane and owns accountability fields itself.
   await page.getByRole("button", { name: "Select Downstream Node" }).click();
-  await page.getByRole("button", { name: "+ Action" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
+  await page
+    .getByRole("menuitem", { name: "Action — Address this finding" })
+    .click();
   await title(page).fill("Add functional photo-eye check");
   await title(page).press("Enter");
   await page.getByLabel("Owner").fill("Maintenance lead");

@@ -159,7 +159,10 @@ test("keyboard workflow and sidebar edits", async ({ page }) => {
     await effectNode.click();
   }
 
-  await page.getByRole("button", { name: "+ Action" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
+  await page
+    .getByRole("menuitem", { name: "Action — Address this finding" })
+    .click();
   await expect(page.getByRole("heading", { name: "Consequences" })).toHaveCount(
     0,
   );

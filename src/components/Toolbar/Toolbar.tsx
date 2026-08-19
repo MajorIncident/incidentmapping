@@ -190,6 +190,9 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
             <Item icon="add" onClick={() => props.onAddSemanticNode("Factor")}>
               Factor — A condition explaining why
             </Item>
+            <Item icon="add" onClick={() => props.onAddSemanticNode("Action")}>
+              Action — Address this event
+            </Item>
           </>
         ) : null}
         {props.selectedNodeType === "Factor" ? (
