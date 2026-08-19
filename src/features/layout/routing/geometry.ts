@@ -108,7 +108,7 @@ const fallbackRoute = (
   const clear = candidates.find((candidate) =>
     clearRoute(candidate, rectangles),
   );
-  return simplifyOrthogonalRoute(clear ?? candidates[0]);
+  return simplifyOrthogonalRoute(clear ?? candidates.at(-1)!);
 };
 
 class MinHeap<T extends { cost: number }> {
@@ -193,6 +193,14 @@ export const routeOrthogonally = (
   const byKey = new Map(points.map((p) => [key(p), p]));
   byKey.set(key(start), start);
   byKey.set(key(end), end);
+  const pointsByX = new Map<number, Point[]>();
+  const pointsByY = new Map<number, Point[]>();
+  byKey.forEach((point) => {
+    pointsByX.set(point.x, [...(pointsByX.get(point.x) ?? []), point]);
+    pointsByY.set(point.y, [...(pointsByY.get(point.y) ?? []), point]);
+  });
+  pointsByX.forEach((axis) => axis.sort((a, b) => a.y - b.y));
+  pointsByY.forEach((axis) => axis.sort((a, b) => a.x - b.x));
   type State = {
     point: Point;
     direction: "H" | "V" | null;
@@ -221,15 +229,14 @@ export const routeOrthogonally = (
       return simplifyOrthogonalRoute(route);
     }
     // Only adjacent visible points on each axis are graph neighbours.
-    const neighbours = [...byKey.values()]
-      .filter(
-        (next) => next.x === current.point.x || next.y === current.point.y,
-      )
-      .sort((a, b) =>
-        a.x === current.point.x
-          ? Math.abs(a.y - current.point.y) - Math.abs(b.y - current.point.y)
-          : Math.abs(a.x - current.point.x) - Math.abs(b.x - current.point.x),
-      );
+    const neighbours = [
+      ...(pointsByX.get(current.point.x) ?? []),
+      ...(pointsByY.get(current.point.y) ?? []),
+    ].sort((a, b) =>
+      a.x === current.point.x
+        ? Math.abs(a.y - current.point.y) - Math.abs(b.y - current.point.y)
+        : Math.abs(a.x - current.point.x) - Math.abs(b.x - current.point.x),
+    );
     const seenDirections = new Set<string>();
     for (const next of neighbours) {
       if (
@@ -270,13 +277,7 @@ export const routeOrthogonally = (
       const candidate: State = {
         point: next,
         direction,
-        cost:
-          current.cost +
-          horizontal +
-          (direction === "V" ? distance : 0) +
-          bend +
-          reverse +
-          proximity,
+        cost: current.cost + horizontal + bend + reverse + proximity,
         previous: currentKey,
       };
       const directionSide = `${direction}:${direction === "V" ? Math.sign(next.y - current.point.y) : Math.sign(next.x - current.point.x)}`;

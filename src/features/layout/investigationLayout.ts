@@ -89,15 +89,14 @@ const size = (
   dimensions: MeasuredDimensions | undefined,
   fallback: MeasuredDimensions,
 ) => dimensions ?? fallback;
-const boundsOf = (nodes: readonly LayoutNodeGeometry[]): Rectangle => {
-  const left = Math.min(0, ...nodes.map((node) => node.rectangle.x));
-  const top = Math.min(0, ...nodes.map((node) => node.rectangle.y));
+export const boundsOf = (nodes: readonly LayoutNodeGeometry[]): Rectangle => {
+  if (!nodes.length) return { x: 0, y: 0, width: 0, height: 0 };
+  const left = Math.min(...nodes.map((node) => node.rectangle.x));
+  const top = Math.min(...nodes.map((node) => node.rectangle.y));
   const right = Math.max(
-    0,
     ...nodes.map((node) => node.rectangle.x + node.rectangle.width),
   );
   const bottom = Math.max(
-    0,
     ...nodes.map((node) => node.rectangle.y + node.rectangle.height),
   );
   return { x: left, y: top, width: right - left, height: bottom - top };
@@ -392,6 +391,26 @@ export const layoutInvestigation = (
     }
   }
 
+  if (options.mode === "ArrangeMap") {
+    children.forEach((childIds, parentId) => {
+      if (childIds.length < 2) return;
+      const parent = byId.get(parentId);
+      const members = childIds
+        .map((id) => byId.get(id))
+        .filter((item): item is LayoutNodeGeometry => Boolean(item));
+      if (!parent || members.length < 2) return;
+      const left = Math.min(...members.map((item) => item.rectangle.x));
+      const right = Math.max(
+        ...members.map((item) => item.rectangle.x + item.rectangle.width),
+      );
+      const parentCenter = parent.rectangle.x + parent.rectangle.width / 2;
+      const delta = snap(parentCenter - (left + right) / 2);
+      members.forEach(
+        (member) => ((member.rectangle as { x: number }).x += delta),
+      );
+    });
+  }
+
   const controlsByRelationship = new Map(
     (input.controls ?? []).map((control) => [control.relationshipId, control]),
   );
@@ -570,3 +589,48 @@ export const layoutInvestigation = (
     causalBounds,
   };
 };
+
+/** Pure PROJECT operation: persisted semantic and Action rectangles are authoritative. */
+export const projectInvestigationGeometry = (
+  input: InvestigationLayoutInput,
+  committed: readonly LayoutNodeGeometry[],
+): LayoutResult => {
+  const result = layoutInvestigation(input, {
+    mode: "Incremental",
+    priorGeometry: committed,
+  });
+  const persisted = new Map(committed.map((node) => [node.id, node]));
+  const nodes = result.nodes.map((node) =>
+    node.role === "Control" ? node : (persisted.get(node.id) ?? node),
+  );
+  const relationships = [
+    ...result.relationships.filter((route) => route.kind !== "Action"),
+    ...routeActionRelationships(
+      input.relationships.filter((route) => route.kind === "Action"),
+      nodes,
+    ),
+  ];
+  return {
+    ...result,
+    nodes,
+    relationships,
+    bounds: boundsOf(nodes),
+    causalBounds: boundsOf(
+      nodes.filter(
+        (node) =>
+          node.role === "Semantic" &&
+          !input.nodes.find(
+            (item) =>
+              item.id === node.id && item.eventDisplay === "ChronologyOnly",
+          ),
+      ),
+    ),
+  };
+};
+
+/** Explicit synchronous local repair operation for structural edits. */
+export const repairInvestigationGeometry = (
+  input: InvestigationLayoutInput,
+  options: Omit<InvestigationLayoutOptions, "mode"> = {},
+): LayoutResult =>
+  layoutInvestigation(input, { ...options, mode: "Incremental" });

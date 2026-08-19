@@ -337,7 +337,7 @@ describe("Toolbar map title", () => {
     expect(useAppStore.getState().nodes[0].data.title).toBe("Database outage");
   });
 
-  it("exposes an accessible organize action with a calculated disabled state", async () => {
+  it("enables Arrange Map for any two relevant semantic nodes", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "More menu" }));
     const organize = screen.getByRole("menuitem", {
@@ -361,7 +361,7 @@ describe("Toolbar map title", () => {
     fireEvent.click(screen.getByRole("button", { name: "More menu" }));
     expect(
       screen.getByRole("menuitem", { name: /arrange map/i }),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   it("uses accessible command names and returns focus when a menu closes", async () => {

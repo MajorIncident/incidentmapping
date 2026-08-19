@@ -26,8 +26,8 @@ import {
   snapPosition,
   VERTICAL_GAP,
   type CanvasDetail,
-} from "../features/layout/hierarchy";
-import { applyHierarchyLayout } from "../features/layout/legacyAdapter";
+} from "../features/layout/policy";
+import { buildLayoutGraph } from "../features/layout/buildLayoutGraph";
 import { layoutWithElk } from "../features/layout/elk/elkAdapter";
 import { layoutInvestigation } from "../features/layout/investigationLayout";
 import { evaluateLayoutHealth } from "../features/layout/layoutHealth";
@@ -36,7 +36,7 @@ import type {
   LayoutNodeGeometry,
 } from "../features/layout/layoutModel";
 
-export { GRID_SIZE } from "../features/layout/hierarchy";
+export { GRID_SIZE } from "../features/layout/policy";
 
 export type ChainNodeData = {
   referenceId?: string;
@@ -520,20 +520,37 @@ const applyLayout = (
     Record<string, { width: number; height: number }>
   > = {},
 ) => {
-  const causalRelationships = new Set(
-    edges
-      .filter((edge) => edge.data?.kind !== "ActionEdge")
-      .map((edge) => `${edge.source}\u0000${edge.target}`),
-  );
-  return applyHierarchyLayout(nodes, edges, {
-    canvasDetail,
-    controlDimensions,
-    barrierEdges: barriers.filter((barrier) =>
-      causalRelationships.has(
-        `${barrier.upstreamNodeId}\u0000${barrier.downstreamNodeId}`,
-      ),
-    ),
+  const graph = buildLayoutGraph({
+    nodes,
+    edges,
+    barriers,
+    measuredControlDimensions: controlDimensions,
+    dimensions: (value) => {
+      const node = value as Node<ChainNodeData>;
+      const fallback = getNodeSize(node, canvasDetail);
+      return {
+        width: node.width ?? fallback.width,
+        height: node.height ?? fallback.height,
+      };
+    },
   });
+  const projected = layoutInvestigation(graph, { mode: "ArrangeMap" });
+  const geometry = new Map(
+    projected.nodes
+      .filter((item) => item.role !== "Control")
+      .map((item) => [item.id, item.rectangle]),
+  );
+  let changed = false;
+  const laidOut = nodes.map((node) => {
+    const rectangle = geometry.get(node.id);
+    if (!rectangle) return node;
+    const position = snapPosition(rectangle);
+    if (position.x === node.position.x && position.y === node.position.y)
+      return node;
+    changed = true;
+    return { ...node, position };
+  });
+  return { nodes: laidOut, changed };
 };
 
 /** Place one new causal card without rewriting geometry established by dragging. */
@@ -726,78 +743,21 @@ const fullLayoutDependencyKey = (state: AppState): string =>
     }),
   });
 
-const toLayoutGraph = (state: AppState): LayoutGraph => {
-  const actions = new Set(
-    state.nodes
-      .filter((node) => node.data.nodeType === "Action")
-      .map((node) => node.id),
-  );
-  const actionAnchor = new Map(
-    state.edges
-      .filter((edge) => edge.data?.kind === "ActionEdge")
-      .map((edge) => [edge.target, edge.source]),
-  );
-  const dimensions = (node: Node<ChainNodeData>) => {
-    const fallback = getNodeSize(node, state.canvasDetail);
-    return {
-      width: node.width ?? fallback.width,
-      height: node.height ?? fallback.height,
-    };
-  };
-  const relationships = state.edges.map((edge) => ({
-    id: edge.id,
-    kind:
-      edge.data?.kind === "ActionEdge"
-        ? ("Action" as const)
-        : ("Causal" as const),
-    fromId: edge.source,
-    toId: edge.target,
-  }));
-  return {
-    nodes: state.nodes
-      .filter((node) => !actions.has(node.id))
-      .map((node) => ({
-        id: node.id,
-        kind:
-          (node.data.nodeType === "Action" ? "Factor" : node.data.nodeType) ??
-          "Factor",
-        referenceId: node.data.referenceId,
-        position: node.position,
-        dimensions: dimensions(node),
-      })),
-    actions: state.nodes
-      .filter((node) => actions.has(node.id))
-      .map((node) => ({
-        id: node.id,
-        kind: "Action" as const,
-        attachedToId: actionAnchor.get(node.id) ?? "",
-        referenceId: node.data.referenceId,
-        position: node.position,
-        dimensions: dimensions(node),
-      })),
-    relationships,
-    controls: state.barriers.flatMap((control) => {
-      const relationship = relationships.find(
-        (edge) =>
-          edge.kind === "Causal" &&
-          edge.fromId === control.upstreamNodeId &&
-          edge.toId === control.downstreamNodeId,
-      );
-      if (!relationship) return [];
-      return [
-        {
-          id: control.id,
-          kind: "Control" as const,
-          relationshipId: relationship.id,
-          upstreamNodeId: control.upstreamNodeId,
-          downstreamNodeId: control.downstreamNodeId,
-          referenceId: control.referenceId,
-          dimensions: state.measuredControlDimensions[control.id],
-        },
-      ];
-    }),
-  };
-};
+const toLayoutGraph = (state: AppState): LayoutGraph =>
+  buildLayoutGraph({
+    nodes: state.nodes,
+    edges: state.edges,
+    barriers: state.barriers,
+    measuredControlDimensions: state.measuredControlDimensions,
+    dimensions: (value) => {
+      const node = value as Node<ChainNodeData>;
+      const fallback = getNodeSize(node, state.canvasDetail);
+      return {
+        width: node.width ?? fallback.width,
+        height: node.height ?? fallback.height,
+      };
+    },
+  });
 
 const runtimeGeometry = (state: AppState): LayoutNodeGeometry[] => {
   const actionIds = new Set(
@@ -2689,11 +2649,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!changed) {
           return {};
         }
-        const { nodes: laidOutNodes, changed: layoutChanged } = applyLayout(
-          nextNodes,
-          state.edges,
-          state.canvasDetail,
-        );
+        const laidOutNodes = nextNodes;
+        const layoutChanged = false;
         const candidate = {
           ...state,
           nodes: laidOutNodes,

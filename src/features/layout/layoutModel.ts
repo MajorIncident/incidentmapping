@@ -148,3 +148,14 @@ export type InvestigationLayoutOptions = Readonly<{
   horizontalGap?: number;
   verticalGap?: number;
 }>;
+
+/** One authoritative vertical grammar shared by row, Control and rail planning. */
+export type RankIntervalPlan = Readonly<{
+  fromRank: number;
+  toRank: number;
+  height: number;
+  branchRailY?: number;
+  controlBandTop?: number;
+  controlBandBottom?: number;
+  mergeRailY?: number;
+}>;

@@ -7,6 +7,7 @@ import {
   CONTROL_NODE_WIDTH,
 } from "../dimensions";
 import { centerAlignmentDelta } from "../geometry/alignment";
+import { boundsOf } from "../investigationLayout";
 import {
   ACTION_GAP,
   CAUSAL_ROW_GAP,
@@ -63,9 +64,13 @@ export const toElkGraph = (
   horizontalGap = SIBLING_GAP,
   verticalGap = CAUSAL_ROW_GAP,
 ): { graph: ElkNode; edges: readonly ProjectedEdge[] } => {
-  const controls = graph.controls ?? [];
+  const chronologyIds = new Set(
+    graph.nodes
+      .filter((node) => node.eventDisplay === "ChronologyOnly")
+      .map((node) => node.id),
+  );
   const allNodes = graph.nodes
-    .slice()
+    .filter((node) => !chronologyIds.has(node.id))
     .sort((left, right) =>
       compareHints(
         hint(left.position?.x, left.referenceId, left.id),
@@ -79,55 +84,21 @@ export const toElkGraph = (
     ports: ports(node.id),
     layoutOptions: { "elk.portConstraints": "FIXED_SIDE" },
   }));
-  const controlsByRelationship = new Map(
-    controls.map((control) => [control.relationshipId, control]),
-  );
   const projected: ProjectedEdge[] = [];
   graph.relationships
-    .filter((relationship) => relationship.kind === "Causal")
-    .map((relationship, index) => ({ relationship, index }))
-    .sort(
-      (a, b) =>
-        a.index - b.index ||
-        a.relationship.fromId.localeCompare(b.relationship.fromId) ||
-        a.relationship.toId.localeCompare(b.relationship.toId) ||
-        a.relationship.id.localeCompare(b.relationship.id),
+    .filter(
+      (relationship) =>
+        relationship.kind === "Causal" &&
+        !chronologyIds.has(relationship.fromId) &&
+        !chronologyIds.has(relationship.toId),
     )
-    .forEach(({ relationship }) => {
-      const control = controlsByRelationship.get(relationship.id);
-      const stops = [
-        relationship.fromId,
-        ...(control ? [control.id] : []),
-        relationship.toId,
-      ];
-      stops.slice(0, -1).forEach((fromId, index) => {
-        projected.push({
-          id:
-            stops.length === 2
-              ? relationship.id
-              : `${relationship.id}:${index}`,
-          relationshipId: relationship.id,
-          kind: relationship.kind,
-          fromId,
-          toId: stops[index + 1],
-        });
-      });
-    });
-  controls
-    .slice()
-    .sort((left, right) =>
-      compareHints(
-        hint(undefined, left.referenceId, left.id),
-        hint(undefined, right.referenceId, right.id),
-      ),
-    )
-    .forEach((control) =>
-      children.push({
-        id: control.id,
-        width: control.dimensions?.width ?? CONTROL_NODE_WIDTH,
-        height: control.dimensions?.height ?? CONTROL_NODE_HEIGHT,
-        ports: ports(control.id),
-        layoutOptions: { "elk.portConstraints": "FIXED_SIDE" },
+    .forEach((relationship) =>
+      projected.push({
+        id: relationship.id,
+        relationshipId: relationship.id,
+        kind: "Causal",
+        fromId: relationship.fromId,
+        toId: relationship.toId,
       }),
     );
   const edges: ElkExtendedEdge[] = projected.map((edge) => ({
@@ -201,6 +172,20 @@ export const layoutWithElk = async (
   // Actions are deliberately absent from the ELK input. Materialise their
   // geometry only after the causal graph has been laid out, so an auxiliary
   // card can never perturb its anchor or the causal layers around it.
+  (graph.controls ?? []).forEach((control) =>
+    nodes.push({
+      id: control.id,
+      role: "Control",
+      controlId: control.id,
+      relationshipId: control.relationshipId,
+      rectangle: {
+        x: 0,
+        y: 0,
+        width: control.dimensions?.width ?? CONTROL_NODE_WIDTH,
+        height: control.dimensions?.height ?? CONTROL_NODE_HEIGHT,
+      },
+    }),
+  );
   (graph.actions ?? []).forEach((action) =>
     nodes.push({
       id: action.id,
@@ -437,33 +422,7 @@ export const layoutWithElk = async (
     nodes,
     relationships,
     sharedSegments: [],
-    bounds: {
-      x: 0,
-      y: 0,
-      width: Math.max(
-        0,
-        ...nodes.map((node) => node.rectangle.x + node.rectangle.width),
-      ),
-      height: Math.max(
-        0,
-        ...nodes.map((node) => node.rectangle.y + node.rectangle.height),
-      ),
-    },
-    causalBounds: {
-      x: 0,
-      y: 0,
-      width: Math.max(
-        0,
-        ...nodes
-          .filter((node) => node.role === "Semantic")
-          .map((node) => node.rectangle.x + node.rectangle.width),
-      ),
-      height: Math.max(
-        0,
-        ...nodes
-          .filter((node) => node.role === "Semantic")
-          .map((node) => node.rectangle.y + node.rectangle.height),
-      ),
-    },
+    bounds: boundsOf(nodes),
+    causalBounds: boundsOf(nodes.filter((node) => node.role === "Semantic")),
   };
 };

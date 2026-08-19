@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
 import type { ChainNode } from "../../features/maps/schema";
-import type { CanvasDetail } from "../../features/layout/hierarchy";
+import type { CanvasDetail } from "../../features/layout/policy";
 import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
