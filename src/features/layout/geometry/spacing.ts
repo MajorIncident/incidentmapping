@@ -17,6 +17,17 @@ export const SIBLING_GAP = 32;
 export const SUBTREE_GAP = 96;
 export const ACTION_GUTTER = 64;
 export const ACTION_GAP = 24;
+/** Candidate search policy for local Action sidecars. */
+export const ACTION_VERTICAL_SEARCH_STEP = 24;
+export const MAX_ACTION_VERTICAL_OFFSET = 72;
+/** Roughly one and a half standard semantic cards; prevents runaway width. */
+export const MAX_ACTION_INDUCED_BRANCH_SHIFT = 360;
+/** Centralized, intentionally simple Action-aware layout cost weights. */
+export const ACTION_DISTANCE_WEIGHT = 8;
+export const ACTION_ROUTE_WEIGHT = 2;
+export const CAUSAL_WIDTH_WEIGHT = 1;
+export const BRANCH_MOVEMENT_WEIGHT = 0.08;
+export const CROSSING_WEIGHT = 2_000;
 export const EDGE_STUB = 12;
 export const BRANCH_RAIL_GAP = 10;
 export const MERGE_RAIL_GAP = 10;

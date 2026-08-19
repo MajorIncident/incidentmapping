@@ -36,6 +36,7 @@ export const placeActionStacks = (
   _causalBounds: Rectangle,
   snap: (value: number) => number = (value) => value,
   preservePrior = false,
+  preferredYBySource: ReadonlyMap<string, number> = new Map(),
 ): LayoutNodeGeometry[] => {
   const sources = new Map(causalObjects.map((node) => [node.id, node]));
   const bySource = new Map<string, Action[]>();
@@ -68,6 +69,7 @@ export const placeActionStacks = (
         0,
       );
       let y =
+        preferredYBySource.get(sourceId) ??
         source.rectangle.y + source.rectangle.height / 2 - stackHeight / 2;
       const preferredX =
         source.rectangle.x + source.rectangle.width + ACTION_GUTTER;

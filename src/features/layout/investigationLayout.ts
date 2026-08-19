@@ -29,6 +29,7 @@ import {
 } from "./routing/actionRouting";
 import { centerAlignmentDelta, rectanglesOverlap } from "./geometry/alignment";
 import { OBJECT_CLEARANCE } from "./geometry/spacing";
+import { negotiateActionSidecars } from "./actionSidecar";
 
 type PositionedSize = Readonly<{
   position: Point;
@@ -411,6 +412,26 @@ export const layoutInvestigation = (
     });
   }
 
+  // Actions remain auxiliary projections, but their complete preferred stack
+  // is negotiated before Controls and routes are derived. Arrange may repair
+  // every pocket; incremental edits repair only a newly introduced stack so a
+  // healthy manual layout is never aesthetically rewritten on open/render.
+  const priorIds = new Set(
+    (options.priorGeometry ?? []).map((node) => node.id),
+  );
+  const newActionSources = new Set(
+    (input.actions ?? [])
+      .filter((action) => !priorIds.has(action.id))
+      .map((action) => action.attachedToId),
+  );
+  const sidecarNegotiation = negotiateActionSidecars(
+    input.actions ?? [],
+    geometries,
+    causal,
+    snap,
+    options.mode === "ArrangeMap" ? undefined : newActionSources,
+  );
+
   const controlsByRelationship = new Map(
     (input.controls ?? []).map((control) => [control.relationshipId, control]),
   );
@@ -513,6 +534,7 @@ export const layoutInvestigation = (
     causalBounds,
     snap,
     options.mode === "Incremental",
+    sidecarNegotiation.preferredY,
   );
   geometries.push(...actionGeometries);
   const controlledCausalRelationships = causalRouting.relationships.flatMap(
