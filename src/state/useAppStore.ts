@@ -1288,7 +1288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(displayMode === "Metric" && rawUnit?.trim()
           ? { unit: rawUnit.trim() }
           : {}),
-        ...(showOnCard === undefined ? {} : { showOnCard }),
+        showOnCard: showOnCard ?? true,
       };
       if (
         target !== "incident" &&
