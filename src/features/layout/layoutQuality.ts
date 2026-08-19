@@ -39,6 +39,9 @@ export type LayoutQuality = Readonly<{
   horizontalCausalEdgeLength: number;
   actionSourceDistance: number;
   actionRouteLength: number;
+  maxActionSourceDistance: number;
+  averageActionSourceDistance: number;
+  overallWidth: number;
   causalBounds: Rectangle;
   sameRankAlignmentError: number;
   directChainCenterAlignmentError: number;
@@ -69,17 +72,18 @@ export const evaluateLayoutQuality = (
   const geometry = new Map(
     layout.nodes.map((node) => [node.id, node.rectangle]),
   );
-  const actionSourceDistance = (graph.actions ?? []).reduce((sum, item) => {
+  const actionDistances = (graph.actions ?? []).map((item) => {
     const a = geometry.get(item.id);
     const source = geometry.get(item.attachedToId);
-    return (
-      sum +
-      (a && source
-        ? Math.abs(a.x - (source.x + source.width)) +
+    return a && source
+      ? Math.abs(a.x - (source.x + source.width)) +
           Math.abs(a.y + a.height / 2 - source.y - source.height / 2)
-        : 0)
-    );
-  }, 0);
+      : 0;
+  });
+  const actionSourceDistance = actionDistances.reduce(
+    (sum, value) => sum + value,
+    0,
+  );
   return {
     crossings,
     bendCount: causal.reduce(
@@ -102,11 +106,17 @@ export const evaluateLayoutQuality = (
       0,
     ),
     actionSourceDistance,
+    maxActionSourceDistance: Math.max(0, ...actionDistances),
+    averageActionSourceDistance:
+      actionDistances.length === 0
+        ? 0
+        : actionSourceDistance / actionDistances.length,
     actionRouteLength: action.reduce(
       (sum, route) => sum + length(route.route),
       0,
     ),
     causalBounds: layout.causalBounds,
+    overallWidth: layout.bounds.width,
     sameRankAlignmentError: 0,
     directChainCenterAlignmentError: 0,
     sharedRailCount: layout.sharedSegments.length,
