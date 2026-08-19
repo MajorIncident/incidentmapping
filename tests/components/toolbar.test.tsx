@@ -51,7 +51,7 @@ describe("Toolbar map title", () => {
       screen.getByRole("button", { name: "Create a new map" }),
     );
     expect(toolbar).toContainElement(
-      screen.getByRole("button", { name: "+ Add menu" }),
+      screen.getByRole("button", { name: "Add menu" }),
     );
     expect(screen.getByLabelText("File menu")).toHaveAttribute(
       "title",
@@ -73,7 +73,7 @@ describe("Toolbar map title", () => {
     const editingCommands = screen.getByRole("navigation", {
       name: "Editing commands",
     });
-    const addMenu = screen.getByRole("button", { name: "+ Add menu" });
+    const addMenu = screen.getByRole("button", { name: "Add menu" });
     const present = screen.getByRole("button", { name: "Present map" });
     expect(addMenu).toBeEnabled();
     expect(present).not.toHaveClass("command-button--primary");
@@ -112,7 +112,7 @@ describe("Toolbar map title", () => {
     act(() => useAppStore.getState().actions.newMap());
     render(<App />);
 
-    const addMenu = screen.getByRole("button", { name: "+ Add menu" });
+    const addMenu = screen.getByRole("button", { name: "Add menu" });
     fireEvent.click(addMenu);
     expect(
       screen.getByRole("menuitem", { name: "Event — What happened?" }),
@@ -138,6 +138,26 @@ describe("Toolbar map title", () => {
         name: "Action — Address this finding",
       }),
     ).toBeVisible();
+  });
+
+  it("can recreate an Impact after every node is deleted", () => {
+    act(() => {
+      useAppStore.getState().actions.newMap();
+      useAppStore.getState().actions.deleteSelection();
+    });
+    expect(useAppStore.getState().nodes).toHaveLength(0);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Add menu" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Impact — Start a new map" }),
+    );
+
+    expect(useAppStore.getState().nodes).toHaveLength(1);
+    expect(useAppStore.getState().nodes[0].data.nodeType).toBe("Impact");
+    expect(useAppStore.getState().selectionId).toBe(
+      useAppStore.getState().nodes[0].id,
+    );
   });
 
   it("edits the canvas title with a double-click and commits on Enter", async () => {
@@ -345,9 +365,9 @@ describe("Toolbar map title", () => {
     const user = userEvent.setup();
     act(() => useAppStore.getState().actions.addChild());
     render(<App />);
-    expect(screen.getByRole("button", { name: "+ Add menu" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Add menu" })).toHaveAttribute(
       "title",
-      "+ Add menu",
+      "Add menu",
     );
     const more = screen.getByRole("button", { name: "More menu" });
     await user.click(more);

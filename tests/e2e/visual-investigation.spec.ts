@@ -89,7 +89,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   await title(page).fill("Airport passengers separated from baggage");
   await title(page).press("Enter");
   await page.getByLabel("Type").selectOption("Impact");
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await page.getByRole("menuitem", { name: "Event — What happened?" }).click();
   await title(page).fill("Arrival belt stopped during unloading");
   await title(page).press("Enter");
@@ -98,7 +98,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
 
   // Convert the child to a Factor while its category is deliberately unset,
   // then complete its investigation classification.
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await page
     .getByRole("menuitem", { name: "Event — Another occurrence" })
     .click();
@@ -141,7 +141,7 @@ test("builds a complete visual investigation and preserves it exactly", async ({
   // Add a second branch so selecting the Control below proves the precise
   // controlled branch is highlighted rather than every sibling cause.
   await page.getByText("Arrival belt stopped during unloading").click();
-  await page.getByRole("button", { name: "+ Add menu" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
   await page
     .getByRole("menuitem", { name: "Event — Another occurrence" })
     .click();

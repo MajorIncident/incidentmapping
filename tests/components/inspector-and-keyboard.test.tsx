@@ -298,7 +298,7 @@ describe("Inspector and keyboard workflows", () => {
       render(<App />);
     });
 
-    await screen.findByRole("button", { name: "+ Add menu" });
+    await screen.findByRole("button", { name: "Add menu" });
     await waitFor(() => {
       expect(useAppStore.getState().nodes).toHaveLength(1);
     });
