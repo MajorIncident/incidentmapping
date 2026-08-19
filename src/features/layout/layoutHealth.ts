@@ -13,7 +13,13 @@ export type LayoutHealthIssue = Readonly<{
     | "ControlCollision"
     | "MissingRoute"
     | "MissingControlRoute"
-    | "GrossActionDistance";
+    | "GrossActionDistance"
+    | "CausalDirectionViolation"
+    | "ActionOverlap"
+    | "InvalidBounds"
+    | "NonFiniteGeometry"
+    | "EdgeNodeIntersection"
+    | "RailNodeIntersection";
   ids: readonly string[];
 }>;
 
@@ -24,6 +30,29 @@ export const evaluateLayoutHealth = (
 ): { healthy: boolean; issues: readonly LayoutHealthIssue[] } => {
   const issues: LayoutHealthIssue[] = [];
   const geometry = new Map(layout.nodes.map((node) => [node.id, node]));
+  const finite = (value: number) => Number.isFinite(value);
+  if (
+    ![
+      layout.bounds.x,
+      layout.bounds.y,
+      layout.bounds.width,
+      layout.bounds.height,
+    ].every(finite) ||
+    layout.bounds.width < 0 ||
+    layout.bounds.height < 0
+  )
+    issues.push({ kind: "InvalidBounds", ids: [] });
+  layout.nodes.forEach((node) => {
+    if (
+      ![
+        node.rectangle.x,
+        node.rectangle.y,
+        node.rectangle.width,
+        node.rectangle.height,
+      ].every(finite)
+    )
+      issues.push({ kind: "NonFiniteGeometry", ids: [node.id] });
+  });
   const semantics = layout.nodes.filter((node) => node.role === "Semantic");
   semantics.forEach((left, index) =>
     semantics.slice(index + 1).forEach((right) => {
@@ -77,9 +106,20 @@ export const evaluateLayoutHealth = (
         ids: [control.relationshipId],
       });
   }
+  const actions = layout.nodes.filter((node) => node.role === "Action");
+  actions.forEach((left, index) =>
+    actions.slice(index + 1).forEach((right) => {
+      if (rectanglesOverlap(left.rectangle, right.rectangle, 0))
+        issues.push({ kind: "ActionOverlap", ids: [left.id, right.id] });
+    }),
+  );
   graph.relationships
     .filter((edge) => edge.kind === "Causal")
     .forEach((edge) => {
+      const source = geometry.get(edge.fromId)?.rectangle;
+      const target = geometry.get(edge.toId)?.rectangle;
+      if (source && target && target.y <= source.y + source.height)
+        issues.push({ kind: "CausalDirectionViolation", ids: [edge.id] });
       const route = layout.relationships.find((item) => item.id === edge.id);
       if (!route || route.route.length < 2)
         issues.push({ kind: "MissingRoute", ids: [edge.id] });

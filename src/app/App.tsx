@@ -6,10 +6,7 @@ import { Inspector } from "../components/Sidebar/Inspector";
 import { Footer } from "../components/Footer/Footer";
 import { IncidentHeader } from "../components/IncidentHeader/IncidentHeader";
 import { useAppStore } from "../state/useAppStore";
-import {
-  applyHierarchyLayout,
-  type CanvasDetail,
-} from "../features/layout/hierarchy";
+import type { CanvasDetail } from "../features/layout/policy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chronology } from "../components/Presentation/Chronology";
 import {
@@ -278,18 +275,11 @@ export const App = (): JSX.Element => {
   }, []);
   const canOrganize = useAppStore(
     (state) =>
-      state.nodes.length >= 2 &&
-      applyHierarchyLayout(state.nodes, state.edges, {
-        canvasDetail: state.canvasDetail,
-        barrierEdges: state.barriers.filter((barrier) =>
-          state.edges.some(
-            (edge) =>
-              edge.data?.kind !== "ActionEdge" &&
-              edge.source === barrier.upstreamNodeId &&
-              edge.target === barrier.downstreamNodeId,
-          ),
-        ),
-      }).changed,
+      state.nodes.filter(
+        (node) =>
+          node.data.nodeType !== "Action" &&
+          node.data.eventDisplay !== "ChronologyOnly",
+      ).length >= 2,
   );
 
   useEffect(() => {

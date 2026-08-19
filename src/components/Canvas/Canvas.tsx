@@ -25,13 +25,11 @@ import {
 import type { EvidenceItem } from "../../features/maps/schema";
 import {
   calculateControlPosition,
-  layoutInvestigation,
+  projectInvestigationGeometry,
   splitEdgeAtControl,
 } from "../../features/layout/investigationLayout";
-import type {
-  LayoutGraph,
-  LayoutResult,
-} from "../../features/layout/layoutModel";
+import type { LayoutResult } from "../../features/layout/layoutModel";
+import { buildLayoutGraph } from "../../features/layout/buildLayoutGraph";
 import {
   deriveHoverPresentation,
   deriveRelationshipPresentation,
@@ -250,88 +248,27 @@ export const Canvas = ({
         .filter((node) => node.data.nodeType === "Action")
         .map((node) => node.id),
     );
-    const actionAnchors = new Map(
-      visibleEdges
-        .filter((edge) => edge.data?.kind === "ActionEdge")
-        .map((edge) => [edge.target, edge.source]),
-    );
     const dimensions = (node: Node<ChainNodeData>) => ({
       width: node.width ?? CHAIN_NODE_WIDTH,
       height: node.height ?? CHAIN_NODE_HEIGHT,
     });
-    const layoutRelationships: LayoutGraph["relationships"] = visibleEdges.map(
-      (edge) => ({
-        id: edge.id,
-        kind: edge.data?.kind === "ActionEdge" ? "Action" : "Causal",
-        fromId: edge.source,
-        toId: edge.target,
-      }),
-    );
-    const layoutGraph: LayoutGraph = {
-      nodes: presentedNodes
-        .filter((node) => !actionIds.has(node.id))
-        .map((node) => ({
-          id: node.id,
-          kind:
-            node.data.nodeType === "Event" || node.data.nodeType === "Impact"
-              ? node.data.nodeType
-              : "Factor",
-          referenceId: node.data.referenceId,
-          position: node.position,
-          dimensions: dimensions(node),
-          eventDisplay: node.data.eventDisplay,
-        })),
-      actions: presentedNodes
-        .filter((node) => actionIds.has(node.id))
-        .map((node) => ({
-          id: node.id,
-          kind: "Action",
-          attachedToId: actionAnchors.get(node.id) ?? "",
-          referenceId: node.data.referenceId,
-          position: node.position,
-          dimensions: dimensions(node),
-        })),
-      relationships: layoutRelationships,
-      controls: barriers.flatMap((control) => {
-        const relationship = layoutRelationships.find(
-          (item) =>
-            item.kind === "Causal" &&
-            item.fromId === control.upstreamNodeId &&
-            item.toId === control.downstreamNodeId,
-        );
-        return relationship
-          ? [
-              {
-                id: control.id,
-                kind: "Control" as const,
-                relationshipId: relationship.id,
-                upstreamNodeId: control.upstreamNodeId,
-                downstreamNodeId: control.downstreamNodeId,
-                referenceId: control.referenceId,
-                dimensions: measuredControlDimensions[control.id],
-              },
-            ]
-          : [];
-      }),
-    };
-    const layout = layoutInvestigation(layoutGraph, {
-      mode: "Incremental",
-      priorGeometry: presentedNodes.map((node) => ({
+    const layoutGraph = buildLayoutGraph({
+      nodes: presentedNodes,
+      edges: visibleEdges,
+      barriers,
+      measuredControlDimensions,
+      dimensions: (value) => dimensions(value as Node<ChainNodeData>),
+    });
+    const layout = projectInvestigationGeometry(
+      layoutGraph,
+      presentedNodes.map((node) => ({
         id: node.id,
         role: actionIds.has(node.id) ? "Action" : "Semantic",
         rectangle: { ...node.position, ...dimensions(node) },
       })),
-    });
+    );
     const layoutNodes = new Map(layout.nodes.map((node) => [node.id, node]));
-    const positionedNodes = presentedNodes.map((node) => {
-      const geometry = layoutNodes.get(node.id);
-      return geometry
-        ? {
-            ...node,
-            position: { x: geometry.rectangle.x, y: geometry.rectangle.y },
-          }
-        : node;
-    });
+    const positionedNodes = presentedNodes;
     const barrierNodes: Node<BarrierNodeData>[] = [];
     const flowEdges = visibleEdges.flatMap((edge) => {
       const presentationRole =
