@@ -10,8 +10,10 @@ import type { CanvasDetail } from "../features/layout/policy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chronology } from "../components/Presentation/Chronology";
 import {
-  canAddBelowSelection,
+  selectAvailableCreationOptions,
+  selectCreationContext,
   selectEligibleControlRelationships,
+  type CreationOption,
 } from "../state/selectors";
 import { ControlBranchChooser } from "../components/Sidebar/ControlBranchChooser";
 import { type PresentationLens } from "../features/presentation/selectors";
@@ -66,9 +68,6 @@ export const App = (): JSX.Element => {
   const setCanvasDetail = useAppStore((state) => state.actions.setCanvasDetail);
   const selectionId = useAppStore((state) => state.selectionId);
   const editorFocusRequest = useAppStore((state) => state.editorFocusRequest);
-  const canAddBelow = useAppStore((state) =>
-    canAddBelowSelection(state.selectionId, state.nodes),
-  );
   const canUndo = useAppStore((state) => state.canUndo);
   const canRedo = useAppStore((state) => state.canRedo);
   const canvasDetail = useAppStore((state) => state.canvasDetail);
@@ -85,6 +84,50 @@ export const App = (): JSX.Element => {
       selectEligibleControlRelationships(selectionId, nodes, edges, barriers),
     [barriers, edges, nodes, selectionId],
   );
+  const creationContext = useMemo(
+    () => selectCreationContext(selectionId, nodes, barriers),
+    [barriers, nodes, selectionId],
+  );
+  const creationOptions = useMemo(
+    () =>
+      selectAvailableCreationOptions(
+        creationContext,
+        nodes.filter((node) => node.data.nodeType === "Impact").length,
+        eligibleControlRelationships.length,
+      ),
+    [creationContext, eligibleControlRelationships.length, nodes],
+  );
+  const executeCreation = (option: CreationOption) => {
+    const state = useAppStore.getState();
+    if (option.mode === "TopLevel") state.actions.createImpact();
+    else if (
+      option.mode === "CausalChild" &&
+      creationContext.kind !== "Canvas" &&
+      creationContext.kind !== "Control" &&
+      creationContext.kind !== "Action"
+    )
+      state.actions.createCausalChild(
+        creationContext.id,
+        option.type as "Event" | "Factor",
+      );
+    else if (
+      option.mode === "Sidecar" &&
+      creationContext.kind !== "Canvas" &&
+      creationContext.kind !== "Control" &&
+      creationContext.kind !== "Action"
+    )
+      state.actions.addAction(creationContext.id);
+    else if (option.mode === "Relationship") {
+      if (eligibleControlRelationships.length === 1) {
+        const relationship = eligibleControlRelationships[0];
+        state.actions.addBarrier(
+          relationship.upstreamNodeId,
+          relationship.downstreamNodeId,
+        );
+      } else if (eligibleControlRelationships.length > 1)
+        setChoosingControl(true);
+    }
+  };
   const presentationStory = useMemo(
     () =>
       derivePresentationStory({
@@ -182,16 +225,19 @@ export const App = (): JSX.Element => {
 
     switch (action) {
       case "add-impact":
-        setInspectorOpen(true);
-        state.actions.addSemanticNode("Impact", selectedId ?? undefined);
+        executeCreation(
+          creationOptions.find((option) => option.type === "Impact")!,
+        );
         return;
       case "add-event":
-        setInspectorOpen(true);
-        state.actions.addSemanticNode("Event", selectedId ?? undefined);
+        executeCreation(
+          creationOptions.find((option) => option.type === "Event")!,
+        );
         return;
       case "add-factor":
-        setInspectorOpen(true);
-        state.actions.addSemanticNode("Factor", selectedId ?? undefined);
+        executeCreation(
+          creationOptions.find((option) => option.type === "Factor")!,
+        );
         return;
       case "add-control":
         if (eligibleControlRelationships.length === 1) {
@@ -222,7 +268,9 @@ export const App = (): JSX.Element => {
         openEditor("Evidence", "Open");
         return;
       case "add-action":
-        openEditor("Action", "Create");
+        executeCreation(
+          creationOptions.find((option) => option.type === "Action")!,
+        );
         return;
       case "open-chronology":
         setChronologyOpen(true);
@@ -359,26 +407,9 @@ export const App = (): JSX.Element => {
             {!presenting ? (
               <Toolbar
                 {...menu}
-                onAddSemanticNode={(nodeType) => {
-                  const state = useAppStore.getState();
-                  if (nodeType === "Impact" && state.nodes.length === 0) {
-                    state.actions.addSemanticNode("Impact");
-                    return;
-                  }
-                  if (!canAddBelowSelection(state.selectionId, state.nodes))
-                    return;
-                  state.actions.addSemanticNode(
-                    nodeType,
-                    state.selectionId ?? undefined,
-                  );
-                }}
-                selectedNodeType={
-                  canAddBelow
-                    ? nodes.find((node) => node.id === selectionId)?.data
-                        .nodeType
-                    : undefined
-                }
-                canCreateImpact={nodes.length === 0}
+                creationContext={creationContext}
+                creationOptions={creationOptions}
+                onCreate={executeCreation}
                 onDeleteSelection={() => {
                   deleteSelection();
                 }}
@@ -441,6 +472,9 @@ export const App = (): JSX.Element => {
                     enabled={learningGuideEnabled}
                     mapSession={mapSession}
                     onAction={runGuideAction}
+                    availableCreationCommands={creationOptions.map(
+                      (option) => option.type,
+                    )}
                     onDismissed={() => setGuideRevision((value) => value + 1)}
                   />
                 ) : null}

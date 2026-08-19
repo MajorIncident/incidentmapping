@@ -30,7 +30,7 @@ export const learnMapPages: readonly LearnMapPage[] = Object.freeze([
     title: "Start with the Impact",
     eyebrow: "The outcome",
     introduction:
-      "Begin at the top with the outcome that mattered, then read downward. Each level answers why the level above happened.",
+      "Impact means an outcome that mattered. An investigation can contain multiple Impacts when one incident produced more than one material outcome. Read downward from each outcome to understand why it happened.",
     cards: [
       { label: "Impact", detail: "Delivery arrived late", tone: "impact" },
       { label: "Event", detail: "Vehicle departed late", tone: "event" },
@@ -38,7 +38,7 @@ export const learnMapPages: readonly LearnMapPage[] = Object.freeze([
     connector: "Why?",
     diagramAlt:
       "Impact: Delivery arrived late. Why? Event: Vehicle departed late.",
-    note: "The map is an explanation, not a checklist. Keep asking why while moving down.",
+    note: "Each Impact is top-level. The map is an explanation, not a checklist; keep asking why while moving down.",
   },
   {
     id: "events",

@@ -12,6 +12,12 @@ An **Impact** is harm, loss, disruption, or another material outcome. An
 optional `endTimestamp`, an Event Phase (`Precursor`, `Incident`, `Detection`,
 `Response`, `Recovery`), Context, and Evidence.
 
+An investigation may contain multiple Impacts when an incident produced more
+than one material outcome. Creating an Impact is always a top-level operation:
+it does not attach the new Impact to the current selection or create a causal
+relationship. Creation controls communicate what may be authored in the
+current context, but their availability never creates or implies causality.
+
 ### Timeline-Only Events
 
 Every Event has an Event Display value. `Map` shows it in the causal canvas and

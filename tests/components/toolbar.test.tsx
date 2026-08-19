@@ -115,30 +115,30 @@ describe("Toolbar map title", () => {
     const addMenu = screen.getByRole("button", { name: "Add menu" });
     fireEvent.click(addMenu);
     expect(
-      screen.getByRole("menuitem", { name: "Event — What happened?" }),
+      screen.getByRole("menuitem", { name: "Event: What happened?" }),
     ).toBeVisible();
 
     const rootId = useAppStore.getState().selectionId!;
     act(() => useAppStore.getState().actions.setNodeType(rootId, "Event"));
     expect(
-      screen.getByRole("menuitem", { name: "Event — Another occurrence" }),
+      screen.getByRole("menuitem", { name: "Event: Contributing occurrence" }),
     ).toBeVisible();
     expect(
       screen.getByRole("menuitem", {
-        name: "Factor — A condition explaining why",
+        name: "Factor: Why did this happen?",
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole("menuitem", { name: "Action — Address this event" }),
+      screen.getByRole("menuitem", { name: "Action: Address this event" }),
     ).toBeVisible();
 
     act(() => useAppStore.getState().actions.setNodeType(rootId, "Factor"));
     expect(
-      screen.getByRole("menuitem", { name: "Factor — Ask why again" }),
+      screen.getByRole("menuitem", { name: "Factor: Ask why again" }),
     ).toBeVisible();
     expect(
       screen.getByRole("menuitem", {
-        name: "Action — Address this finding",
+        name: "Action: Address this finding",
       }),
     ).toBeVisible();
   });
@@ -153,7 +153,7 @@ describe("Toolbar map title", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Add menu" }));
     fireEvent.click(
-      screen.getByRole("menuitem", { name: "Impact — Start a new map" }),
+      screen.getByRole("menuitem", { name: "Impact: Add an outcome" }),
     );
 
     expect(useAppStore.getState().nodes).toHaveLength(1);

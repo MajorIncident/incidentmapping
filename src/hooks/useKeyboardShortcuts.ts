@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { GRID_SIZE, useAppStore } from "../state/useAppStore";
-import { canAddBelowSelection } from "../state/selectors";
+import {
+  selectAvailableCreationOptions,
+  selectCreationContext,
+} from "../state/selectors";
 
 type ShortcutHandlers = {
   onSave: () => void;
@@ -89,20 +92,35 @@ export const useKeyboardShortcuts = ({
           return;
         }
         case "Enter": {
-          if (!canAddBelowSelection(selectionId, state.nodes)) {
+          const context = selectCreationContext(
+            selectionId,
+            state.nodes,
+            state.barriers,
+          );
+          const options = selectAvailableCreationOptions(
+            context,
+            state.nodes.filter((node) => node.data.nodeType === "Impact")
+              .length,
+            0,
+          );
+          const causal = options.find(
+            (option) => option.mode === "CausalChild",
+          );
+          if (
+            !causal ||
+            context.kind === "Canvas" ||
+            context.kind === "Control" ||
+            context.kind === "Action"
+          )
             return;
-          }
           event.preventDefault();
           if (event.shiftKey) {
             actions.addSibling(selectionId ?? undefined);
           } else {
-            const selectedType = state.nodes.find(
-              (node) => node.id === selectionId,
-            )?.data.nodeType;
-            const nodeType = selectedType === "Impact" ? "Event" : selectedType;
-            if (nodeType === "Event" || nodeType === "Factor") {
-              actions.addSemanticNode(nodeType, selectionId ?? undefined);
-            }
+            actions.createCausalChild(
+              context.id,
+              causal.type as "Event" | "Factor",
+            );
           }
           return;
         }

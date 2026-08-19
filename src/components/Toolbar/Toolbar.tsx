@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FileMenuRenderProps } from "../FileMenu/FileMenu";
-import type { ChainNode } from "../../features/maps/schema";
 import type { CanvasDetail } from "../../features/layout/policy";
+import type { CreationContext, CreationOption } from "../../state/selectors";
 import { Icon, type IconName } from "./Icons";
 
 type ToolbarProps = FileMenuRenderProps & {
-  onAddSemanticNode: (nodeType: ChainNode["nodeType"]) => void;
-  selectedNodeType?: ChainNode["nodeType"];
-  canCreateImpact: boolean;
+  creationContext: CreationContext;
+  creationOptions: CreationOption[];
+  onCreate: (option: CreationOption) => void;
   onDeleteSelection: () => void;
   canDelete: boolean;
   onUndo: () => void;
@@ -119,6 +119,56 @@ const Item = ({
   </button>
 );
 
+const contextHeading = (context: CreationContext) => {
+  if (context.kind === "Canvas") return "Add to investigation";
+  const identity =
+    context.referenceId ?? `${context.kind} · ${context.title.slice(0, 24)}`;
+  return context.kind === "Control" || context.kind === "Action"
+    ? `${identity} · ${context.kind}`
+    : `Add to ${identity} · ${context.kind}`;
+};
+
+const CreationRegion = (
+  props: Pick<ToolbarProps, "creationContext" | "creationOptions" | "onCreate">,
+) => {
+  const emptyMessage =
+    props.creationContext.kind === "Control"
+      ? "Controls describe safeguards on a causal relationship."
+      : props.creationContext.kind === "Action"
+        ? "Actions do not extend the causal investigation."
+        : null;
+  return (
+    <section
+      className="hidden min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 lg:flex"
+      aria-label="Contextual creation"
+    >
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-[11px] font-semibold text-slate-600">
+          {contextHeading(props.creationContext)}
+        </div>
+        {emptyMessage ? (
+          <div className="max-w-64 truncate text-[10px] text-slate-500">
+            {emptyMessage}
+          </div>
+        ) : null}
+      </div>
+      {props.creationOptions.map((option) => (
+        <button
+          key={option.type}
+          type="button"
+          className={`${buttonBase} min-h-9 min-w-0 px-2`}
+          onClick={() => props.onCreate(option)}
+          aria-label={`${option.type}: ${option.label}`}
+          title={`${option.label}. ${option.help}`}
+        >
+          <span aria-hidden="true">+</span>
+          <span>{option.type}</span>
+        </button>
+      ))}
+    </section>
+  );
+};
+
 export const Toolbar = (props: ToolbarProps): JSX.Element => (
   <header className="z-30 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-[max(0.5rem,env(safe-area-inset-left))] pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] shadow-sm sm:px-[max(1rem,env(safe-area-inset-left))]">
     <nav className="flex items-center gap-2" aria-label="Map commands">
@@ -170,48 +220,29 @@ export const Toolbar = (props: ToolbarProps): JSX.Element => (
         <span aria-hidden="true">●</span> {props.isSaved ? "Saved" : "Unsaved"}
       </span>
     </nav>
+    <CreationRegion {...props} />
     <nav className="flex items-center gap-2" aria-label="Editing commands">
-      <Menu label="Add" icon="add">
-        {props.canCreateImpact ? (
-          <Item icon="add" onClick={() => props.onAddSemanticNode("Impact")}>
-            Impact — Start a new map
-          </Item>
-        ) : null}
-        {props.selectedNodeType === "Impact" ? (
-          <Item icon="add" onClick={() => props.onAddSemanticNode("Event")}>
-            Event — What happened?
-          </Item>
-        ) : null}
-        {props.selectedNodeType === "Event" ? (
-          <>
-            <Item icon="add" onClick={() => props.onAddSemanticNode("Event")}>
-              Event — Another occurrence
+      <div className="lg:hidden">
+        <Menu label="Add" icon="add">
+          {props.creationOptions.map((option) => (
+            <Item
+              key={option.type}
+              icon="add"
+              onClick={() => props.onCreate(option)}
+              aria-label={`${option.type}: ${option.label}`}
+            >
+              {option.type} — {option.label}
             </Item>
-            <Item icon="add" onClick={() => props.onAddSemanticNode("Factor")}>
-              Factor — A condition explaining why
-            </Item>
-            <Item icon="add" onClick={() => props.onAddSemanticNode("Action")}>
-              Action — Address this event
-            </Item>
-          </>
-        ) : null}
-        {props.selectedNodeType === "Factor" ? (
-          <>
-            <Item icon="add" onClick={() => props.onAddSemanticNode("Factor")}>
-              Factor — Ask why again
-            </Item>
-            <Item icon="add" onClick={() => props.onAddSemanticNode("Action")}>
-              Action — Address this finding
-            </Item>
-          </>
-        ) : null}
-        {(!props.selectedNodeType || props.selectedNodeType === "Action") &&
-        !props.canCreateImpact ? (
-          <Item icon="add" disabled>
-            Select an Impact, Event, or Factor
-          </Item>
-        ) : null}
-      </Menu>
+          ))}
+          {!props.creationOptions.length ? (
+            <div className="max-w-64 px-3 py-2 text-sm text-slate-600">
+              {props.creationContext.kind === "Control"
+                ? "Controls describe safeguards on a causal relationship."
+                : "Actions do not extend the causal investigation."}
+            </div>
+          ) : null}
+        </Menu>
+      </div>
       <button
         type="button"
         className={buttonBase}
