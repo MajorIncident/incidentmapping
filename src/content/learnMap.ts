@@ -27,7 +27,7 @@ export type LearnMapPage = Readonly<{
 export const learnMapPages: readonly LearnMapPage[] = Object.freeze([
   {
     id: "impact",
-    title: "Start with an Impact",
+    title: "Start with the Impact",
     eyebrow: "The outcome",
     introduction:
       "Impact means an outcome that mattered. An investigation can contain multiple Impacts when one incident produced more than one material outcome. Read downward from each outcome to understand why it happened.",
