@@ -34,7 +34,11 @@ describe("ContextEditor", () => {
     await user.type(screen.getByLabelText("New label"), "Weather");
     await user.type(screen.getByLabelText("New value"), "Heavy rain{Enter}");
     expect(useAppStore.getState().metadata?.contextItems).toEqual([
-      expect.objectContaining({ label: "Weather", value: "Heavy rain" }),
+      expect.objectContaining({
+        label: "Weather",
+        value: "Heavy rain",
+        showOnCard: true,
+      }),
     ]);
   });
 
@@ -47,9 +51,10 @@ describe("ContextEditor", () => {
     expect(row).toHaveClass("flex-col");
     expect(row).not.toHaveClass("overflow-x-auto");
     const toggle = screen.getByRole("button", {
-      name: "Show Shift on compact card",
+      name: "Hide Shift on compact card",
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveTextContent("Hide on Card");
     await user.tab();
     await user.tab();
     await user.tab();
@@ -57,8 +62,9 @@ describe("ContextEditor", () => {
     await user.tab();
     expect(toggle).toHaveFocus();
     await user.keyboard(" ");
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect(toggle).toHaveAccessibleName("Hide Shift on compact card");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAccessibleName("Show Shift on compact card");
+    expect(toggle).toHaveTextContent("Show on Card");
 
     await user.click(screen.getByRole("button", { name: /delete context/i }));
     expect(useAppStore.getState().metadata?.contextItems).toHaveLength(0);

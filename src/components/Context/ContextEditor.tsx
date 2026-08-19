@@ -225,7 +225,7 @@ export const ContextEditor = ({
                     actions.toggleContextShowOnCard(target, item.id)
                   }
                 >
-                  {item.showOnCard ? "Shown on card" : "Hidden from card"}
+                  {item.showOnCard ? "Hide on Card" : "Show on Card"}
                 </button>
                 <button
                   type="button"
