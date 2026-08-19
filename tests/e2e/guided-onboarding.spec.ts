@@ -71,8 +71,10 @@ test("builds an investigation through the real onboarding guide", async ({
   await expect(inspector.getByText(/E-\d+ ·/)).toHaveCount(0);
 
   await firstEvent.click();
-  await inspector.getByText("Actions", { exact: true }).click();
-  await inspector.getByRole("button", { name: "+ Action" }).click();
+  await page.getByRole("button", { name: "Add menu" }).click();
+  await page
+    .getByRole("menuitem", { name: "Action — Address this event" })
+    .click();
   await expect(page.getByLabel("Type")).toHaveValue("Action");
   await expect(inspector.getByLabel("Status")).toBeVisible();
 

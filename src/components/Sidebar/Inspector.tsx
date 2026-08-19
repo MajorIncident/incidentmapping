@@ -1304,26 +1304,6 @@ export const Inspector = ({
           </SecondarySection>
         ) : null}
 
-        <SecondarySection
-          title="Actions"
-          openOnRequest={requestedEditorSection === "Actions"}
-        >
-          {node.data.nodeType === "Event" || node.data.nodeType === "Factor" ? (
-            <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
-              <button
-                type="button"
-                className={`${buttonClasses} w-full border-sky-400 bg-sky-600 text-white hover:bg-sky-700`}
-                onClick={() => addAction(node.id)}
-              >
-                + Action
-              </button>
-              <p className="mt-2 text-xs text-sky-900">
-                Add a corrective action that addresses this node.
-              </p>
-            </div>
-          ) : null}
-        </SecondarySection>
-
         {node.data.nodeType === "Action"
           ? (() => {
               const addressEdge = edges.find(
@@ -1358,7 +1338,6 @@ export const Inspector = ({
     );
   }, [
     addBarrier,
-    addAction,
     barrier,
     barrierDescription,
     chainNodes,

@@ -128,6 +128,9 @@ describe("Toolbar map title", () => {
         name: "Factor — A condition explaining why",
       }),
     ).toBeVisible();
+    expect(
+      screen.getByRole("menuitem", { name: "Action — Address this event" }),
+    ).toBeVisible();
 
     act(() => useAppStore.getState().actions.setNodeType(rootId, "Factor"));
     expect(

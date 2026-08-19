@@ -90,7 +90,6 @@ describe("Inspector and keyboard workflows", () => {
       "More details",
       "Timing",
       "Context",
-      "Actions",
     ].map((title) =>
       screen
         .getAllByText(title)
@@ -155,7 +154,7 @@ describe("Inspector and keyboard workflows", () => {
     }
   });
 
-  it.each(["Controls", "Evidence", "Context", "Actions"])(
+  it.each(["Controls", "Evidence", "Context"])(
     "opens a closed %s drawer when it is targeted",
     async (requestedSection) => {
       const user = userEvent.setup();
